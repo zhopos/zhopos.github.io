@@ -182,7 +182,10 @@ th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04
 .struk-preview{background:#000;padding:24px 12px;margin:0 -14px}
 .struk-box{font-family:monospace;white-space:pre-wrap;background:#fff;padding:16px;border:1px dashed #94a3b8;border-radius:12px;margin:0 auto;max-width:420px}
 /* --- Struk ala Griyo (layar + cetak) --- */
-.struk{font-family:Arial,Helvetica,sans-serif;color:#111;max-width:340px;margin:0 auto}
+.struk{font-family:Arial,Helvetica,sans-serif;color:#111;max-width:340px;margin:0 auto;position:relative}
+.struk-isi{position:relative;z-index:1}
+.struk-wm{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:0}
+.struk-wm img{max-width:280px;max-height:280px;opacity:.13}
 .struk-nama{text-align:center;font-size:26px;font-weight:700}
 .struk-info{text-align:center;font-size:15px;color:#333}
 .struk-bar{display:flex;justify-content:space-between;font-size:15px;margin-top:10px}
@@ -564,12 +567,21 @@ body.dark .menu-item{background:#1e293b}
 
 <section id="pengaturan">
 <div class="card"><h3>Profil Toko</h3>
-<p style="color:#64748b;font-size:14px;margin-top:0">Yang tampil di struk: logo, nama, alamat, telepon, dan slogan. Kosongkan alamat/telepon bila tidak ingin tampil di struk.</p>
-<div style="margin:8px 0"><label>Logo Toko — tampil otomatis di struk</label><input id="logoFile" type="file" accept="image/*" onchange="pilihLogo(this)"><div style="margin-top:6px"><img id="logoPreview" alt="Logo toko" style="max-width:120px;max-height:120px;display:none;border:1px solid var(--line);border-radius:8px;padding:4px;background:#fff"></div><button class="secondary" id="logoHapusBtn" style="display:none;margin-top:6px" onclick="hapusLogo()">Hapus Logo</button></div>
+<p style="color:#64748b;font-size:14px;margin-top:0">Yang tampil di struk: logo, nama, slogan, alamat, kota, telepon, dan Print Footer di bawah struk — seperti Profil di Griyo. Kosongkan alamat/kota/telepon bila tidak ingin tampil di struk.</p>
+<h4 style="margin:14px 0 6px">Logo Struk</h4>
+<p style="color:#64748b;font-size:13px;margin:0 0 8px">Tiap slot ada gunanya: Logo 1 di atas struk, Logo 2 dipakai di gambar struk (WhatsApp), Watermark tampil samar di belakang isi struk, Logo Bawah tampil di bawah struk. Kosongkan slot yang tidak dipakai.</p>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+<div><label>Logo 1 — Mode teks (atas struk)</label><input id="logoFile" type="file" accept="image/*" onchange="pilihLogo(this,'LogoToko')"><div style="margin-top:6px"><img id="logoPreview" alt="Logo 1" style="max-width:100px;max-height:100px;display:none;border:1px solid var(--line);border-radius:8px;padding:4px;background:#fff"></div><button class="secondary" id="logoHapusBtn" style="display:none;margin-top:6px" onclick="hapusLogo('LogoToko')">Hapus</button></div>
+<div><label>Logo 2 — Mode grafis &amp; WhatsApp</label><input id="logo2File" type="file" accept="image/*" onchange="pilihLogo(this,'Logo2')"><div style="margin-top:6px"><img id="logo2Preview" alt="Logo 2" style="max-width:100px;max-height:100px;display:none;border:1px solid var(--line);border-radius:8px;padding:4px;background:#fff"></div><button class="secondary" id="logo2HapusBtn" style="display:none;margin-top:6px" onclick="hapusLogo('Logo2')">Hapus</button></div>
+<div><label>Watermark — samar di belakang struk</label><input id="wmFile" type="file" accept="image/*" onchange="pilihLogo(this,'Watermark')"><div style="margin-top:6px"><img id="wmPreview" alt="Watermark" style="max-width:100px;max-height:100px;display:none;border:1px solid var(--line);border-radius:8px;padding:4px;background:#fff"></div><button class="secondary" id="wmHapusBtn" style="display:none;margin-top:6px" onclick="hapusLogo('Watermark')">Hapus</button></div>
+<div><label>Logo Bawah — di bawah struk</label><input id="bawahFile" type="file" accept="image/*" onchange="pilihLogo(this,'LogoBawah')"><div style="margin-top:6px"><img id="bawahPreview" alt="Logo Bawah" style="max-width:100px;max-height:100px;display:none;border:1px solid var(--line);border-radius:8px;padding:4px;background:#fff"></div><button class="secondary" id="bawahHapusBtn" style="display:none;margin-top:6px" onclick="hapusLogo('LogoBawah')">Hapus</button></div>
+</div>
 <label>Nama Toko <input id="sNama" oninput="pratinjauProfil()"></label>
 <label>Slogan — tampil di bawah nama toko di struk (opsional) <input id="sSlogan" placeholder="Contoh: Toko Kelontong & ATK" oninput="pratinjauProfil()"></label>
 <label>Alamat <input id="sAlamat" oninput="pratinjauProfil()"></label>
+<label>Kota <input id="sKota" placeholder="Contoh: Kota Bersih" oninput="pratinjauProfil()"></label>
 <label>Telepon <input id="sTelp" oninput="pratinjauProfil()"></label>
+<label>Print Footer — kalimat penutup di bawah struk <input id="sFooter" placeholder="Terima kasih" oninput="pratinjauProfil()"></label>
 <h4 style="margin:14px 0 6px">Pratinjau Struk</h4>
 <div id="profilPreview" style="background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:14px"></div>
 <button class="primary" onclick="simpanPengaturan()" style="margin-top:12px">Simpan Profil Toko</button></div>

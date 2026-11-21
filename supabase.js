@@ -114,7 +114,8 @@
     terjemahan: ['Kasir', 'Pelanggan', 'Lunas', 'Kurang', 'Belum Dibayar', 'Total', 'Subtotal', 'Kembali', 'Proses', 'Selesai', 'Diambil', 'Antri'].map(function (k) { return { istilah: k, terjemahan: k }; }),
     opname: [], lapor_bos: [],
     pengaturan: {
-      nama_toko: 'Zho POS', alamat_toko: '', telepon_toko: '', target_harian: 0,
+      nama_toko: 'Zho POS', alamat_toko: '', kota_toko: '', telepon_toko: '', footer_struk: 'Terima kasih', target_harian: 0,
+      logo_toko: '', logo_2: '', watermark: '', logo_bawah: '',
       cabang_aktif: 'CBG-UTAMA', nomor_pemilik_wa: '', jatuh_tempo_hari: 7,
       poin_aktif: 'YA', poin_per_rupiah: 1000, poin_tukar_rate: 100,
       pajak_aktif: 'TIDAK', pajak_persen: 0, bahasa: 'id', format_tanggal: 'dd-mm-yyyy',
@@ -1123,7 +1124,8 @@
     var lines = [tengah(p.NamaToko || 'Zho POS')];
     if (p.SloganToko) lines.push(tengah(p.SloganToko));
     if (p.AlamatToko) lines.push(tengah(p.AlamatToko));
-    if (p.TeleponToko) lines.push(tengah('Telp: ' + p.TeleponToko));
+    if (p.KotaToko) lines.push(tengah(p.KotaToko));
+    if (p.TeleponToko) lines.push(tengah(p.TeleponToko));
     lines.push('', tgl + (no ? '  #' + no : ''), 'Pelanggan: ' + trx.Pelanggan, '--------------------------------');
     DATA.detail.filter(function (x) { return x.TransaksiID === trx.ID; }).forEach(function (x) {
       lines.push(x.NamaProduk);
@@ -1136,7 +1138,7 @@
     lines.push(kanan('Total', rpN(trx.Total)),
       kanan(trx.Metode || 'Tunai', rpN(trx.Bayar)),
       kanan('Kembali', rpN(Math.max(0, Number(trx.Bayar || 0) - Number(trx.Total || 0)))),
-      '', tengah('Terima kasih sudah berbelanja!'));
+      '', tengah(p.FooterStruk || 'Terima kasih'));
     return { teks: lines.join('\n') };
   }
 

@@ -742,7 +742,7 @@ insert into pengguna (id, nama, pin, peran, aktif, akses_transaksi, cabang_id)
 values ('USR-ADMIN', 'Admin', '', 'Admin', true, 'Tidak dibatasi', 'CBG-UTAMA')
 on conflict (id) do nothing;
 
--- Pengaturan (16 keys)
+-- Pengaturan (18 keys)
 insert into pengaturan (kunci, nilai) values
   ('NamaToko', 'Zho POS'),
   ('CabangAktif', 'CBG-UTAMA'),
@@ -759,6 +759,11 @@ insert into pengaturan (kunci, nilai) values
   ('PromoAktif', 'YA'),
   ('MultiCabangAktif', 'YA'),
   ('JatuhTempoHari', '7'),
+  ('KotaToko', ''),
+  ('FooterStruk', 'Terima kasih'),
+  ('Logo2', ''),
+  ('Watermark', ''),
+  ('LogoBawah', ''),
   ('StrukUkuranKertas', '58')
 on conflict (kunci) do nothing;
 
