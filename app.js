@@ -45,9 +45,12 @@ function setModeLabel() {
 }
 
 /* ---------- MUAT DATA / LOGIN / PERAN ---------- */
+function withTimeout(promise, ms, msg) {
+  return Promise.race([promise, new Promise(function (_, reject) { setTimeout(function () { reject(new Error(msg)); }, ms); })]);
+}
 async function loadData() {
   try {
-    var d = await DB.loadAll();
+    var d = await withTimeout(DB.loadAll(), 20000, 'Supabase tidak menjawab dalam 20 detik. Periksa koneksi internet, lalu muat ulang halaman.');
     DATA = Object.assign(DATA, d || {});
     var p = DATA.pengaturan || {};
     document.getElementById('namaTokoHead').textContent = p.NamaToko || 'Zho POS';

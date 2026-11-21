@@ -239,6 +239,10 @@
   async function persist(table, pascalRow, conflictKey) {
     if (MODE !== 'supabase' || !client) return;
     var row = toSnake(pascalRow);
+    // FK kosong ('') tidak valid di Postgres (23503) — ubah jadi null (tanpa referensi).
+    Object.keys(row).forEach(function (k) {
+      if (k.length > 2 && k.slice(-3) === '_id' && row[k] === '') row[k] = null;
+    });
     var conflict = conflictKey || 'id';
     if (row[conflict] == null || row[conflict] === '') {
       // Baris tanpa kunci konflik (detail, resep, riwayat poin): insert biasa.
@@ -277,9 +281,10 @@
       return DATA;
     }
     var d = emptyData();
+    // Muat semua tabel paralel (sebelumnya berurutan: 35x round-trip, puluhan detik).
+    var results = await Promise.all(TABLES.map(function (t) { return client.from(t).select('*'); }));
     for (var i = 0; i < TABLES.length; i++) {
-      var t = TABLES[i];
-      var res = await client.from(t).select('*');
+      var t = TABLES[i], res = results[i];
       if (res.error) throw new Error('Supabase: gagal memuat ' + t + ' — ' + res.error.message);
       d[TABLE_KEY[t]] = (res.data || []).map(toPascal);
     }
@@ -447,7 +452,7 @@
       PoinDidapat: 0, KodeAlternatif: payload.kodeAlternatif || kodeAcak(),
       Meja: payload.meja || '', CatatanStruk: payload.catatanStruk || '',
       CatatanInternal: payload.catatanInternal || '', Laba: labaTotal,
-      PromoID: promo.promoTerpakai.length ? promo.promoTerpakai[0].id : (payload.promoId || '')
+      PromoID: promo.promoTerpakai.length ? promo.promoTerpakai[0].id : (payload.promoId || null)
     };
     DATA.transaksi.unshift(trx);
     await persist('transaksi', trx);
