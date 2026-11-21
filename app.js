@@ -164,6 +164,7 @@ function applyRole() {
     if (sec && allowed.indexOf(sec) < 0) b.style.display = 'none';
   });
   if (!izinAktif('diskon')) { var d = document.getElementById('kasirDiskon'); if (d) d.disabled = true; }
+  terapkanModeMeja();
 }
 function isiPengaturanForm() {
   var p = DATA.pengaturan || {};
