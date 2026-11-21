@@ -65,8 +65,12 @@ header small{opacity:.92;font-size:11px}
 .checkrow input{width:auto;margin:0}
 /* Gambar produk di halaman detail */
 .gambar-box{width:150px;height:150px;border:1.5px solid #cbd5e1;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:44px;color:#94a3b8;margin:6px auto;overflow:hidden;background:#f8fafc}
-/* Tombol hapus yang dipersenjatai (ketuk kedua = yakin) */
-button.armed{background:#7f1d1d!important;border-color:#7f1d1d!important;color:#fff!important}
+/* --- Popup konfirmasi (modal di dalam aplikasi) --- */
+.konfirm-card{background:#fff;border-radius:16px;padding:20px;box-shadow:0 12px 40px rgba(15,23,42,.28)}
+.konfirm-judul{font-weight:700;font-size:17px;margin-bottom:8px}
+.konfirm-pesan{font-size:14px;color:#444;line-height:1.55}
+.konfirm-tombol{display:flex;gap:10px;margin-top:18px}
+.konfirm-tombol button{flex:1;padding:12px}
 /* --- Popup notif (toast modern) --- */
 #errBar{display:none;position:fixed;top:60px;left:0;right:0;z-index:80;pointer-events:none;padding:0 12px}
 .toast{pointer-events:auto;display:flex;gap:10px;align-items:flex-start;max-width:480px;margin:0 auto 8px;background:#fff;border:1px solid var(--line);border-left:5px solid #0ea5e9;border-radius:14px;box-shadow:0 10px 28px rgba(15,23,42,.18);padding:12px;animation:toastMasuk .25s ease}
@@ -343,6 +347,8 @@ body.dark .menu-item{background:#1e293b}
 <div id="errBar"></div>
 <div id="notifBackdrop" style="display:none;position:fixed;inset:0;z-index:70" onclick="toggleNotifPanel()"></div>
 <div id="notifPanel" style="display:none;position:fixed;top:58px;right:10px;z-index:71;width:min(340px,calc(100vw - 20px))"></div>
+<div id="konfirmBackdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:90" onclick="jawabKonfirm(false)"></div>
+<div id="konfirmBox" style="display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:91;width:min(360px,calc(100vw - 40px))"><div class="konfirm-card"><div id="konfirmJudul" class="konfirm-judul"></div><div id="konfirmPesan" class="konfirm-pesan"></div><div class="konfirm-tombol"><button class="secondary" onclick="jawabKonfirm(false)">Batal</button><button id="konfirmYa" class="danger" onclick="jawabKonfirm(true)">Ya, Hapus</button></div></div></div>
 <div id="drawerBackdrop" onclick="closeDrawer()"></div>
 <nav id="nav">
   <div class="drawer-head"><div class="zmark"><img src="icon-192.png" alt="ZPOS" style="width:100%;height:100%;border-radius:14px;display:block"></div><div><b>ZPOS</b></div><button class="hbtn" style="margin-left:auto" onclick="closeDrawer()">✕</button></div>

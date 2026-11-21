@@ -588,6 +588,19 @@
     return upsertInto('produk', 'produk', row, 'PRD');
   }
   async function hapusProduk(id) { if (!DATA) await loadAll(); await hapusDari('produk', 'produk', id); return { ok: true }; }
+  // Nonaktifkan produk (dipakai bila produk sudah pernah terjual/dibeli dan
+  // database menolak hapus). upsertProduk tidak bisa dipakai di sini karena
+  // ia selalu menulis Aktif: true — jadi PATCH langsung kolom aktif saja.
+  async function nonaktifkanProduk(id) {
+    if (!DATA) await loadAll();
+    var ex = DATA.produk.find(function (x) { return String(x.ID) === String(id); });
+    if (ex) ex.Aktif = false;
+    if (MODE !== 'supabase' || !client) return { ok: true };
+    var res = await client.from('produk').update({ aktif: false }).eq('id', id);
+    if (res.error) throw new Error(res.error.message);
+    refreshRingkasan();
+    return { ok: true };
+  }
   async function upsertPelanggan(payload) {
     if (!DATA) await loadAll();
     var row = {
@@ -1251,7 +1264,7 @@
     mode: MODE, configured: !!CONFIGURED, isSample: MODE === 'contoh',
     getData: getData, refreshRingkasan: refreshRingkasan,
     loadAll: loadAll, login: login, saveTransaksi: saveTransaksi,
-    upsertProduk: upsertProduk, hapusProduk: hapusProduk,
+    upsertProduk: upsertProduk, hapusProduk: hapusProduk, nonaktifkanProduk: nonaktifkanProduk,
     upsertPelanggan: upsertPelanggan, simpanPengeluaran: simpanPengeluaran,
     simpanUangKas: simpanUangKas, simpanPembelian: simpanPembelian,
     prosesPembelian: prosesPembelian, cicilUtang: cicilUtang, simpanRetur: simpanRetur,
