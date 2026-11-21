@@ -64,9 +64,12 @@ self.addEventListener('fetch', function (event) {
   if (url.origin !== self.location.origin) return;
 
   // App shell (same-origin): cache-first + refresh di background.
+  // Refresh pakai {cache:'reload'} supaya tidak kena HTTP cache GitHub
+  // Pages (max-age 10 menit) — tanpa ini, file lama bisa bertahan di
+  // cache meski server sudah menyajikan versi baru.
   event.respondWith(
     caches.match(event.request, { ignoreSearch: true }).then(function (cached) {
-      var network = fetch(event.request).then(function (res) {
+      var network = fetch(event.request, { cache: 'reload' }).then(function (res) {
         if (res && res.ok) {
           var copy = res.clone();
           caches.open(CACHE_NAME).then(function (cache) {
