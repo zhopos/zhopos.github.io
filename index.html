@@ -509,6 +509,7 @@ body.dark .menu-item{background:#1e293b}
 <section id="pengaturan">
 <div class="card"><h3>Pengaturan Toko — bisa diubah kapan pun</h3>
 <label>Nama Toko <input id="sNama"></label><label>Alamat <input id="sAlamat"></label><label>Telepon <input id="sTelp"></label>
+<div style="margin:8px 0"><label>Logo Toko — tampil otomatis di struk</label><input id="logoFile" type="file" accept="image/*" onchange="pilihLogo(this)"><div style="margin-top:6px"><img id="logoPreview" alt="Logo toko" style="max-width:120px;max-height:120px;display:none;border:1px solid var(--line);border-radius:8px;padding:4px;background:#fff"></div><button class="secondary" id="logoHapusBtn" style="display:none;margin-top:6px" onclick="hapusLogo()">Hapus Logo</button></div>
 <label>Target Omzet Harian (Rp) <input id="sTarget" type="number"></label>
 <label>Cabang Aktif <select id="sCabangAktif"></select></label>
 <label>Nomor WhatsApp Pemilik (format 628xx tanpa +) <input id="sWa" placeholder="62812xxxx"></label>

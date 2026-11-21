@@ -28,7 +28,7 @@ function stokProduk(p) {
 // Produk nonaktif (mis. TES Kopi setelah dinonaktifkan) tidak tampil di kasir
 // dan tidak dihitung di dashboard/laporan — tapi tetap ada di master & riwayat.
 function produkAktif(p) { return p.Aktif !== false && String(p.Aktif == null ? 'YA' : p.Aktif).toUpperCase() !== 'TIDAK'; }
-function lacakStok(p) { return String(p.TermasukStok == null ? 'YA' : p.TermasukStok).toUpperCase() !== 'TIDAK'; }
+function lacakStok(p) { if (p.TermasukStok === false) return false; return String(p.TermasukStok == null ? 'YA' : p.TermasukStok).toUpperCase() !== 'TIDAK'; }
 function izinAktif(kunci) {
   if (!currentUser) return true;
   if (currentUser.peran === 'Admin') return true;
@@ -158,6 +158,7 @@ function isiPengaturanForm() {
   set('sPoinAktif', p.PoinAktif || 'YA'); set('sPajakAktif', p.PajakAktif || 'TIDAK'); set('sGelap', p.ModeGelap || 'TIDAK');
   set('sPoinStruk', p.TampilkanPoinStruk || 'YA'); set('sWatermark', p.WatermarkStruk || 'TIDAK'); set('sKertas', p.StrukUkuranKertas || '58');
   set('sMeja', p.ModeMejaAktif || 'TIDAK'); set('sPromo', p.PromoAktif || 'YA'); set('sMultiCabang', p.MultiCabangAktif || 'YA');
+  logoDataUrl = p.LogoToko || ''; tampilLogoPreview();
   var cb = document.getElementById('sCabangAktif');
   cb.innerHTML = (DATA.cabang || []).map(function (c) { return '<option value="' + esc(c.ID) + '"' + (String(c.ID) === String(p.CabangAktif) ? ' selected' : '') + '>' + esc(c.Nama) + '</option>'; }).join('');
 }
@@ -503,8 +504,8 @@ async function simpanTransaksi() {
     sembunyiError();
     var res = await withTimeout(DB.saveTransaksi(payload), 15000, 'Supabase tidak menjawab saat menyimpan (15 detik). Periksa koneksi internet, lalu coba lagi.');
     lastStruk = buatStruk(res, payload, h, pl);
-    var el = document.getElementById('struk'); el.style.display = 'block'; el.textContent = lastStruk;
-    document.getElementById('strukPrint').textContent = lastStruk;
+    var el = document.getElementById('struk'); el.style.display = 'block'; el.innerHTML = strukKeHtml(lastStruk);
+    document.getElementById('strukPrint').innerHTML = strukKeHtml(lastStruk);
     lastWaTelp = pl && pl.Telepon ? String(pl.Telepon).replace(/\D/g, '') : '';
     cart = []; promoDiskon = 0; promoTerpakai = []; poinDipakai = 0; bayarManual = false; document.getElementById('kasirBayar').value = '';
     await loadData();
@@ -583,8 +584,8 @@ async function batalkanTransaksi(id) {
 async function strukUlang(id) {
   try {
     var res = await DB.getStruk({ transaksiId: id }); lastStruk = res.teks || ('Struk ' + id);
-    var el = document.getElementById('struk'); el.style.display = 'block'; el.textContent = lastStruk;
-    document.getElementById('strukPrint').textContent = lastStruk;
+    var el = document.getElementById('struk'); el.style.display = 'block'; el.innerHTML = strukKeHtml(lastStruk);
+    document.getElementById('strukPrint').innerHTML = strukKeHtml(lastStruk);
     show('kasir', document.querySelector('nav button.menu[data-sec="kasir"]'));
   } catch (e) { alert(e.message); }
 }
@@ -1103,9 +1104,49 @@ async function simpanPengguna() {
 }
 async function hapusPengguna(id) { if (confirm('Hapus pengguna ini?')) { await DB.hapusPengguna({ id: id }); await loadData(); } }
 
+/* ---------- LOGO TOKO (pengaturan LogoToko, tampil di struk) ---------- */
+var logoDataUrl = '';
+function tampilLogoPreview() {
+  var img = document.getElementById('logoPreview'); if (!img) return;
+  var src = logoDataUrl || (DATA.pengaturan || {}).LogoToko || '';
+  img.src = src; img.style.display = src ? 'block' : 'none';
+  var hb = document.getElementById('logoHapusBtn'); if (hb) hb.style.display = src ? '' : 'none';
+}
+function pilihLogo(input) {
+  var f = input.files && input.files[0]; if (!f) return;
+  if (!/^image\//.test(f.type || '')) { alert('Pilih file gambar (PNG/JPG).'); input.value = ''; return; }
+  var rd = new FileReader();
+  rd.onload = function () {
+    var img = new Image();
+    img.onload = function () {
+      var url = kecilkanLogo(img, 512);
+      if (url.length > 200000) url = kecilkanLogo(img, 256);
+      logoDataUrl = url; tampilLogoPreview();
+    };
+    img.onerror = function () { alert('File gambar tidak bisa dibaca.'); };
+    img.src = rd.result;
+  };
+  rd.readAsDataURL(f);
+}
+function kecilkanLogo(img, maks) {
+  var sk = Math.min(1, maks / Math.max(img.width, img.height));
+  var cv = document.createElement('canvas');
+  cv.width = Math.max(1, Math.round(img.width * sk)); cv.height = Math.max(1, Math.round(img.height * sk));
+  cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+  return cv.toDataURL('image/png');
+}
+function hapusLogo() { logoDataUrl = ''; tampilLogoPreview(); var inp = document.getElementById('logoFile'); if (inp) inp.value = ''; }
+// Struk teks -> HTML untuk layar & cetak: logo (bila ada) di atas, lalu isi struk.
+function strukKeHtml(teks) {
+  var logo = (DATA.pengaturan || {}).LogoToko || logoDataUrl || '';
+  var html = esc(teks).replace(/\n/g, '<br>');
+  if (logo) html = '<div style="text-align:center;margin-bottom:6px"><img src="' + logo + '" style="max-width:120px;max-height:120px"></div>' + html;
+  return html;
+}
+
 /* ---------- PENGATURAN / CABANG / LOGS ---------- */
 async function simpanPengaturan() {
-  var payload = { NamaToko: document.getElementById('sNama').value, AlamatToko: document.getElementById('sAlamat').value, TeleponToko: document.getElementById('sTelp').value, TargetHarian: document.getElementById('sTarget').value, NomorPemilikWA: document.getElementById('sWa').value, JatuhTempoHari: document.getElementById('sJatuhTempo').value, PoinAktif: document.getElementById('sPoinAktif').value, PoinPerRupiah: document.getElementById('sPoinPer').value, PoinTukarRate: document.getElementById('sPoinRate').value, PajakAktif: document.getElementById('sPajakAktif').value, PajakPersen: document.getElementById('sPajakPersen').value, Bahasa: document.getElementById('sBahasa').value, FormatTanggal: document.getElementById('sFormatTanggal').value, ModeGelap: document.getElementById('sGelap').value, TampilkanPoinStruk: document.getElementById('sPoinStruk').value, WatermarkStruk: document.getElementById('sWatermark').value, StrukUkuranKertas: document.getElementById('sKertas').value, ModeMejaAktif: document.getElementById('sMeja').value, PromoAktif: document.getElementById('sPromo').value, MultiCabangAktif: document.getElementById('sMultiCabang').value };
+  var payload = { NamaToko: document.getElementById('sNama').value, AlamatToko: document.getElementById('sAlamat').value, TeleponToko: document.getElementById('sTelp').value, TargetHarian: document.getElementById('sTarget').value, NomorPemilikWA: document.getElementById('sWa').value, JatuhTempoHari: document.getElementById('sJatuhTempo').value, PoinAktif: document.getElementById('sPoinAktif').value, PoinPerRupiah: document.getElementById('sPoinPer').value, PoinTukarRate: document.getElementById('sPoinRate').value, PajakAktif: document.getElementById('sPajakAktif').value, PajakPersen: document.getElementById('sPajakPersen').value, Bahasa: document.getElementById('sBahasa').value, FormatTanggal: document.getElementById('sFormatTanggal').value, ModeGelap: document.getElementById('sGelap').value, TampilkanPoinStruk: document.getElementById('sPoinStruk').value, WatermarkStruk: document.getElementById('sWatermark').value, StrukUkuranKertas: document.getElementById('sKertas').value, ModeMejaAktif: document.getElementById('sMeja').value, PromoAktif: document.getElementById('sPromo').value, MultiCabangAktif: document.getElementById('sMultiCabang').value, LogoToko: logoDataUrl };
   await DB.simpanPengaturan(payload);
   document.body.classList.toggle('dark', payload.ModeGelap === 'YA');
   var cb = document.getElementById('sCabangAktif').value;

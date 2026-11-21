@@ -227,7 +227,7 @@
   // file mandiri): produk nonaktif tidak dihitung; jasa tanpa stok (ONGKIR)
   // tidak masuk daftar stok menipis.
   function produkAktif(p) { return p.Aktif !== false && String(p.Aktif == null ? 'YA' : p.Aktif).toUpperCase() !== 'TIDAK'; }
-  function lacakStok(p) { return String(p.TermasukStok == null ? 'YA' : p.TermasukStok).toUpperCase() !== 'TIDAK'; }
+  function lacakStok(p) { if (p.TermasukStok === false) return false; return String(p.TermasukStok == null ? 'YA' : p.TermasukStok).toUpperCase() !== 'TIDAK'; }
   function setStok(d, p, nilai) {
     var sc = (d.stokCabang || []).find(function (x) { return String(x.ProdukID) === String(p.ID) && String(x.CabangID) === String(cabangAktifId(d)); });
     if (sc) { sc.Stok = nilai; return sc; }
