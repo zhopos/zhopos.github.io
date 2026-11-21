@@ -7,6 +7,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>Zho POS v4</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -444,5 +446,16 @@ body.dark .pill{background:#0f172a;color:#e2e8f0}
 <script src="config.js"></script>
 <script src="supabase.js"></script>
 <script src="app.js"></script>
+<script>
+// PWA: daftarkan service worker setelah halaman dimuat.
+// Hanya di http/https — preview file:// dilewati agar tidak rusak.
+// Kegagalan registrasi (mis. offline / browser lama) ditelan diam-diam:
+// aplikasi tetap jalan normal tanpa PWA.
+if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+  });
+}
+</script>
 </body>
 </html>
