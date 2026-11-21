@@ -146,6 +146,18 @@ th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04
 .cart-item:last-child{border-bottom:0}
 .badge{display:inline-block;padding:3px 8px;border-radius:999px;font-size:12px;background:#dcfce7}
 .badge.warn{background:#fef3c7} .badge.bad{background:#fee2e2}
+/* --- Daftar Transaksi (kartu, mobile-first) --- */
+.trx-card{display:flex;gap:12px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px;cursor:pointer;box-shadow:0 1px 3px rgba(15,23,42,.05)}
+.trx-card:active{background:#f0fdfa}
+.trx-main{flex:1;min-width:0}
+.trx-id{font-weight:700;font-size:15px;word-break:break-all}
+.trx-sub{color:#64748b;font-size:13px;margin-top:2px}
+.trx-total{text-align:right;white-space:nowrap}
+.trx-total b{font-size:16px;color:#0f766e}
+.trx-chev{color:#94a3b8;font-size:20px;line-height:1;margin-top:2px}
+.drow{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:14px}
+.drow:last-child{border-bottom:0}
+.drow .k{color:#64748b}
 .flex{display:flex;gap:10px;flex-wrap:wrap} .flex>*{flex:1;min-width:220px}
 #struk{font-family:monospace;white-space:pre-wrap;background:#fff;padding:16px;border:1px dashed #94a3b8;border-radius:12px}
 .notice{background:#fef9c3;border:1px solid #fde68a;padding:10px 12px;border-radius:10px;margin-bottom:12px;font-size:14px}
@@ -343,6 +355,11 @@ body.dark .menu-item{background:#1e293b}
 <div class="flex"><input id="returProduk" placeholder="Nama produk"><input id="returQty" type="number" value="1" placeholder="Qty"><input id="returNominal" type="number" placeholder="Nominal kembali (Rp)"><input id="returAlasan" placeholder="Alasan"></div>
 <button class="primary" onclick="simpanRetur()">Simpan Retur</button>
 <div id="returTable" style="margin-top:12px"></div></div>
+</section>
+
+<section id="detailTrx">
+<div class="card"><div style="display:flex;align-items:center;gap:8px"><button class="secondary" onclick="show('daftar',document.querySelector('nav button.menu[data-sec=daftar]'))">← Kembali</button><h3 style="margin:0">Detail Transaksi</h3></div>
+<div id="detailTrxBody" style="margin-top:12px"></div></div>
 </section>
 
 <section id="produk">

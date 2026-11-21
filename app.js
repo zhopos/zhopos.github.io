@@ -659,10 +659,10 @@ function renderTrx() {
     if (sampai && tg > sampai) return false;
     return true;
   }).sort(function (a, b) { return String(b.Tanggal || '') < String(a.Tanggal || '') ? -1 : 1; }).slice(0, 100);
-  var html = '<table><tr><th>ID / Tanggal</th><th>Pelanggan</th><th>Total</th><th>Bayar / Sisa</th><th>Status</th><th></th></tr>' + list.map(function (t) {
+  var html = list.map(function (t) {
     var rugi = (t.Laba != null && Number(t.Laba) < 0) ? ' <span class="badge bad">Rugi</span>' : '';
-    return '<tr><td>' + esc(t.ID) + '<br><small>' + new Date(t.Tanggal).toLocaleString('id-ID') + '</small>' + (t.KodeAlternatif ? '<br><small>Kode: ' + esc(t.KodeAlternatif) + '</small>' : '') + '</td><td>' + esc(t.Pelanggan) + '</td><td>' + rp(t.Total) + rugi + '</td><td>' + rp(t.Bayar) + ' / ' + rp(t.Sisa) + '</td><td><span class="badge ' + (t.StatusBayar === 'Lunas' ? '' : 'warn') + '">' + esc(t.StatusBayar) + '</span> • ' + esc(t.StatusPesanan || '') + '</td><td><button class="secondary" onclick="lunasi(\'' + esc(t.ID) + '\')">+ Bayar</button> <button class="secondary" onclick="strukUlang(\'' + esc(t.ID) + '\')">Struk</button> <select onchange="ubahStatus(\'' + esc(t.ID) + '\',this.value)"><option value="">Ubah status…</option><option>Antri</option><option>Proses</option><option>Selesai</option><option>Diambil</option></select> <button class="danger" onclick="batalkanTransaksi(\'' + esc(t.ID) + '\')">Batalkan</button></td></tr>';
-  }).join('') + '</table>';
+    return '<div class="trx-card" onclick="bukaDetailTrx(\'' + esc(t.ID) + '\')"><div class="trx-main"><div class="trx-id">' + esc(t.ID) + '</div><div class="trx-sub">' + new Date(t.Tanggal).toLocaleString('id-ID') + ' • ' + esc(t.Pelanggan || '') + '</div><div class="trx-sub" style="margin-top:6px"><span class="badge ' + (t.StatusBayar === 'Lunas' ? '' : 'warn') + '">' + esc(t.StatusBayar) + '</span>' + (t.StatusPesanan ? ' • ' + esc(t.StatusPesanan) : '') + rugi + '</div></div><div class="trx-total"><b>' + rp(t.Total) + '</b><div class="trx-sub">Bayar ' + rp(t.Bayar) + (Number(t.Sisa) > 0 ? '<br>Sisa ' + rp(t.Sisa) : '') + '</div></div><div class="trx-chev">›</div></div>';
+  }).join('') || '<p style="color:#64748b">Belum ada transaksi.</p>';
   document.getElementById('trxTable').innerHTML = html;
   document.getElementById('laporanTable').innerHTML = html;
 }
@@ -682,6 +682,40 @@ async function strukUlang(id) {
     show('kasir', document.querySelector('nav button.menu[data-sec="kasir"]'));
   } catch (e) { alert(e.message); }
 }
+/* ---------- DETAIL TRANSAKSI (ketuk kartu di Daftar Transaksi) ---------- */
+async function bukaDetailTrx(id) {
+  var t = (DATA.transaksi || []).find(function (x) { return x.ID === id; });
+  if (!t) return;
+  var items = (DATA.detail || []).filter(function (d) { return d.TransaksiID === id; });
+  var kembali = Math.max(0, Number(t.Bayar || 0) - Number(t.Total || 0));
+  var html = '<div class="trx-id" style="font-size:17px">' + esc(t.ID) + '</div>'
+    + '<div class="trx-sub">' + new Date(t.Tanggal).toLocaleString('id-ID') + (t.KodeAlternatif ? ' • Kode: ' + esc(t.KodeAlternatif) : '') + '</div>'
+    + '<div style="margin:8px 0"><span class="badge ' + (t.StatusBayar === 'Lunas' ? '' : 'warn') + '">' + esc(t.StatusBayar) + '</span>' + (t.StatusPesanan ? ' <span class="badge">' + esc(t.StatusPesanan) + '</span>' : '') + '</div>'
+    + '<div class="drow"><span class="k">Pelanggan</span><b>' + esc(t.Pelanggan || '') + '</b></div>'
+    + '<div class="drow"><span class="k">Kasir</span><span>' + esc(t.Kasir || '') + '</span></div>'
+    + '<div class="drow"><span class="k">Metode Bayar</span><span>' + esc(t.Metode || 'Tunai') + '</span></div>'
+    + '<h4 style="margin:14px 0 6px">Item</h4>'
+    + (items.length ? items.map(function (d) { return '<div class="cart-item"><span>' + esc(d.NamaProduk) + ' x' + d.Qty + '</span><b>' + rp(d.Subtotal) + '</b></div>'; }).join('') : '<p style="color:#64748b">Tidak ada rincian item.</p>')
+    + '<div class="drow" style="margin-top:8px"><span class="k">Total</span><b>' + rp(t.Total) + '</b></div>'
+    + '<div class="drow"><span class="k">Bayar</span><span>' + rp(t.Bayar) + '</span></div>'
+    + '<div class="drow"><span class="k">Kembali</span><span>' + rp(kembali) + '</span></div>'
+    + (Number(t.Sisa) > 0 ? '<div class="drow"><span class="k">Sisa</span><b>' + rp(t.Sisa) + '</b></div>' : '')
+    + '<div class="flex noprint" style="margin-top:14px"><button class="primary" onclick="window.print()">🖨 Cetak Struk</button><button class="secondary" onclick="kirimWAGambar()">💬 Kirim Struk via WhatsApp (Gambar)</button><button class="secondary" onclick="kirimWA()">💬 Kirim Struk via WhatsApp (Teks)</button></div>'
+    + '<div class="flex noprint" style="margin-top:10px"><button class="secondary" onclick="lunasiDetail(\'' + esc(t.ID) + '\')">+ Bayar</button><select onchange="ubahStatusDetail(\'' + esc(t.ID) + '\',this.value)"><option value="">Ubah status…</option><option>Antri</option><option>Proses</option><option>Selesai</option><option>Diambil</option></select><button class="danger" onclick="batalkanDetail(\'' + esc(t.ID) + '\')">Batalkan</button></div>';
+  document.getElementById('detailTrxBody').innerHTML = html;
+  // Struk transaksi lama: nomor WA pelanggan tidak tersimpan, jadi kosongkan
+  // agar kirim teks membuka wa.me dan Bos memilih sendiri kontaknya.
+  lastWaTelp = '';
+  try {
+    var res = await DB.getStruk({ transaksiId: id });
+    lastStruk = res.teks || ('Struk ' + id);
+    document.getElementById('strukPrint').innerHTML = strukKeHtml(lastStruk);
+  } catch (e) { tampilError('Gagal memuat struk: ' + e.message); }
+  show('detailTrx');
+}
+async function lunasiDetail(id) { await lunasi(id); renderTrx(); bukaDetailTrx(id); }
+async function ubahStatusDetail(id, status) { if (!status) return; await ubahStatus(id, status); renderTrx(); bukaDetailTrx(id); }
+async function batalkanDetail(id) { await batalkanTransaksi(id); renderTrx(); bukaDetailTrx(id); }
 function renderRetur() {
   document.getElementById('returTable').innerHTML = '<table><tr><th>Tanggal</th><th>Transaksi</th><th>Produk</th><th>Qty</th><th>Nominal</th><th>Alasan</th></tr>' + (DATA.retur || []).map(function (r) { return '<tr><td>' + new Date(r.Tanggal).toLocaleString('id-ID') + '</td><td>' + esc(r.TransaksiID) + '</td><td>' + esc(r.Produk) + '</td><td>' + r.Qty + '</td><td>' + rp(r.Nominal) + '</td><td>' + esc(r.Alasan || '') + '</td></tr>'; }).join('') + '</table>';
 }
