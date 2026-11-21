@@ -13,8 +13,21 @@ function show(id, btn) {
   var nb = document.querySelector('#bottomNav button[data-sec="' + id + '"]'); if (nb) nb.classList.add('active');
   var db = document.querySelector('nav button.menu[data-sec="' + id + '"]'); if (db) db.classList.add('active');
   tutupForm(id);
+  if (id === 'kasir') langkahKasir(1);
   closeDrawer(); window.scrollTo(0, 0);
 }
+/* ---------- KASIR 3 LANGKAH ala Griyo: 1) daftar produk, 2) keranjang, 3) pembayaran (#bayar) ---------- */
+var langkahKasirAktif = 1;
+function langkahKasir(n) {
+  var s1 = document.getElementById('kasirLangkah1'), s2 = document.getElementById('kasirLangkah2');
+  if (!s1 || !s2) return;
+  langkahKasirAktif = n;
+  s1.style.display = n === 1 ? '' : 'none';
+  s2.style.display = n === 2 ? '' : 'none';
+  renderCart();
+  window.scrollTo(0, 0);
+}
+function kembaliKeKeranjang() { show('kasir', document.querySelector('nav button.menu[data-sec="kasir"]')); langkahKasir(2); }
 function toggleDrawer() { var n = document.getElementById('nav'); var b = document.getElementById('drawerBackdrop'); var open = n && !n.classList.contains('open'); if (n) n.classList.toggle('open', open); if (b) b.style.display = open ? 'block' : 'none'; }
 function closeDrawer() { var n = document.getElementById('nav'); var b = document.getElementById('drawerBackdrop'); if (n) n.classList.remove('open'); if (b) b.style.display = 'none'; }
 
@@ -350,8 +363,6 @@ function isiSelectKasir() {
 }
 function isiSelectLain() {
   var opt = function (arr, fn) { return (arr || []).map(fn).join(''); };
-  document.getElementById('beliPemasok').innerHTML = opt(DATA.pemasok, function (p) { return '<option>' + esc(p.Nama) + '</option>'; });
-  document.getElementById('beliProduk').innerHTML = opt(DATA.produk, function (p) { return '<option value="' + esc(p.ID) + '">' + esc(p.Nama) + ' — ' + rp(p.HargaJual) + '</option>'; });
   document.getElementById('resepProduk').innerHTML = opt(DATA.produk, function (p) { return '<option value="' + esc(p.ID) + '">' + esc(p.Nama) + '</option>'; });
   document.getElementById('resepBahan').innerHTML = opt(DATA.bahan, function (p) { return '<option value="' + esc(p.ID) + '">' + esc(p.Nama) + ' (' + (p.Satuan || '') + ')</option>'; });
   document.getElementById('returTrx').innerHTML = opt(DATA.transaksi.slice(0, 100), function (p) { return '<option value="' + esc(p.ID) + '">' + esc(p.ID) + ' — ' + esc(p.Pelanggan) + ' — ' + rp(p.Total) + '</option>'; });
@@ -500,20 +511,38 @@ function hitungCart() {
   return { sub: sub, diskonItemTotal: diskonItemTotal, setelahItem: setelahItem, diskonTotal: diskonTotal, ongkir: ongkir, pajak: pajak, poinDiskon: poinDiskon, total: total };
 }
 var promoTimer = null; var bayarManual = false;
+function renderTotalKasir() {
+  var h = hitungCart();
+  var nProduk = cart.length, nItem = cart.reduce(function (a, x) { return a + x.Qty; }, 0);
+  document.getElementById('cartTotal').innerHTML =
+    '<div class="cart-item"><span>Subtotal</span><b>' + rp(h.sub) + '</b></div>' +
+    (h.diskonItemTotal ? '<div class="cart-item"><span>Diskon item</span><b>−' + rp(h.diskonItemTotal) + '</b></div>' : '') +
+    (h.diskonTotal ? '<div class="cart-item"><span>Diskon total</span><b>−' + rp(h.diskonTotal) + '</b></div>' : '') +
+    (promoDiskon ? '<div class="cart-item"><span>Promo</span><b>−' + rp(promoDiskon) + '</b></div>' : '') +
+    (h.poinDiskon ? '<div class="cart-item"><span>Tukar poin</span><b>−' + rp(h.poinDiskon) + '</b></div>' : '') +
+    (h.pajak ? '<div class="cart-item"><span>Pajak</span><b>' + rp(h.pajak) + '</b></div>' : '') +
+    (h.ongkir ? '<div class="cart-item"><span>Ongkir</span><b>' + rp(h.ongkir) + '</b></div>' : '') +
+    '<div class="cart-item"><span><b>Total</b></span><b class="trx-biru" style="font-size:20px">' + rp(h.total) + '</b></div>' +
+    '<div style="color:#64748b;font-size:14px">Produk: ' + nProduk + ' • Jumlah item: ' + nItem + '</div>';
+  if (!bayarManual) document.getElementById('kasirBayar').value = h.total;
+}
+function hapusCartItem(i) { cart.splice(i, 1); renderCart(); }
 function renderCart() {
   var h = hitungCart();
   document.getElementById('cart').innerHTML = cart.map(function (it, i) {
-    return '<div class="cart-item"><span>' + esc(it.nama) + ' × ' + it.Qty + (it.satuanDipakai ? ' (' + esc(it.satuanDipakai) + ')' : '') + (it.hargaLainLabel ? ' [' + esc(it.hargaLainLabel) + ']' : '') + '<br><small>Diskon item: ' + rp(it.diskonItem || 0) + '</small></span><span>' + rp(it.Harga * it.Qty - (it.diskonItem || 0) * it.Qty) + ' <button class="secondary" onclick="cart[' + i + '].Qty++;renderCart()">+</button> <button class="secondary" onclick="cart[' + i + '].Qty--;if(cart[' + i + '].Qty<=0)cart.splice(' + i + ',1);renderCart()">−</button><br><button class="secondary" onclick="pilihHargaLain(' + i + ')">Harga Lain</button> <button class="secondary" onclick="pilihVarian(' + i + ')">Varian</button> <button class="secondary" onclick="ubahDiskonItem(' + i + ')">Diskon</button></span></div>';
+    var subIt = it.Harga * it.Qty - (it.diskonItem || 0) * it.Qty;
+    return '<div class="cart-item"><span><b>' + esc(it.nama) + '</b><br><small>' + rp(it.Harga) + (it.satuanDipakai ? ' / ' + esc(it.satuanDipakai) : '') + (it.hargaLainLabel ? ' [' + esc(it.hargaLainLabel) + ']' : '') + ' • Diskon item: ' + rp(it.diskonItem || 0) + '</small><br>'
+      + '<button class="secondary" onclick="hapusCartItem(' + i + ')" style="color:#dc2626">✕ Hapus</button> <button class="secondary" onclick="ubahDiskonItem(' + i + ')">% Diskon</button> <button class="secondary" onclick="pilihHargaLain(' + i + ')">Harga Lain</button> <button class="secondary" onclick="pilihVarian(' + i + ')">Varian</button></span>'
+      + '<span style="text-align:right"><span class="qty-ctl"><button onclick="cart[' + i + '].Qty--;if(cart[' + i + '].Qty<=0)cart.splice(' + i + ',1);renderCart()">−</button><b class="qty-badge">' + it.Qty + '</b><button onclick="cart[' + i + '].Qty++;renderCart()">+</button></span><br><b class="trx-biru">' + rp(subIt) + '</b></span></div>';
   }).join('') || 'Keranjang kosong.';
-  document.getElementById('cartTotal').textContent = 'Subtotal ' + rp(h.sub) + ' • Diskon item ' + rp(h.diskonItemTotal) + ' • Diskon total ' + rp(h.diskonTotal) + ' • Promo ' + rp(promoDiskon) + ' • Poin ' + rp(h.poinDiskon) + ' • Pajak ' + rp(h.pajak) + ' • Ongkir ' + rp(h.ongkir) + ' • Total ' + rp(h.total);
-  if (!bayarManual) document.getElementById('kasirBayar').value = h.total;
+  renderTotalKasir();
   if (promoTimer) clearTimeout(promoTimer);
   promoTimer = setTimeout(cekPromo, 400);
   var bar = document.getElementById('cartBar');
   if (bar) {
     document.getElementById('cartBarCount').textContent = cart.reduce(function (a, x) { return a + x.Qty; }, 0);
     document.getElementById('cartBarTotal').textContent = cart.reduce(function (a, x) { return a + x.Qty; }, 0) + ' item | ' + rp(h.total);
-    bar.style.display = cart.length ? 'flex' : 'none';
+    bar.style.display = (langkahKasirAktif === 1 && cart.length) ? 'flex' : 'none';
   }
   renderProdukKasir();
   if (document.getElementById('bayar').classList.contains('active')) renderBayar();
@@ -532,8 +561,7 @@ async function cekPromo() {
     var res = await DB.hitungPromo({ items: cart, pelanggan: document.getElementById('kasirPelanggan').value, total: h.setelahItem, cabangId: cabangAktifId() });
     promoDiskon = Number(res.diskon || 0); promoTerpakai = res.promoTerpakai || [];
     document.getElementById('promoBox').textContent = promoTerpakai.length ? ('Promo otomatis: ' + promoTerpakai.map(function (x) { return x.nama || x; }).join(', ') + ' — hemat ' + rp(promoDiskon)) : 'Tidak ada promo yang memenuhi syarat.';
-    var hh = hitungCart();
-    document.getElementById('cartTotal').textContent = 'Subtotal ' + rp(hh.sub) + ' • Diskon item ' + rp(hh.diskonItemTotal) + ' • Diskon total ' + rp(hh.diskonTotal) + ' • Promo ' + rp(promoDiskon) + ' • Poin ' + rp(hh.poinDiskon) + ' • Pajak ' + rp(hh.pajak) + ' • Ongkir ' + rp(hh.ongkir) + ' • Total ' + rp(hh.total);
+    renderTotalKasir();
   } catch (e) { /* promo gagal dihitung: transaksi tetap jalan tanpa promo */ }
 }
 function tukarPoin() {
@@ -610,6 +638,7 @@ async function simpanTransaksi() {
     cart = []; promoDiskon = 0; promoTerpakai = []; poinDipakai = 0; bayarManual = false; document.getElementById('kasirBayar').value = '';
     await loadData();
     show('kasir', document.querySelector('nav button.menu[data-sec="kasir"]'));
+    langkahKasir(2);
     alert('Transaksi tersimpan. ID: ' + (res.id || '') + (res.rugi ? ' — RUGI (total di bawah HPP)' : ''));
   } catch (e) { var m = 'Gagal menyimpan: ' + (e && e.message ? e.message : e); tampilError(m); alert(m); }
 }
@@ -967,6 +996,7 @@ function strukUlang(id) {
   var el = document.getElementById('struk'); el.style.display = 'block'; el.innerHTML = strukKeHtml(lastStruk);
   document.getElementById('strukPrint').innerHTML = strukKeHtml(lastStruk);
   show('kasir', document.querySelector('nav button.menu[data-sec="kasir"]'));
+  langkahKasir(2);
 }
 /* ---------- DETAIL TRANSAKSI ala Griyo (ketuk baris di Daftar) ---------- */
 var detailTrxId = '', detailTab = 'detail';
@@ -1317,32 +1347,230 @@ function gambarLabel() {
 }
 
 /* ---------- PEMBELIAN ---------- */
-function tambahItemBeli() {
-  var pid = document.getElementById('beliProduk').value; var pr = DATA.produk.find(function (x) { return x.ID === pid; }); if (!pr) return alert('Pilih produk dulu.');
-  beliItems.push({ id: pid, nama: pr.Nama, Qty: Number(document.getElementById('beliQty').value || 1), HargaBeli: Number(document.getElementById('beliHarga').value || 0), Kedaluwarsa: document.getElementById('beliKedaluwarsa').value || '' });
-  renderBeliItems();
+/* ---------- PEMBELIAN ala Griyo: daftar per bulan + form + picker cari ---------- */
+var beliItemIndex = -1, beliItemProdukId = '', pickerProdukDariItem = false, pembelianNomor = {}, detailPembelianId = '';
+function hitungNomorPembelian() {
+  pembelianNomor = {};
+  (DATA.pembelian || []).slice().sort(function (a, b) { return String(a.Tanggal || '') < String(b.Tanggal || '') ? -1 : 1; }).forEach(function (p, i) { pembelianNomor[p.ID] = i + 1; });
+}
+function fmtBulan(d) { return d.toLocaleDateString('id-ID', { month: 'short', year: 'numeric' }); }
+function ringkasItemBeli(id) {
+  return (DATA.pembelianDetail || []).filter(function (x) { return x.PembelianID === id; }).map(function (x) { return String(x.NamaProduk || '').slice(0, 10) + ':' + x.Qty; }).join(' ');
+}
+function renderPembelian() {
+  var list = (DATA.pembelian || []).slice().sort(function (a, b) { return String(b.Tanggal || '') < String(a.Tanggal || '') ? -1 : 1; });
+  hitungNomorPembelian();
+  var html = '', grupTerakhir = '';
+  list.forEach(function (p) {
+    var d = new Date(p.Tanggal);
+    var kunci = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    if (kunci !== grupTerakhir) {
+      grupTerakhir = kunci;
+      var bln = list.filter(function (x) { var dd = new Date(x.Tanggal); return dd.getFullYear() + '-' + String(dd.getMonth() + 1).padStart(2, '0') === kunci; });
+      var totalBln = bln.reduce(function (s, x) { return s + Number(x.Total || 0); }, 0);
+      html += '<div class="trx-grup"><span>' + fmtBulan(d) + '</span><span class="trx-grup-total">' + rp(totalBln) + '</span><span>' + bln.length + '</span></div>';
+    }
+    var diproses = p.Diproses === 'YA' || p.Status === 'Diproses' || p.Status === 'Sudah diproses';
+    html += '<div class="trx-row" onclick="bukaDetailPembelian(\'' + esc(p.ID) + '\')">'
+      + '<div class="trx-r1"><b class="trx-biru">' + rp(p.Total) + '</b><span>' + d.getDate() + ' ' + BULAN_ID[d.getMonth()] + ' ' + d.getFullYear() + '</span><span>#' + (pembelianNomor[p.ID] || '') + '</span></div>'
+      + '<div class="trx-r2"><span>' + esc(p.Pemasok || '') + '</span><span class="trx-ringkas">' + esc(ringkasItemBeli(p.ID)) + '</span></div>'
+      + '<div class="trx-r3"><span></span><span class="badge' + (diproses ? '' : ' warn') + '">' + (diproses ? 'Diproses' : 'Belum diproses') + '</span></div>'
+      + '</div>';
+  });
+  html = html || '<p style="color:#64748b">Belum ada pembelian.</p>';
+  document.getElementById('pembelianTable').innerHTML = html;
+  document.getElementById('pemasokTable').innerHTML = '<table><tr><th>Nama</th><th>Telepon</th><th>Hutang</th></tr>' + (DATA.pemasok || []).map(function (p) { return '<tr><td>' + esc(p.Nama) + '</td><td>' + esc(p.Telepon || '') + '</td><td>' + rp(p.Hutang || 0) + '</td></tr>'; }).join('') + '</table>';
+}
+function baruPembelian() {
+  beliItems = []; beliItemIndex = -1; beliItemProdukId = '';
+  document.getElementById('beliPemasok').value = '';
+  document.getElementById('beliPemasokLabel').textContent = 'Pilih pemasok…';
+  ['beliDiskon', 'beliPajak', 'beliBiaya'].forEach(function (i) { document.getElementById(i).value = '0'; });
+  document.getElementById('beliBayar').value = '0';
+  document.getElementById('beliCatatan').value = '';
+  renderBeliItems(); hitungTotalBeli();
+  bukaForm('pembelian', 'formPembelian');
 }
 function renderBeliItems() {
-  document.getElementById('beliItems').innerHTML = beliItems.map(function (it, i) { return '<div class="cart-item"><span>' + esc(it.nama) + ' × ' + it.Qty + ' @ ' + rp(it.HargaBeli) + (it.Kedaluwarsa ? ' • exp ' + esc(it.Kedaluwarsa) : '') + '</span><span>' + rp(it.Qty * it.HargaBeli) + ' <button class="secondary" onclick="beliItems.splice(' + i + ',1);renderBeliItems()">Hapus</button></span></div>'; }).join('') || 'Belum ada item pembelian.';
+  document.getElementById('beliItems').innerHTML = beliItems.map(function (it, i) {
+    return '<div class="cart-item" onclick="editItemBeli(' + i + ')"><span>' + esc(it.nama) + ' × ' + it.Qty + ' @ ' + rp(it.HargaBeli) + (it.Kedaluwarsa ? ' • exp ' + esc(it.Kedaluwarsa) : '') + '</span><span>' + rp(it.Qty * it.HargaBeli) + ' <button class="secondary" onclick="event.stopPropagation();hapusItemBeliList(' + i + ')">✕</button></span></div>';
+  }).join('') || 'Belum ada item. Ketuk "+ Tambah Produk".';
+}
+function hitungTotalBeli() {
+  var sub = beliItems.reduce(function (a, i) { return a + Number(i.Qty || 0) * Number(i.HargaBeli || 0); }, 0);
+  var dis = Number(document.getElementById('beliDiskon').value || 0);
+  var paj = Number(document.getElementById('beliPajak').value || 0);
+  var bia = Number(document.getElementById('beliBiaya').value || 0);
+  var tot = sub - dis + paj + bia;
+  document.getElementById('beliTotalBox').innerHTML = '<div class="dtotal"><span>Subtotal</span><b>' + rp(sub) + '</b></div>'
+    + '<div class="dtotal"><span>Total</span><b class="trx-biru">' + rp(tot) + '</b></div>';
+  return tot;
 }
 async function simpanPembelian() {
-  if (!beliItems.length) return alert('Tambahkan minimal 1 item pembelian.');
-  var total = beliItems.reduce(function (a, i) { return a + i.Qty * i.HargaBeli; }, 0);
-  total = total - Number(document.getElementById('beliDiskon').value || 0) + Number(document.getElementById('beliPajak').value || 0) + Number(document.getElementById('beliBiaya').value || 0);
-  await DB.simpanPembelian({ pemasok: document.getElementById('beliPemasok').value, items: beliItems, total: total, diskon: Number(document.getElementById('beliDiskon').value || 0), pajak: Number(document.getElementById('beliPajak').value || 0), biayaLain: Number(document.getElementById('beliBiaya').value || 0), bayar: Number(document.getElementById('beliBayar').value || 0), catatan: document.getElementById('beliCatatan').value, cabangId: cabangAktifId() });
-  beliItems = []; renderBeliItems(); await loadData(); tampilInfo('DRAFT pembelian tersimpan. Tekan PROSES untuk menambah stok.');
+  if (!beliItems.length) return tampilError('Tambahkan minimal 1 item pembelian.');
+  var pemasok = document.getElementById('beliPemasok').value;
+  if (!pemasok) return tampilError('Pilih pemasok dulu.');
+  var total = hitungTotalBeli();
+  try {
+    await DB.simpanPembelian({ pemasok: pemasok, items: beliItems, total: total, diskon: Number(document.getElementById('beliDiskon').value || 0), pajak: Number(document.getElementById('beliPajak').value || 0), biayaLain: Number(document.getElementById('beliBiaya').value || 0), bayar: Number(document.getElementById('beliBayar').value || 0), catatan: document.getElementById('beliCatatan').value, cabangId: cabangAktifId() });
+  } catch (e) { return tampilError('Gagal menyimpan pembelian: ' + (e.message || e)); }
+  beliItems = []; renderBeliItems(); await loadData(); tutupForm('pembelian'); tampilInfo('DRAFT pembelian tersimpan. Tekan PROSES untuk menambah stok.');
 }
 async function prosesPembelian(id, el) {
   if (!await konfirmasi('Proses pembelian?', 'Stok bertambah, pengeluaran dan utang pemasok tercatat. Proses ini tidak bisa dibatalkan.', 'Ya, Proses', 'primary')) return;
   try { await DB.prosesPembelian({ id: id }); await loadData(); tampilInfo('Pembelian diproses. Stok bertambah.'); }
   catch (e) { tampilError('Gagal memproses pembelian: ' + (e.message || e)); }
 }
-function renderPembelian() {
-  document.getElementById('pembelianTable').innerHTML = '<table><tr><th>ID</th><th>Pemasok</th><th>Total</th><th>Bayar / Sisa</th><th>Status</th><th></th></tr>' + (DATA.pembelian || []).map(function (p) {
-    var diproses = p.Diproses === 'YA' || p.Status === 'Diproses' || p.Status === 'Sudah diproses';
-    return '<tr><td>' + esc(p.ID) + '</td><td>' + esc(p.Pemasok) + '</td><td>' + rp(p.Total) + '</td><td>' + rp(p.Bayar) + ' / ' + rp(p.Sisa) + '</td><td>' + (diproses ? '<span class="badge">Diproses</span>' : '<span class="badge warn">Draft</span>') + '</td><td>' + (diproses ? '' : '<button class="primary" onclick="prosesPembelian(\'' + esc(p.ID) + '\', this)">PROSES</button>') + '</td></tr>';
-  }).join('') + '</table>';
-  document.getElementById('pemasokTable').innerHTML = '<table><tr><th>Nama</th><th>Telepon</th><th>Hutang</th></tr>' + (DATA.pemasok || []).map(function (p) { return '<tr><td>' + esc(p.Nama) + '</td><td>' + esc(p.Telepon || '') + '</td><td>' + rp(p.Hutang || 0) + '</td></tr>'; }).join('') + '</table>';
+async function prosesPembelianDetail(id) {
+  await prosesPembelian(id, null);
+  if (detailPembelianId) renderDetailPembelian();
+}
+/* --- Picker pemasok (ketik untuk cari) --- */
+function bukaPickerPemasok() {
+  document.getElementById('cariPemasok').value = '';
+  document.getElementById('formPemasokBaru').style.display = 'none';
+  renderPickerPemasok();
+  bukaForm('pembelian', 'pickerPemasok');
+}
+function renderPickerPemasok() {
+  var q = (document.getElementById('cariPemasok').value || '').toLowerCase();
+  var list = (DATA.pemasok || []).filter(function (p) { return !q || String(p.Nama || '').toLowerCase().indexOf(q) >= 0; });
+  document.getElementById('daftarPemasok').innerHTML = list.map(function (p) {
+    return '<div class="prow" onclick="pilihPemasok(\'' + esc(p.Nama) + '\')"><div class="pinfo"><b>' + esc(p.Nama) + '</b><span>' + esc(p.Telepon || '') + '</span></div><span style="font-size:20px;color:#94a3b8">›</span></div>';
+  }).join('') || '<p style="color:#64748b">Tidak ada pemasok yang cocok.</p>';
+}
+function pilihPemasok(nama) {
+  document.getElementById('beliPemasok').value = nama;
+  document.getElementById('beliPemasokLabel').textContent = nama;
+  bukaForm('pembelian', 'formPembelian');
+}
+function tampilFormPemasokBaru() { document.getElementById('formPemasokBaru').style.display = 'block'; document.getElementById('pmBaruNama').focus(); }
+async function simpanPemasokBaru() {
+  var nama = document.getElementById('pmBaruNama').value.trim();
+  if (!nama) return tampilError('Nama pemasok wajib diisi.');
+  try {
+    await DB.upsertPemasok({ Nama: nama, Telepon: document.getElementById('pmBaruTelp').value });
+    await loadData();
+    document.getElementById('pmBaruNama').value = ''; document.getElementById('pmBaruTelp').value = '';
+    document.getElementById('formPemasokBaru').style.display = 'none';
+    renderPickerPemasok(); tampilInfo('Pemasok tersimpan.');
+  } catch (e) { tampilError('Gagal menyimpan pemasok: ' + (e.message || e)); }
+}
+/* --- Picker produk (ketik nama / SKU, tidak perlu scroll jauh) --- */
+function bukaPickerProduk(dariItem) {
+  pickerProdukDariItem = !!dariItem;
+  document.getElementById('cariProduk').value = '';
+  renderPickerProduk();
+  bukaForm('pembelian', 'pickerProduk');
+}
+function kembaliDariPickerProduk() {
+  bukaForm('pembelian', pickerProdukDariItem ? 'formBeliItem' : 'formPembelian');
+}
+function renderPickerProduk() {
+  var q = (document.getElementById('cariProduk').value || '').toLowerCase();
+  var list = (DATA.produk || []).filter(function (p) {
+    if (!produkAktif(p)) return false;
+    if (!q) return true;
+    return String(p.Nama || '').toLowerCase().indexOf(q) >= 0 || String(p.SKUBarcode || p.SKU || '').toLowerCase().indexOf(q) >= 0;
+  });
+  document.getElementById('daftarProduk').innerHTML = list.map(function (p) {
+    return '<div class="prow" onclick="pilihProdukBeli(\'' + esc(p.ID) + '\')"><div class="pinfo"><b>' + esc(p.Nama) + '</b><span>Stok: ' + stokProduk(p) + ' ' + esc(p.Satuan || 'pcs') + '</span></div><div class="pharga"><b>' + rp(p.HargaJual) + '</b></div></div>';
+  }).join('') || '<p style="color:#64748b">Tidak ada produk yang cocok.</p>';
+}
+function pilihProdukBeli(id) {
+  var pr = (DATA.produk || []).find(function (x) { return String(x.ID) === String(id); });
+  if (!pr) return;
+  // Produk yang sama tidak boleh dua baris (PK pembelian_detail) — edit baris yang ada.
+  var ada = beliItems.findIndex(function (it) { return String(it.id) === String(id); });
+  if (ada >= 0) { editItemBeli(ada); return; }
+  beliItemIndex = -1; beliItemProdukId = id;
+  document.getElementById('beliItemProdukId').value = id;
+  document.getElementById('beliItemProdukLabel').textContent = pr.Nama;
+  document.getElementById('beliItemQty').value = '1';
+  document.getElementById('beliItemSatuan').value = pr.Satuan || 'pcs';
+  document.getElementById('beliItemTotal').value = '';
+  document.getElementById('beliItemJual').value = Number(pr.HargaJual || 0);
+  document.getElementById('beliItemKedaluwarsa').value = '';
+  document.getElementById('beliItemHapusBtn').style.display = 'none';
+  hitungItemBeli();
+  bukaForm('pembelian', 'formBeliItem');
+}
+function hitungItemBeli() {
+  var qty = Number(document.getElementById('beliItemQty').value || 0);
+  var total = Number(document.getElementById('beliItemTotal').value || 0);
+  var jual = Number(document.getElementById('beliItemJual').value || 0);
+  var perItem = qty > 0 ? Math.round(total / qty) : 0;
+  document.getElementById('beliItemPerItem').value = perItem ? perItem.toLocaleString('id-ID') : '';
+  document.getElementById('beliItemLaba').value = (jual - perItem) ? (jual - perItem).toLocaleString('id-ID') : '0';
+  return perItem;
+}
+function simpanItemBeli() {
+  var id = beliItemProdukId || document.getElementById('beliItemProdukId').value;
+  var pr = (DATA.produk || []).find(function (x) { return String(x.ID) === String(id); });
+  if (!pr) return tampilError('Pilih produk dulu.');
+  var qty = Number(document.getElementById('beliItemQty').value || 0);
+  if (qty < 1) return tampilError('Jumlah minimal 1.');
+  var totalStr = document.getElementById('beliItemTotal').value;
+  if (totalStr === '' || totalStr == null) return tampilError('Isi Harga beli (total).');
+  var perItem = hitungItemBeli();
+  var jual = Number(document.getElementById('beliItemJual').value || 0);
+  var item = { id: id, nama: pr.Nama, Qty: qty, HargaBeli: perItem, HargaJual: jual, Satuan: document.getElementById('beliItemSatuan').value || pr.Satuan || 'pcs', Kedaluwarsa: document.getElementById('beliItemKedaluwarsa').value || '' };
+  if (beliItemIndex >= 0) beliItems[beliItemIndex] = item; else beliItems.push(item);
+  beliItemIndex = -1;
+  renderBeliItems(); hitungTotalBeli();
+  bukaForm('pembelian', 'formPembelian');
+}
+function editItemBeli(i) {
+  var it = beliItems[i]; if (!it) return;
+  beliItemIndex = i; beliItemProdukId = it.id;
+  var pr = (DATA.produk || []).find(function (x) { return String(x.ID) === String(it.id); });
+  document.getElementById('beliItemProdukId').value = it.id;
+  document.getElementById('beliItemProdukLabel').textContent = it.nama;
+  document.getElementById('beliItemQty').value = it.Qty;
+  document.getElementById('beliItemSatuan').value = it.Satuan || (pr && pr.Satuan) || 'pcs';
+  document.getElementById('beliItemTotal').value = Number(it.Qty || 0) * Number(it.HargaBeli || 0);
+  document.getElementById('beliItemJual').value = Number(it.HargaJual || (pr && pr.HargaJual) || 0);
+  document.getElementById('beliItemKedaluwarsa').value = it.Kedaluwarsa || '';
+  document.getElementById('beliItemHapusBtn').style.display = 'block';
+  hitungItemBeli();
+  bukaForm('pembelian', 'formBeliItem');
+}
+function hapusItemBeliList(i) { beliItems.splice(i, 1); renderBeliItems(); hitungTotalBeli(); }
+async function hapusItemBeliForm() {
+  if (beliItemIndex < 0) return;
+  if (!await konfirmasi('Hapus item?', 'Item ini akan dihapus dari pembelian ini.')) return;
+  beliItems.splice(beliItemIndex, 1); beliItemIndex = -1;
+  renderBeliItems(); hitungTotalBeli();
+  bukaForm('pembelian', 'formPembelian');
+}
+/* --- Detail pembelian (ketuk baris di daftar) --- */
+function bukaDetailPembelian(id) {
+  detailPembelianId = id;
+  renderDetailPembelian();
+  bukaForm('pembelian', 'detailPembelian');
+}
+function renderDetailPembelian() {
+  var p = (DATA.pembelian || []).find(function (x) { return x.ID === detailPembelianId; });
+  var box = document.getElementById('detailPembelianBody');
+  if (!p) { box.innerHTML = '<p style="color:#64748b">Pembelian tidak ditemukan.</p>'; return; }
+  var d = new Date(p.Tanggal);
+  var diproses = p.Diproses === 'YA' || p.Status === 'Diproses' || p.Status === 'Sudah diproses';
+  var items = (DATA.pembelianDetail || []).filter(function (x) { return x.PembelianID === p.ID; });
+  document.getElementById('detailPembelianJudul').textContent = 'Pembelian #' + (pembelianNomor[p.ID] || '');
+  var sub = items.reduce(function (a, x) { return a + Number(x.Subtotal || 0); }, 0);
+  box.innerHTML = '<div class="dhead"><b>' + rp(p.Total) + '</b><span class="badge' + (diproses ? '' : ' warn') + '">' + (diproses ? 'Diproses' : 'Belum diproses') + '</span></div>'
+    + '<div class="ditem"><span>Pemasok</span><b>' + esc(p.Pemasok || '') + '</b></div>'
+    + '<div class="ditem"><span>Tanggal</span><b>' + d.getDate() + ' ' + BULAN_ID[d.getMonth()] + ' ' + d.getFullYear() + ' ' + jamMenit(d) + '</b></div>'
+    + items.map(function (x) { return '<div class="ditem"><span>' + esc(x.NamaProduk) + '<br><span class="ditem-sub">' + x.Qty + ' × ' + rp(x.HargaBeli) + (x.Kedaluwarsa ? ' • exp ' + esc(x.Kedaluwarsa) : '') + '</span></span><b>' + rp(x.Subtotal) + '</b></div>'; }).join('')
+    + '<div class="dtotal"><span>Subtotal</span><b>' + rp(sub) + '</b></div>'
+    + '<div class="dtotal"><span>Diskon</span><b>− ' + rp(p.Diskon || 0) + '</b></div>'
+    + '<div class="dtotal"><span>Pajak</span><b>' + rp(p.Pajak || 0) + '</b></div>'
+    + '<div class="dtotal"><span>Biaya lain</span><b>' + rp(p.BiayaLain || 0) + '</b></div>'
+    + '<div class="dtotal"><span>Total</span><b class="trx-biru">' + rp(p.Total) + '</b></div>'
+    + '<div class="dtotal"><span>Bayar</span><b>' + rp(p.Bayar || 0) + '</b></div>'
+    + '<div class="dtotal"><span>Sisa</span><b>' + rp(p.Sisa || 0) + '</b></div>'
+    + (p.Catatan ? '<div class="ditem"><span>Catatan</span><b>' + esc(p.Catatan) + '</b></div>' : '')
+    + (diproses ? '' : '<button class="primary" style="width:100%;padding:13px;margin-top:12px" onclick="prosesPembelianDetail(\'' + esc(p.ID) + '\')">PROSES — Tambah Stok</button>');
 }
 async function simpanPemasok() { var nama = document.getElementById('pmNama').value; if (!nama) return alert('Nama wajib diisi.'); await DB.upsertPemasok({ Nama: nama, Telepon: document.getElementById('pmTelp').value, Alamat: document.getElementById('pmAlamat').value }); ['pmNama', 'pmTelp', 'pmAlamat'].forEach(function (i) { document.getElementById(i).value = ''; }); await loadData(); tutupForm('pembelian'); tampilInfo('Pemasok tersimpan.'); }
 

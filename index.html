@@ -50,7 +50,7 @@ header small{opacity:.92;font-size:11px}
 .prow .pinfo b{font-size:16px;display:block}
 .prow .pinfo span{color:var(--muted);font-size:13px;display:block;margin-top:2px}
 .prow .pharga{text-align:right;flex:none}
-.prow .pharga b{color:#1d4ed8;font-size:17px;display:block}
+.prow .pharga b{color:#0f766e;font-size:17px;display:block}
 .prow .pharga span{color:var(--muted);font-size:13px;display:block;margin-top:2px}
 /* Baris isian detail ala Griyo */
 .frow{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--line)}
@@ -209,12 +209,12 @@ th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04
 /* --- Daftar Transaksi ala Griyo: kelompok per tanggal --- */
 .trx-grup{display:flex;justify-content:space-between;align-items:center;background:#e8eaed;padding:10px 14px;font-weight:700;font-size:14px;margin:12px -14px 0}
 .trx-grup:first-child{margin-top:0}
-.trx-grup-total{color:#0b5394}
+.trx-grup-total{color:#0f766e}
 .trx-row{background:#fff;padding:12px 14px;border-bottom:1px solid #e8eaed;cursor:pointer;margin:0 -14px}
 .trx-row:active{background:#f0fdfa}
 .trx-r1,.trx-r2,.trx-r3{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
 .trx-r1{font-size:15px}
-.trx-biru{color:#0b5394;font-size:17px}
+.trx-biru{color:#0f766e;font-size:17px}
 .trx-r2{margin-top:4px;font-size:15px}
 .trx-ringkas{color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:65%;text-align:right}
 .trx-r3{margin-top:4px}
@@ -226,7 +226,7 @@ th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04
 .dhead b{flex:1}
 .dhead-btn{background:transparent;border:0;color:#fff;font-size:20px;cursor:pointer;padding:4px 8px}
 .dtop{display:flex;justify-content:space-between;gap:10px;background:#f1f3f4;padding:14px;margin:0 -14px}
-.dtop-total{color:#0b5394;font-size:26px;font-weight:700}
+.dtop-total{color:#0f766e;font-size:26px;font-weight:700}
 .dkode{display:inline-block;background:#3c4043;color:#fff;border-radius:6px;padding:3px 10px;font-size:14px}
 .ditems{padding:6px 0}
 .ditem{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid #e8eaed;font-size:15px}
@@ -404,6 +404,7 @@ body.dark .menu-item{background:#1e293b}
 </section>
 
 <section id="kasir">
+  <div id="kasirLangkah1">
   <div class="card" style="margin-bottom:10px"><div class="kasir-head"><button class="burger" onclick="toggleDrawer()">☰</button><h3>Transaksi Baru</h3><button class="secondary" onclick="go('pengaturan')">⚙</button></div>
     <div class="pillrow" style="margin-top:12px"><button class="pill active" id="pillReguler" onclick="setModeKasir('reguler')">🛒 Reguler</button><button class="pill" id="pillCepat" onclick="setModeKasir('cepat')">⚡ Cepat</button></div>
     <div class="searchbar"><span class="sic">🔍</span><input id="cariProduk" placeholder="Cari produk (nama / kode / barcode)" oninput="renderProdukKasir()"><button class="secondary" onclick="document.getElementById('scanBarcode').focus()">📷</button></div>
@@ -415,8 +416,10 @@ body.dark .menu-item{background:#1e293b}
   <div id="kasirCepat" style="display:none">
     <div class="card"><h3>Template Transaksi Cepat</h3><p style="color:#64748b;font-size:14px">Ketuk template untuk memuatnya ke keranjang.</p><div id="cepatListKasir"></div></div>
   </div>
-  <div id="cartBar" class="cart-bar noprint" onclick="goCheckout()" style="display:none"><span class="cart-ic">🛒<b id="cartBarCount" class="cart-badge">0</b></span><span id="cartBarTotal" style="font-weight:700">0 item | Rp0</span><span>›</span></div>
-  <div class="card" id="keranjangCard"><h3>Keranjang</h3>
+  <div id="cartBar" class="cart-bar noprint" onclick="langkahKasir(2)" style="display:none"><span class="cart-ic">🛒<b id="cartBarCount" class="cart-badge">0</b></span><span id="cartBarTotal" style="font-weight:700">0 item | Rp0</span><span>›</span></div>
+  </div>
+  <div id="kasirLangkah2" style="display:none">
+  <div class="card" id="keranjangCard"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><button class="secondary" onclick="langkahKasir(1)">← Kembali</button><h3 style="margin:0">Keranjang</h3></div>
     <label>Pelanggan <select id="kasirPelanggan" onchange="pelangganDipilih()"></select></label>
     <div id="kasirPelangganInfo" style="font-size:13px;color:#64748b"></div>
     <label id="kasirMejaWrap">Meja (bila mode meja aktif) <select id="kasirMeja"><option value="">— Tanpa meja —</option></select></label>
@@ -425,20 +428,22 @@ body.dark .menu-item{background:#1e293b}
     <div id="cart"></div>
     <div class="flex"><label>Jenis Diskon Total <select id="kasirDiskonJenis" onchange="renderCart()"><option value="nominal">Nominal (Rp)</option><option value="persen">Persen (%)</option></select></label><label>Diskon Total <input id="kasirDiskon" type="number" value="0" oninput="renderCart()"></label></div>
     <label>Ongkir (Rp, field sendiri — tidak kena diskon/pajak) <input id="kasirOngkir" type="number" value="0" oninput="renderCart()"></label>
-    <label>Bayar (Rp) <input id="kasirBayar" type="number" value="" oninput="bayarManual=true"></label>
+    <input type="hidden" id="kasirBayar" value="">
     <label>Catatan Struk (tampil di struk) <input id="kasirCatatanStruk" placeholder="Contoh: tanpa gula"></label>
     <label>Catatan Internal (tidak tampil di struk) <input id="kasirCatatanInternal" placeholder="Catatan internal kasir"></label>
     <div id="promoBox" style="font-size:13px;color:#0f766e;margin:6px 0"></div>
     <div id="poinBox" style="font-size:13px;margin:6px 0"></div>
     <div id="cartTotal" style="font-weight:700;margin:10px 0"></div>
-    <div class="flex noprint"><button class="primary" id="btnSimpanTrx" onclick="goCheckout()">Lanjut ke Pembayaran ›</button><button class="secondary" onclick="tukarPoin()">Tukar Poin</button><button class="secondary" onclick="simpanCepatDariKasir()">Simpan Transaksi Cepat</button><button class="secondary" onclick="parkirTransaksi()">Parkir (Tertunda)</button><button class="secondary" onclick="kosongkanCart()">Kosongkan</button></div>
+    <div class="flex noprint"><button class="primary" id="btnSimpanTrx" onclick="goCheckout()" style="flex:1;padding:14px;font-size:17px">KE PEMBAYARAN ›</button></div>
+    <div class="flex noprint"><button class="secondary" onclick="tukarPoin()">Tukar Poin</button><button class="secondary" onclick="simpanCepatDariKasir()">Simpan Transaksi Cepat</button><button class="secondary" onclick="parkirTransaksi()">Parkir (Tertunda)</button><button class="secondary" onclick="kosongkanCart()">Kosongkan</button></div>
     <div id="struk" style="margin-top:12px;display:none"></div>
     <div class="flex noprint" style="margin-top:10px"><button class="secondary" onclick="go('pengaturan')">⚙ Pengaturan Struk</button><button class="secondary" onclick="window.print()">🖨 Cetak Struk</button><button class="secondary" onclick="kirimWAGambar()">💬 Kirim Struk via WhatsApp (Gambar)</button></div>
+  </div>
   </div>
 </section>
 
 <section id="bayar">
-  <div class="card"><div style="display:flex;align-items:center;gap:8px"><button class="secondary" onclick="show('kasir',document.querySelector('nav button[data-sec=kasir]'))">← Kembali</button><h3 style="margin:0">Pembayaran</h3></div>
+  <div class="card"><div style="display:flex;align-items:center;gap:8px"><button class="secondary" onclick="kembaliKeKeranjang()">← Kembali</button><h3 style="margin:0">Pembayaran</h3></div>
     <div class="pay-total"><div class="lbl">Total Belanja</div><div class="amt" id="bayarTotal">Rp0</div></div>
     <div id="bayarRincian" style="font-size:15px"></div>
     <h4>Metode Pembayaran</h4><div class="paygrid" id="bayarMetodeGrid"></div>
@@ -528,18 +533,39 @@ body.dark .menu-item{background:#1e293b}
 <div class="form-view" id="formPemasok"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="tutupForm('pembelian')">← Kembali</button><h3 style="margin:0">Tambah Pemasok</h3></div><div class="flex"><input id="pmNama" placeholder="Nama pemasok *"><input id="pmTelp" placeholder="Telepon"><input id="pmAlamat" placeholder="Alamat"></div><button class="primary" onclick="simpanPemasok()">Simpan Pemasok</button></div>
 <div class="list-view"><h3>Pemasok</h3><div id="pemasokTable" style="margin-top:12px"></div><button class="fab" onclick="['pmNama','pmTelp','pmAlamat'].forEach(function(i){document.getElementById(i).value=''});bukaForm('pembelian','formPemasok')" aria-label="Tambah pemasok">+</button></div>
 </div>
-<div class="card list-view"><h3>Pembelian — DRAFT dulu, lalu PROSES</h3>
-<p style="color:#64748b;font-size:14px">Simpan sebagai DRAFT: stok belum bertambah, kas belum bergerak. Tombol PROSES: stok + pengeluaran + utang terbentuk sekaligus dan setelah itu tidak bisa diubah.</p>
-<label>Pemasok <select id="beliPemasok"></select></label>
-<label>Produk <select id="beliProduk"></select></label>
-<div class="flex"><input id="beliQty" type="number" value="1" placeholder="Qty"><input id="beliHarga" type="number" placeholder="Harga beli / pcs"><input id="beliKedaluwarsa" type="date" placeholder="Kedaluwarsa"></div>
-<button class="secondary" onclick="tambahItemBeli()">+ Tambah Item</button>
+<div class="card list-view"><h3>Pembelian</h3>
+<p style="color:#64748b;font-size:14px">Simpan sebagai DRAFT: stok belum bertambah, kas belum bergerak. Tekan PROSES: stok + pengeluaran + utang terbentuk sekaligus dan setelah itu tidak bisa diubah.</p>
+<div id="pembelianTable" style="margin-top:12px"></div>
+<button class="fab" onclick="baruPembelian()" aria-label="Pembelian baru">+</button></div>
+<div class="card form-view" id="formPembelian"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="tutupForm('pembelian')">← Kembali</button><h3 style="margin:0">Pembelian Baru</h3></div>
+<input type="hidden" id="beliPemasok">
+<div class="frow" onclick="bukaPickerPemasok()"><span class="fic">🏪</span><div class="fcol"><label>Pemasok</label><div id="beliPemasokLabel" style="font-size:16px">Pilih pemasok…</div></div><span style="font-size:20px;color:#94a3b8">›</span></div>
 <div id="beliItems" style="margin-top:10px"></div>
-<div class="flex"><input id="beliDiskon" type="number" value="0" placeholder="Diskon (Rp)"><input id="beliPajak" type="number" value="0" placeholder="Pajak (Rp)"><input id="beliBiaya" type="number" value="0" placeholder="Biaya lain (Rp)"></div>
+<button class="secondary" onclick="bukaPickerProduk(false)" style="width:100%">+ Tambah Produk</button>
+<div id="beliTotalBox" style="margin-top:12px"></div>
+<div class="flex"><input id="beliDiskon" type="number" value="0" placeholder="Diskon (Rp)" oninput="hitungTotalBeli()"><input id="beliPajak" type="number" value="0" placeholder="Pajak (Rp)" oninput="hitungTotalBeli()"><input id="beliBiaya" type="number" value="0" placeholder="Biaya lain (Rp)" oninput="hitungTotalBeli()"></div>
 <label>Bayar (Rp, kosongkan = hutang) <input id="beliBayar" type="number" value="0"></label>
 <input id="beliCatatan" placeholder="Keterangan pembelian">
-<button class="primary" onclick="simpanPembelian()">Simpan DRAFT Pembelian</button>
-<div id="pembelianTable" style="margin-top:12px"></div></div>
+<button class="primary" onclick="simpanPembelian()" style="width:100%;padding:13px">💾 SIMPAN DRAFT</button></div>
+<div class="card form-view" id="formBeliItem"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="bukaForm('pembelian','formPembelian')">← Kembali</button><h3 style="margin:0">Tambah Item</h3><button class="danger" id="beliItemHapusBtn" style="display:none;margin-left:auto" onclick="hapusItemBeliForm()">🗑 Hapus</button></div>
+<input type="hidden" id="beliItemProdukId">
+<div class="frow" onclick="bukaPickerProduk(true)"><span class="fic">💡</span><div class="fcol"><label>Produk/Bahan Baku</label><div id="beliItemProdukLabel" style="font-size:16px">Pilih produk…</div></div><span style="font-size:20px;color:#94a3b8">›</span></div>
+<div class="frow"><span class="fic">📦</span><div class="fcol"><label>Jumlah</label><input id="beliItemQty" type="number" value="1" min="1" oninput="hitungItemBeli()"></div><div class="fcol"><label>Satuan</label><input id="beliItemSatuan" value="pcs" readonly></div></div>
+<div class="frow"><span class="fic">💵</span><div class="fcol"><label>Harga beli (total)</label><input id="beliItemTotal" type="number" placeholder="0" oninput="hitungItemBeli()"></div></div>
+<div class="frow2"><div class="fcol"><label>Harga beli per item</label><input id="beliItemPerItem" readonly></div><div class="fcol"><label>Harga jual per item</label><input id="beliItemJual" type="number" oninput="hitungItemBeli()"></div></div>
+<div class="frow"><span class="fic">💰</span><div class="fcol"><label>Laba</label><input id="beliItemLaba" readonly></div></div>
+<div class="frow"><span class="fic">📅</span><div class="fcol"><label>Kedaluwarsa</label><input id="beliItemKedaluwarsa" type="date"></div><button class="secondary" onclick="document.getElementById('beliItemKedaluwarsa').value=''">✕</button></div>
+<button class="primary" onclick="simpanItemBeli()" style="width:100%;padding:13px">💾 SIMPAN</button></div>
+<div class="card form-view" id="pickerPemasok"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="bukaForm('pembelian','formPembelian')">← Kembali</button><h3 style="margin:0">Pilih Pemasok</h3></div>
+<input id="cariPemasok" placeholder="🔍 Cari pemasok…" oninput="renderPickerPemasok()">
+<div id="daftarPemasok" style="margin-top:8px"></div>
+<button class="secondary" onclick="tampilFormPemasokBaru()" style="width:100%;margin-top:10px">+ Pemasok Baru</button>
+<div id="formPemasokBaru" style="display:none;margin-top:10px"><div class="flex"><input id="pmBaruNama" placeholder="Nama pemasok *"><input id="pmBaruTelp" placeholder="Telepon"></div><button class="primary" onclick="simpanPemasokBaru()" style="width:100%">Simpan Pemasok</button></div></div>
+<div class="card form-view" id="pickerProduk"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="kembaliDariPickerProduk()">← Kembali</button><h3 style="margin:0">Pilih Produk</h3></div>
+<div style="display:flex;gap:8px"><input id="cariProduk" placeholder="🔍 Cari nama / SKU…" oninput="renderPickerProduk()" style="flex:1"><button class="secondary" onclick="document.getElementById('cariProduk').focus()" aria-label="Scan barcode">Scan</button></div>
+<div id="daftarProduk" style="margin-top:8px"></div></div>
+<div class="card form-view" id="detailPembelian"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="tutupForm('pembelian')">← Kembali</button><h3 style="margin:0" id="detailPembelianJudul">Pembelian</h3></div>
+<div id="detailPembelianBody"></div></div>
 </section>
 
 <section id="pengeluaran">
