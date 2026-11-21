@@ -25,7 +25,12 @@ var APP_SHELL = [
 self.addEventListener('install', function (event) {
   event.waitUntil(
     caches.open(CACHE_NAME).then(function (cache) {
-      return cache.addAll(APP_SHELL);
+      // Satu file lambat/gagal tidak boleh menahan install (pernah membuat
+      // install PWA di HP terasa lama): cache per-file, yang gagal dilewati —
+      // file itu akan di-cache saat pertama dipakai (fetch handler).
+      return Promise.all(APP_SHELL.map(function (url) {
+        return cache.add(url).catch(function () { return null; });
+      }));
     }).then(function () {
       return self.skipWaiting();
     })

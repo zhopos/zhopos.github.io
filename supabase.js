@@ -228,6 +228,9 @@
   // tidak masuk daftar stok menipis.
   function produkAktif(p) { return p.Aktif !== false && String(p.Aktif == null ? 'YA' : p.Aktif).toUpperCase() !== 'TIDAK'; }
   function lacakStok(p) { if (p.TermasukStok === false) return false; return String(p.TermasukStok == null ? 'YA' : p.TermasukStok).toUpperCase() !== 'TIDAK'; }
+  // Normalisasi bendera boolean: DB menyimpan boolean, UI lama memakai 'YA'/'TIDAK'.
+  // Jangan pakai `false || 'YA'` (menghasilkan 'YA') — pakai helper ini untuk nilai simpan.
+  function boolFlag(v, def) { if (v === true || v === false) return v; if (typeof v === 'string') return v.toUpperCase() !== 'TIDAK'; return def; }
   function setStok(d, p, nilai) {
     var sc = (d.stokCabang || []).find(function (x) { return String(x.ProdukID) === String(p.ID) && String(x.CabangID) === String(cabangAktifId(d)); });
     if (sc) { sc.Stok = nilai; return sc; }
@@ -319,7 +322,7 @@
     var u = list.find(function (x) { return String(x.Nama).toLowerCase() === String(nama || '').trim().toLowerCase(); });
     if (!u) return { ok: false, error: 'Pengguna tidak ditemukan.' };
     if (String(u.PIN || '') !== String(pin || '')) return { ok: false, error: 'PIN salah.' };
-    if (String(u.Aktif || 'YA').toUpperCase() === 'TIDAK') return { ok: false, error: 'Pengguna tidak aktif.' };
+    if (!boolFlag(u.Aktif, true)) return { ok: false, error: 'Pengguna tidak aktif.' };
     addLog(DATA, u.Nama, 'Login', u.Nama + ' masuk');
     return { ok: true, nama: u.Nama, peran: u.Peran, ID: u.ID, CabangID: u.CabangID || '', IzinJSON: u.IzinJSON || '{}', AksesTransaksi: u.AksesTransaksi || 'Tidak dibatasi' };
   }
@@ -331,7 +334,7 @@
     var now = new Date();
     var hariIni = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'][now.getDay()];
     (DATA.promo || []).forEach(function (p) {
-      if (String(p.Aktif || 'YA').toUpperCase() === 'TIDAK') return;
+      if (!boolFlag(p.Aktif, true)) return;
       if (p.CabangID && cabangId && String(p.CabangID) !== String(cabangId)) return;
       if (p.Mulai && todayStr() < String(p.Mulai).slice(0, 10)) return;
       if (p.Selesai && todayStr() > String(p.Selesai).slice(0, 10)) return;
@@ -397,7 +400,7 @@
       var it = items[i];
       var prod = DATA.produk.find(function (x) { return String(x.ID) === String(it.id); });
       if (!prod) continue;
-      var termasuk = String(prod.TermasukStok == null ? 'YA' : prod.TermasukStok).toUpperCase() !== 'TIDAK';
+      var termasuk = lacakStok(prod);
       if (!termasuk) continue;
       var isi = 1;
       if (it.satuanDipakai) {
@@ -429,7 +432,7 @@
         if (v) isi = Number(v.isi || 1);
       }
       var butuh = Number(it.Qty || 0) * isi;
-      var termasuk = String(prod.TermasukStok == null ? 'YA' : prod.TermasukStok).toUpperCase() !== 'TIDAK';
+      var termasuk = lacakStok(prod);
       if (termasuk) {
         var sisaButuh = butuh;
         var batches = (DATA.stokBatch || []).filter(function (b) { return String(b.ProdukID) === String(prod.ID) && String(b.CabangID) === String(cabangId) && Number(b.Qty) > 0; })
@@ -572,11 +575,11 @@
       ID: payload.ID || '', Nama: payload.Nama, Kategori: payload.Kategori || '', Grup: payload.Grup || '',
       SKU: payload.SKU || '', HargaJual: Number(payload.HargaJual || 0), HargaModal: Number(payload.HargaModal || 0),
       Stok: Number(payload.Stok == null || payload.Stok === '' ? 0 : payload.Stok),
-      Satuan: payload.Satuan || 'pcs', Aktif: 'YA', StokMinimum: Number(payload.StokMinimum || 5),
+      Satuan: payload.Satuan || 'pcs', Aktif: true, StokMinimum: Number(payload.StokMinimum || 5),
       GambarURL: payload.GambarURL || '', Keterangan: payload.Keterangan || '',
-      HargaBisaDiganti: payload.HargaBisaDiganti || 'YA', TermasukStok: payload.TermasukStok || 'YA',
+      HargaBisaDiganti: boolFlag(payload.HargaBisaDiganti, true), TermasukStok: boolFlag(payload.TermasukStok, true),
       HargaLainJSON: payload.HargaLainJSON || '', HargaJumlahJSON: payload.HargaJumlahJSON || '',
-      VarianJSON: payload.VarianJSON || '', TampilkanDiKatalog: payload.TampilkanDiKatalog || 'YA',
+      VarianJSON: payload.VarianJSON || '', TampilkanDiKatalog: boolFlag(payload.TampilkanDiKatalog, true),
       CabangID: payload.CabangID || cabangAktifId(DATA)
     };
     return upsertInto('produk', 'produk', row, 'PRD');
@@ -804,7 +807,7 @@
   /* ---------- promo / tier / meja / dapur ---------- */
   async function upsertPromo(payload) {
     if (!DATA) await loadAll();
-    var row = { ID: payload.ID || '', Nama: payload.Nama, Jenis: payload.Jenis || 'DiskonPersen', SyaratJSON: payload.SyaratJSON || '', Nilai: Number(payload.Nilai || 0), Mulai: payload.Mulai || '', Selesai: payload.Selesai || '', JamMulai: payload.JamMulai || '', JamSelesai: payload.JamSelesai || '', Hari: payload.Hari || '', Aktif: payload.Aktif || 'YA', CabangID: payload.CabangID || '' };
+    var row = { ID: payload.ID || '', Nama: payload.Nama, Jenis: payload.Jenis || 'DiskonPersen', SyaratJSON: payload.SyaratJSON || '', Nilai: Number(payload.Nilai || 0), Mulai: payload.Mulai || '', Selesai: payload.Selesai || '', JamMulai: payload.JamMulai || '', JamSelesai: payload.JamSelesai || '', Hari: payload.Hari || '', Aktif: boolFlag(payload.Aktif, true), CabangID: payload.CabangID || '' };
     return upsertInto('promo', 'promo', row, 'PRM');
   }
   async function hapusPromo(payload) { if (!DATA) await loadAll(); hapusDari('promo', 'promo', payload.id); return { ok: true }; }
@@ -886,7 +889,7 @@
   }
   async function upsertCabang(payload) {
     if (!DATA) await loadAll();
-    var row = { ID: payload.ID || '', Nama: payload.Nama, Alamat: payload.Alamat || '', Telepon: payload.Telepon || '', Aktif: 'YA' };
+    var row = { ID: payload.ID || '', Nama: payload.Nama, Alamat: payload.Alamat || '', Telepon: payload.Telepon || '', Aktif: true };
     return upsertInto('cabang', 'cabang', row, 'CBG');
   }
   async function hapusCabang(payload) { if (!DATA) await loadAll(); hapusDari('cabang', 'cabang', payload.id); return { ok: true }; }
@@ -898,7 +901,7 @@
   }
   async function upsertPengguna(payload) {
     if (!DATA) await loadAll();
-    var row = { ID: payload.ID || '', Nama: payload.Nama, PIN: String(payload.PIN || ''), Peran: payload.Peran || 'Kasir', Aktif: 'YA', IzinJSON: payload.IzinJSON || '{}', AksesTransaksi: payload.AksesTransaksi || 'Tidak dibatasi', CabangID: payload.CabangID || '' };
+    var row = { ID: payload.ID || '', Nama: payload.Nama, PIN: String(payload.PIN || ''), Peran: payload.Peran || 'Kasir', Aktif: true, IzinJSON: payload.IzinJSON || '{}', AksesTransaksi: payload.AksesTransaksi || 'Tidak dibatasi', CabangID: payload.CabangID || '' };
     return upsertInto('pengguna', 'pengguna', row, 'USR');
   }
   async function hapusPengguna(payload) { if (!DATA) await loadAll(); hapusDari('pengguna', 'pengguna', payload.id); return { ok: true }; }
@@ -939,7 +942,7 @@
   async function hapusSatuan(payload) { if (!DATA) await loadAll(); hapusDari('satuan', 'satuan', payload.id); return { ok: true }; }
   async function upsertJenisBayar(payload) {
     if (!DATA) await loadAll();
-    return upsertInto('jenisBayar', 'jenis_pembayaran', { ID: payload.id || payload.ID || '', Nama: payload.nama, Aktif: 'YA' }, 'JB');
+    return upsertInto('jenisBayar', 'jenis_pembayaran', { ID: payload.id || payload.ID || '', Nama: payload.nama, Aktif: true }, 'JB');
   }
   async function hapusJenisBayar(payload) { if (!DATA) await loadAll(); hapusDari('jenisBayar', 'jenis_pembayaran', payload.id); return { ok: true }; }
   async function upsertItemPengeluaran(payload) {
@@ -949,13 +952,13 @@
   async function hapusItemPengeluaran(payload) { if (!DATA) await loadAll(); hapusDari('itemPengeluaran', 'item_pengeluaran', payload.id); return { ok: true }; }
   async function upsertPegawai(payload) {
     if (!DATA) await loadAll();
-    var row = { ID: payload.id || payload.ID || '', Nama: payload.nama, Telepon: payload.telepon || '', Jabatan: payload.jabatan || '', Target: Number(payload.target || 0), KomisiPersen: Number(payload.komisiPersen || 0), Aktif: 'YA' };
+    var row = { ID: payload.id || payload.ID || '', Nama: payload.nama, Telepon: payload.telepon || '', Jabatan: payload.jabatan || '', Target: Number(payload.target || 0), KomisiPersen: Number(payload.komisiPersen || 0), Aktif: true };
     return upsertInto('pegawai', 'pegawai', row, 'PGW');
   }
   async function hapusPegawai(payload) { if (!DATA) await loadAll(); hapusDari('pegawai', 'pegawai', payload.id); return { ok: true }; }
   async function upsertKatalog(payload) {
     if (!DATA) await loadAll();
-    var row = { ID: payload.ID || '', Nama: payload.Nama, TampilkanGambar: payload.TampilkanGambar || 'YA', TampilkanHarga: payload.TampilkanHarga || 'YA', TampilkanStok: payload.TampilkanStok || 'TIDAK', SembunyikanStokKosong: payload.SembunyikanStokKosong || 'TIDAK', TampilkanKeterangan: payload.TampilkanKeterangan || 'TIDAK', Footer: payload.Footer || '', Aktif: payload.Aktif || 'YA', CabangID: payload.CabangID || cabangAktifId(DATA) };
+    var row = { ID: payload.ID || '', Nama: payload.Nama, TampilkanGambar: boolFlag(payload.TampilkanGambar, true), TampilkanHarga: boolFlag(payload.TampilkanHarga, true), TampilkanStok: boolFlag(payload.TampilkanStok, false), SembunyikanStokKosong: boolFlag(payload.SembunyikanStokKosong, false), TampilkanKeterangan: boolFlag(payload.TampilkanKeterangan, false), Footer: payload.Footer || '', Aktif: boolFlag(payload.Aktif, true), CabangID: payload.CabangID || cabangAktifId(DATA) };
     return upsertInto('katalog', 'katalog', row, 'KTG');
   }
 

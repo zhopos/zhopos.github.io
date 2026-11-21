@@ -29,6 +29,8 @@ function stokProduk(p) {
 // dan tidak dihitung di dashboard/laporan — tapi tetap ada di master & riwayat.
 function produkAktif(p) { return p.Aktif !== false && String(p.Aktif == null ? 'YA' : p.Aktif).toUpperCase() !== 'TIDAK'; }
 function lacakStok(p) { if (p.TermasukStok === false) return false; return String(p.TermasukStok == null ? 'YA' : p.TermasukStok).toUpperCase() !== 'TIDAK'; }
+// Bendera umum (checkbox YA/TIDAK) yang tahan boolean maupun string.
+function flagYa(v) { return v !== false && String(v == null ? 'YA' : v).toUpperCase() !== 'TIDAK'; }
 function izinAktif(kunci) {
   if (!currentUser) return true;
   if (currentUser.peran === 'Admin') return true;
@@ -244,7 +246,7 @@ function isiSelectKasir() {
   var mj = document.getElementById('kasirMeja');
   mj.innerHTML = '<option value="">— Tanpa meja —</option>' + (DATA.meja || []).filter(function (m) { return m.Status !== 'Terisi'; }).map(function (m) { return '<option>' + esc(m.Nama) + '</option>'; }).join('');
   var mt = document.getElementById('kasirMetode');
-  var jb = (DATA.jenisBayar || []).filter(function (j) { return j.Aktif !== 'TIDAK'; });
+  var jb = (DATA.jenisBayar || []).filter(function (j) { return produkAktif(j); });
   mt.innerHTML = (jb.length ? jb : [{ Nama: 'Tunai' }]).map(function (j) { return '<option>' + esc(j.Nama) + '</option>'; }).join('');
   pelangganDipilih();
 }
@@ -323,7 +325,7 @@ function ubahQtyKasir(id, delta) {
   if (!it) return;
   if (delta > 0) {
     var p = DATA.produk.find(function (x) { return x.ID === id; });
-    var termasukStok = p ? String(p.TermasukStok == null ? 'YA' : p.TermasukStok).toUpperCase() !== 'TIDAK' : false;
+    var termasukStok = p ? lacakStok(p) : false;
     if (p && termasukStok && stokProduk(p) - it.Qty <= 0) { return alert('Stok produk tidak mencukupi: ' + p.Nama); }
   }
   it.Qty += delta;
@@ -339,7 +341,7 @@ function hargaJumlahOtomatis(p, qty) {
 }
 function addToCart(id, hargaOverride, satuanDipakai) {
   var p = DATA.produk.find(function (x) { return x.ID === id; }); if (!p) return;
-  var termasukStok = String(p.TermasukStok == null ? 'YA' : p.TermasukStok).toUpperCase() !== 'TIDAK';
+  var termasukStok = lacakStok(p);
   var diKeranjang = 0; cart.forEach(function (x) { if (x.id === id) diKeranjang += x.Qty; });
   if (termasukStok && stokProduk(p) - diKeranjang <= 0) { return alert('Stok produk tidak mencukupi: ' + p.Nama); }
   var it = cart.find(function (x) { return x.id === id && !x.satuanDipakai; });
@@ -468,7 +470,7 @@ function renderBayar() {
     (h.ongkir ? '<div class="cart-item"><span>Ongkir</span><b>' + rp(h.ongkir) + '</b></div>' : '') +
     '<div class="cart-item"><span><b>Total</b></span><b>' + rp(h.total) + '</b></div>';
   var metode = document.getElementById('kasirMetode').value || 'Tunai';
-  var jb = (DATA.jenisBayar || []).filter(function (j) { return j.Aktif !== 'TIDAK'; });
+  var jb = (DATA.jenisBayar || []).filter(function (j) { return produkAktif(j); });
   if (!jb.length) jb = [{ Nama: 'Tunai' }];
   document.getElementById('bayarMetodeGrid').innerHTML = jb.map(function (j) {
     var sel = j.Nama === metode;
@@ -729,15 +731,15 @@ function editProduk(id) {
   var p = DATA.produk.find(function (x) { return x.ID === id; }); if (!p) return;
   document.getElementById('pId').value = p.ID; document.getElementById('pNama').value = p.Nama; document.getElementById('pKategori').value = p.Kategori || ''; document.getElementById('pGrup').value = p.Grup || ''; document.getElementById('pSKU').value = p.SKU || p['SKU/Barcode'] || ''; document.getElementById('pJual').value = p.HargaJual; document.getElementById('pModal').value = p.HargaModal; document.getElementById('pStok').value = p.Stok; document.getElementById('pStokMin').value = p.StokMinimum || 5; document.getElementById('pSatuan').value = p.Satuan || 'pcs';
   document.getElementById('pGambar').value = p.GambarURL || ''; document.getElementById('pKet').value = p.Keterangan || '';
-  document.getElementById('pHargaGanti').checked = p.HargaBisaDiganti !== 'TIDAK';
-  document.getElementById('pTermasukStok').checked = p.TermasukStok !== 'TIDAK';
-  document.getElementById('pTampilKatalog').checked = p.TampilkanDiKatalog !== 'TIDAK';
+  document.getElementById('pHargaGanti').checked = flagYa(p.HargaBisaDiganti);
+  document.getElementById('pTermasukStok').checked = flagYa(p.TermasukStok);
+  document.getElementById('pTampilKatalog').checked = flagYa(p.TampilkanDiKatalog);
   document.getElementById('pHargaLain').value = p.HargaLainJSON || ''; document.getElementById('pHargaJumlah').value = p.HargaJumlahJSON || ''; document.getElementById('pVarian').value = p.VarianJSON || '';
   show('produk', document.querySelector('nav button.menu[data-sec="produk"]')); window.scrollTo(0, 0);
 }
 function resetProduk() { ['pId', 'pNama', 'pKategori', 'pGrup', 'pSKU', 'pJual', 'pModal', 'pStok', 'pGambar', 'pKet', 'pHargaLain', 'pHargaJumlah', 'pVarian'].forEach(function (i) { document.getElementById(i).value = ''; }); document.getElementById('pSatuan').value = 'pcs'; document.getElementById('pStokMin').value = '5'; document.getElementById('pHargaGanti').checked = true; document.getElementById('pTermasukStok').checked = true; document.getElementById('pTampilKatalog').checked = true; }
 async function simpanProduk() {
-  var payload = { ID: document.getElementById('pId').value || '', Nama: document.getElementById('pNama').value, Kategori: document.getElementById('pKategori').value, Grup: document.getElementById('pGrup').value, SKU: document.getElementById('pSKU').value, HargaJual: document.getElementById('pJual').value, HargaModal: document.getElementById('pModal').value, Stok: document.getElementById('pStok').value, StokMinimum: document.getElementById('pStokMin').value, Satuan: document.getElementById('pSatuan').value, GambarURL: document.getElementById('pGambar').value, Keterangan: document.getElementById('pKet').value, HargaBisaDiganti: document.getElementById('pHargaGanti').checked ? 'YA' : 'TIDAK', TermasukStok: document.getElementById('pTermasukStok').checked ? 'YA' : 'TIDAK', TampilkanDiKatalog: document.getElementById('pTampilKatalog').checked ? 'YA' : 'TIDAK', HargaLainJSON: document.getElementById('pHargaLain').value, HargaJumlahJSON: document.getElementById('pHargaJumlah').value, VarianJSON: document.getElementById('pVarian').value, CabangID: cabangAktifId() };
+  var payload = { ID: document.getElementById('pId').value || '', Nama: document.getElementById('pNama').value, Kategori: document.getElementById('pKategori').value, Grup: document.getElementById('pGrup').value, SKU: document.getElementById('pSKU').value, HargaJual: document.getElementById('pJual').value, HargaModal: document.getElementById('pModal').value, Stok: document.getElementById('pStok').value, StokMinimum: document.getElementById('pStokMin').value, Satuan: document.getElementById('pSatuan').value, GambarURL: document.getElementById('pGambar').value, Keterangan: document.getElementById('pKet').value, HargaBisaDiganti: document.getElementById('pHargaGanti').checked, TermasukStok: document.getElementById('pTermasukStok').checked, TampilkanDiKatalog: document.getElementById('pTampilKatalog').checked, HargaLainJSON: document.getElementById('pHargaLain').value, HargaJumlahJSON: document.getElementById('pHargaJumlah').value, VarianJSON: document.getElementById('pVarian').value, CabangID: cabangAktifId() };
   if (!payload.Nama || !payload.HargaJual) return alert('Nama dan harga jual wajib diisi.');
   try { JSON.parse(payload.HargaLainJSON || '[]'); JSON.parse(payload.HargaJumlahJSON || '[]'); JSON.parse(payload.VarianJSON || '[]'); } catch (e) { return alert('JSON Harga Lain / Harga Jumlah / Varian tidak valid.'); }
   await DB.upsertProduk(payload); resetProduk(); await loadData();
@@ -955,7 +957,7 @@ function renderKatalog() {
   }).join('') || 'Belum ada katalog.';
   var k = (DATA.katalog || [])[0];
   if (k) {
-    var prods = (DATA.produk || []).filter(function (p) { return p.TampilkanDiKatalog !== 'TIDAK'; });
+    var prods = (DATA.produk || []).filter(function (p) { return flagYa(p.TampilkanDiKatalog); });
     document.getElementById('katalogPreview').innerHTML = '<h4>' + esc(k.Nama) + '</h4>' + prods.map(function (p) {
       return '<div class="cart-item"><span>' + (k.TampilkanGambar === 'YA' ? emojiProduk(p.Nama) + ' ' : '') + esc(p.Nama) + (k.TampilkanKeterangan === 'YA' && p.Keterangan ? '<br><small>' + esc(p.Keterangan) + '</small>' : '') + '</span><span>' + (k.TampilkanHarga === 'YA' ? rp(p.HargaJual) : '') + ' <button class="secondary" onclick="window.open(\'https://wa.me/' + String((DATA.pengaturan.TeleponToko || '')).replace(/\D/g, '') + '?text=' + encodeURIComponent('Halo, saya mau pesan ' + p.Nama) + '\',\'_blank\')">💬 Pesan</button></span></div>';
     }).join('') + (k.Footer ? '<p style="color:#64748b;font-size:13px">' + esc(k.Footer) + '</p>' : '');
@@ -977,15 +979,15 @@ function salinLinkKatalog(id) {
 function editKatalog(id) {
   var k = (DATA.katalog || []).find(function (x) { return x.ID === id; }); if (!k) return;
   document.getElementById('ktgId').value = k.ID; document.getElementById('ktgNama').value = k.Nama;
-  document.getElementById('ktgGambar').checked = k.TampilkanGambar !== 'TIDAK'; document.getElementById('ktgHarga').checked = k.TampilkanHarga !== 'TIDAK';
-  document.getElementById('ktgStok').checked = k.TampilkanStok === 'YA'; document.getElementById('ktgSembunyiKosong').checked = k.SembunyikanStokKosong === 'YA';
-  document.getElementById('ktgKet').checked = k.TampilkanKeterangan === 'YA'; document.getElementById('ktgFooter').value = k.Footer || '';
+  document.getElementById('ktgGambar').checked = flagYa(k.TampilkanGambar); document.getElementById('ktgHarga').checked = flagYa(k.TampilkanHarga);
+  document.getElementById('ktgStok').checked = flagYa(k.TampilkanStok); document.getElementById('ktgSembunyiKosong').checked = flagYa(k.SembunyikanStokKosong);
+  document.getElementById('ktgKet').checked = flagYa(k.TampilkanKeterangan); document.getElementById('ktgFooter').value = k.Footer || '';
   window.scrollTo(0, 0);
 }
 function resetKatalog() { ['ktgId', 'ktgNama', 'ktgFooter'].forEach(function (i) { document.getElementById(i).value = ''; }); }
 async function simpanKatalog() {
   var nama = document.getElementById('ktgNama').value; if (!nama) return alert('Masukkan nama katalog');
-  await DB.upsertKatalog({ ID: document.getElementById('ktgId').value || '', Nama: nama, TampilkanGambar: document.getElementById('ktgGambar').checked ? 'YA' : 'TIDAK', TampilkanHarga: document.getElementById('ktgHarga').checked ? 'YA' : 'TIDAK', TampilkanStok: document.getElementById('ktgStok').checked ? 'YA' : 'TIDAK', SembunyikanStokKosong: document.getElementById('ktgSembunyiKosong').checked ? 'YA' : 'TIDAK', TampilkanKeterangan: document.getElementById('ktgKet').checked ? 'YA' : 'TIDAK', Footer: document.getElementById('ktgFooter').value, Aktif: 'YA', CabangID: cabangAktifId() });
+  await DB.upsertKatalog({ ID: document.getElementById('ktgId').value || '', Nama: nama, TampilkanGambar: document.getElementById('ktgGambar').checked, TampilkanHarga: document.getElementById('ktgHarga').checked, TampilkanStok: document.getElementById('ktgStok').checked, SembunyikanStokKosong: document.getElementById('ktgSembunyiKosong').checked, TampilkanKeterangan: document.getElementById('ktgKet').checked, Footer: document.getElementById('ktgFooter').value, Aktif: true, CabangID: cabangAktifId() });
   resetKatalog(); await loadData();
 }
 
@@ -1006,7 +1008,7 @@ async function simpanPromo() {
   var nama = document.getElementById('prmNama').value; if (!nama) return alert('Nama promo wajib diisi.');
   var syarat = document.getElementById('prmSyarat').value;
   try { if (syarat) JSON.parse(syarat); } catch (e) { return alert('Syarat JSON tidak valid.'); }
-  await DB.upsertPromo({ ID: document.getElementById('prmId').value || '', Nama: nama, Jenis: document.getElementById('prmJenis').value, Nilai: document.getElementById('prmNilai').value, SyaratJSON: syarat, Mulai: document.getElementById('prmMulai').value, Selesai: document.getElementById('prmSelesai').value, JamMulai: document.getElementById('prmJamMulai').value, JamSelesai: document.getElementById('prmJamSelesai').value, Hari: document.getElementById('prmHari').value, Aktif: 'YA', CabangID: document.getElementById('prmCabang').value || cabangAktifId() });
+  await DB.upsertPromo({ ID: document.getElementById('prmId').value || '', Nama: nama, Jenis: document.getElementById('prmJenis').value, Nilai: document.getElementById('prmNilai').value, SyaratJSON: syarat, Mulai: document.getElementById('prmMulai').value, Selesai: document.getElementById('prmSelesai').value, JamMulai: document.getElementById('prmJamMulai').value, JamSelesai: document.getElementById('prmJamSelesai').value, Hari: document.getElementById('prmHari').value, Aktif: true, CabangID: document.getElementById('prmCabang').value || cabangAktifId() });
   resetPromo(); await loadData();
 }
 async function hapusPromo(id) { if (confirm('Hapus promo ini?')) { await DB.hapusPromo({ id: id }); await loadData(); } }
