@@ -158,6 +158,7 @@
       .reduce(function (a, u) { return a + Number(u.Sisa || 0); }, 0);
     var saldoKas = (d.kas || []).reduce(function (a, k) { return a + Number(k.Masuk || 0) - Number(k.Keluar || 0); }, 0);
     var stokTipisList = (d.produk || []).filter(function (p) {
+      if (!produkAktif(p) || !lacakStok(p)) return false;
       return stokOf(d, p) <= Number(p.StokMinimum == null ? 5 : p.StokMinimum);
     }).map(function (p) { return { nama: p.Nama, stok: stokOf(d, p), satuan: p.Satuan || '' }; });
     var kedaluwarsaList = (d.stokBatch || []).filter(function (b) {
@@ -222,6 +223,11 @@
     if (sc) return Number(sc.Stok || 0);
     return Number(p.Stok || 0);
   }
+  // Sama seperti produkAktif/lacakStok di app.js (definisi ganda supaya tiap
+  // file mandiri): produk nonaktif tidak dihitung; jasa tanpa stok (ONGKIR)
+  // tidak masuk daftar stok menipis.
+  function produkAktif(p) { return p.Aktif !== false && String(p.Aktif == null ? 'YA' : p.Aktif).toUpperCase() !== 'TIDAK'; }
+  function lacakStok(p) { return String(p.TermasukStok == null ? 'YA' : p.TermasukStok).toUpperCase() !== 'TIDAK'; }
   function setStok(d, p, nilai) {
     var sc = (d.stokCabang || []).find(function (x) { return String(x.ProdukID) === String(p.ID) && String(x.CabangID) === String(cabangAktifId(d)); });
     if (sc) { sc.Stok = nilai; return sc; }
@@ -1062,7 +1068,7 @@
       ringkasan = { Dibayar: lunas.reduce(function (a, t) { return a + Number(t.Bayar || 0); }, 0), Transaksi: lunas.length };
       baris = Object.keys(byMetode).map(function (m) { return { Metode: m, Total: byMetode[m] }; });
     } else if (jenis === 'stok') {
-      ringkasan = { Produk: (DATA.produk || []).length, StokMenipis: (DATA.ringkasan || {}).stokMenipis || 0 };
+      ringkasan = { Produk: (DATA.produk || []).filter(produkAktif).length, StokMenipis: (DATA.ringkasan || {}).stokMenipis || 0 };
       baris = (DATA.produk || []).map(function (p) { return { Produk: p.Nama, Stok: stokOf(DATA, p), HargaJual: p.HargaJual, HargaModal: p.HargaModal }; });
     } else if (jenis === 'labarugi') {
       var omzet = lunas.reduce(function (a, t) { return a + Number(t.Total || 0); }, 0);

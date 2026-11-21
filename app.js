@@ -24,6 +24,11 @@ function stokProduk(p) {
   if (sc.length) return Number(sc[0].Stok || 0);
   return Number(p.Stok || 0);
 }
+// Produk aktif? Menangani boolean (Supabase) dan 'YA'/'TIDAK' (Mode Contoh / V12).
+// Produk nonaktif (mis. TES Kopi setelah dinonaktifkan) tidak tampil di kasir
+// dan tidak dihitung di dashboard/laporan — tapi tetap ada di master & riwayat.
+function produkAktif(p) { return p.Aktif !== false && String(p.Aktif == null ? 'YA' : p.Aktif).toUpperCase() !== 'TIDAK'; }
+function lacakStok(p) { return String(p.TermasukStok == null ? 'YA' : p.TermasukStok).toUpperCase() !== 'TIDAK'; }
 function izinAktif(kunci) {
   if (!currentUser) return true;
   if (currentUser.peran === 'Admin') return true;
@@ -194,7 +199,7 @@ function renderAll() {
   var bb = document.getElementById('bellBadge');
   if (bb) { var sm = Number(r.stokMenipis || 0); bb.style.display = sm > 0 ? 'flex' : 'none'; bb.textContent = sm > 99 ? '99+' : String(sm); }
   document.getElementById('statTiles').innerHTML = [
-    ['🛒', 'Transaksi', r.jumlahTrxHariIni || 0], ['📦', 'Produk', (DATA.produk || []).length],
+    ['🛒', 'Transaksi', r.jumlahTrxHariIni || 0], ['📦', 'Produk', (DATA.produk || []).filter(produkAktif).length],
     ['⚠️', 'Stok Menipis', r.stokMenipis || 0], ['👥', 'Pelanggan', (DATA.pelanggan || []).length]
   ].map(function (x) { return '<div class="tile"><span class="tile-ic">' + x[0] + '</span><span>' + x[1] + '</span><b>' + x[2] + '</b></div>'; }).join('');
   document.getElementById('menuUtama').innerHTML = MENU_UTAMA.map(function (m) {
@@ -301,7 +306,7 @@ function emojiProduk(nama) {
 }
 function renderProdukKasir() {
   var q = (document.getElementById('cariProduk').value || '').toLowerCase();
-  document.getElementById('produkKasir').innerHTML = (DATA.produk || []).filter(function (p) { return !q || p.Nama.toLowerCase().indexOf(q) >= 0 || String(p.SKU || p['SKU/Barcode'] || '').toLowerCase().indexOf(q) >= 0; })
+  document.getElementById('produkKasir').innerHTML = (DATA.produk || []).filter(function (p) { return produkAktif(p) && (!q || p.Nama.toLowerCase().indexOf(q) >= 0 || String(p.SKU || p['SKU/Barcode'] || '').toLowerCase().indexOf(q) >= 0); })
     .map(function (p) {
       var diKeranjang = 0; cart.forEach(function (x) { if (x.id === p.ID) diKeranjang += x.Qty; });
       var stok = stokProduk(p);
