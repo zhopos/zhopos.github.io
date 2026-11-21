@@ -562,7 +562,7 @@ body.dark .menu-item{background:#1e293b}
 <button class="secondary" onclick="tampilFormPemasokBaru()" style="width:100%;margin-top:10px">+ Pemasok Baru</button>
 <div id="formPemasokBaru" style="display:none;margin-top:10px"><div class="flex"><input id="pmBaruNama" placeholder="Nama pemasok *"><input id="pmBaruTelp" placeholder="Telepon"></div><button class="primary" onclick="simpanPemasokBaru()" style="width:100%">Simpan Pemasok</button></div></div>
 <div class="card form-view" id="pickerProduk"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="kembaliDariPickerProduk()">← Kembali</button><h3 style="margin:0">Pilih Produk</h3></div>
-<div style="display:flex;gap:8px"><input id="cariProduk" placeholder="🔍 Cari nama / SKU…" oninput="renderPickerProduk()" style="flex:1"><button class="secondary" onclick="document.getElementById('cariProduk').focus()" aria-label="Scan barcode">Scan</button></div>
+<div style="display:flex;gap:8px"><input id="cariProdukBeli" placeholder="🔍 Cari nama / SKU…" oninput="renderPickerProduk()" style="flex:1"><button class="secondary" onclick="document.getElementById('cariProdukBeli').focus()" aria-label="Scan barcode">Scan</button></div>
 <div id="daftarProduk" style="margin-top:8px"></div></div>
 <div class="card form-view" id="detailPembelian"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="tutupForm('pembelian')">← Kembali</button><h3 style="margin:0" id="detailPembelianJudul">Pembelian</h3></div>
 <div id="detailPembelianBody"></div></div>

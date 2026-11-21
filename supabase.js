@@ -651,7 +651,7 @@
     if (!DATA) await loadAll();
     var id = uid('PBL');
     var total = Number(payload.total || 0);
-    var row = { ID: id, Tanggal: nowISO(), Pemasok: payload.pemasok || '', Total: total, Bayar: Number(payload.bayar || 0), Sisa: total - Number(payload.bayar || 0), Status: 'Draft', Catatan: payload.catatan || '', CabangID: payload.cabangId || cabangAktifId(DATA), Diskon: Number(payload.diskon || 0), Pajak: Number(payload.pajak || 0), BiayaLain: Number(payload.biayaLain || 0), Diproses: 'TIDAK' };
+    var row = { ID: id, Tanggal: nowISO(), Pemasok: payload.pemasok || '', Total: total, Bayar: Number(payload.bayar || 0), Sisa: total - Number(payload.bayar || 0), Status: 'Draft', Catatan: payload.catatan || '', CabangID: payload.cabangId || cabangAktifId(DATA), Diskon: Number(payload.diskon || 0), Pajak: Number(payload.pajak || 0), BiayaLain: Number(payload.biayaLain || 0), Diproses: false };
     DATA.pembelian.unshift(row); await persist('pembelian', row);
     (payload.items || []).forEach(function (it) {
       var det = { PembelianID: id, ProdukID: it.id, NamaProduk: it.nama, Qty: Number(it.Qty || 0), HargaBeli: Number(it.HargaBeli || 0), HargaJual: Number(it.HargaJual || 0), Subtotal: Number(it.Qty || 0) * Number(it.HargaBeli || 0), Kedaluwarsa: it.Kedaluwarsa || '' };
@@ -665,7 +665,7 @@
     var id = payload.id || payload.ID;
     var p = DATA.pembelian.find(function (x) { return x.ID === id; });
     if (!p) throw new Error('Pembelian tidak ditemukan.');
-    if (p.Diproses === 'YA') throw new Error('Pembelian sudah diproses.');
+    if (p.Diproses === true || p.Diproses === 'YA') throw new Error('Pembelian sudah diproses.');
     var cabangId = p.CabangID || cabangAktifId(DATA);
     var items = DATA.pembelianDetail.filter(function (x) { return x.PembelianID === id; });
     await Promise.all(items.map(async function (it) {
@@ -680,7 +680,7 @@
         DATA.stokBatch.push(batch); await persist('stok_batch', batch);
       }
     }));
-    p.Diproses = 'YA'; p.Status = 'Diproses';
+    p.Diproses = true; p.Status = 'Diproses';
     await persist('pembelian', p);
     // pengeluaran + kas keluar sebesar Bayar
     var saldo = (DATA.kas || []).reduce(function (a, k) { return a + Number(k.Masuk || 0) - Number(k.Keluar || 0); }, 0);

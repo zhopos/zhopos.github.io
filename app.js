@@ -1370,7 +1370,7 @@ function renderPembelian() {
       var totalBln = bln.reduce(function (s, x) { return s + Number(x.Total || 0); }, 0);
       html += '<div class="trx-grup"><span>' + fmtBulan(d) + '</span><span class="trx-grup-total">' + rp(totalBln) + '</span><span>' + bln.length + '</span></div>';
     }
-    var diproses = p.Diproses === 'YA' || p.Status === 'Diproses' || p.Status === 'Sudah diproses';
+    var diproses = p.Diproses === true || p.Diproses === 'YA' || p.Status === 'Diproses' || p.Status === 'Sudah diproses';
     html += '<div class="trx-row" onclick="bukaDetailPembelian(\'' + esc(p.ID) + '\')">'
       + '<div class="trx-r1"><b class="trx-biru">' + rp(p.Total) + '</b><span>' + d.getDate() + ' ' + BULAN_ID[d.getMonth()] + ' ' + d.getFullYear() + '</span><span>#' + (pembelianNomor[p.ID] || '') + '</span></div>'
       + '<div class="trx-r2"><span>' + esc(p.Pemasok || '') + '</span><span class="trx-ringkas">' + esc(ringkasItemBeli(p.ID)) + '</span></div>'
@@ -1459,7 +1459,7 @@ async function simpanPemasokBaru() {
 /* --- Picker produk (ketik nama / SKU, tidak perlu scroll jauh) --- */
 function bukaPickerProduk(dariItem) {
   pickerProdukDariItem = !!dariItem;
-  document.getElementById('cariProduk').value = '';
+  document.getElementById('cariProdukBeli').value = '';
   renderPickerProduk();
   bukaForm('pembelian', 'pickerProduk');
 }
@@ -1467,7 +1467,7 @@ function kembaliDariPickerProduk() {
   bukaForm('pembelian', pickerProdukDariItem ? 'formBeliItem' : 'formPembelian');
 }
 function renderPickerProduk() {
-  var q = (document.getElementById('cariProduk').value || '').toLowerCase();
+  var q = (document.getElementById('cariProdukBeli').value || '').toLowerCase();
   var list = (DATA.produk || []).filter(function (p) {
     if (!produkAktif(p)) return false;
     if (!q) return true;
@@ -1554,7 +1554,7 @@ function renderDetailPembelian() {
   var box = document.getElementById('detailPembelianBody');
   if (!p) { box.innerHTML = '<p style="color:#64748b">Pembelian tidak ditemukan.</p>'; return; }
   var d = new Date(p.Tanggal);
-  var diproses = p.Diproses === 'YA' || p.Status === 'Diproses' || p.Status === 'Sudah diproses';
+  var diproses = p.Diproses === true || p.Diproses === 'YA' || p.Status === 'Diproses' || p.Status === 'Sudah diproses';
   var items = (DATA.pembelianDetail || []).filter(function (x) { return x.PembelianID === p.ID; });
   document.getElementById('detailPembelianJudul').textContent = 'Pembelian #' + (pembelianNomor[p.ID] || '');
   var sub = items.reduce(function (a, x) { return a + Number(x.Subtotal || 0); }, 0);
