@@ -68,6 +68,7 @@
     var o = {};
     Object.keys(obj || {}).forEach(function (k) {
       if (k === 'SKU/Barcode') { o.sku_barcode = obj[k]; return; }
+      if (k === 'SKU') return; // alias baca saja — nilainya sudah ada di SKUBarcode; kolom 'sku' tidak ada di tabel
       o[pascalToSnake(k)] = obj[k];
     });
     return o;
