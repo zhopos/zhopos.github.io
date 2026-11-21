@@ -554,6 +554,82 @@ function kirimWA() {
   var url = lastWaTelp ? ('https://wa.me/' + lastWaTelp + '?text=' + encodeURIComponent(lastStruk)) : ('https://wa.me/?text=' + encodeURIComponent(lastStruk));
   window.open(url, '_blank');
 }
+// Struk sebagai GAMBAR (PNG) untuk WhatsApp: wa.me hanya bisa mengirim teks,
+// jadi gambar dibagikan lewat menu berbagi bawaan HP (pilih WhatsApp di sana).
+// Bila HP/browser tidak mendukung berbagi file, gambar diunduh — lampirkan
+// manual di WhatsApp. Jalan terakhir bila unduhan pun gagal: kirim teks.
+async function kirimWAGambar() {
+  if (!lastStruk) return alert('Belum ada struk. Simpan transaksi dulu.');
+  try {
+    var blob = await gambarStruk();
+    var m = lastStruk.match(/No:\s*(\S+)/);
+    var nama = 'struk-' + (m ? m[1] : 'zho-pos') + '.png';
+    var file = new File([blob], nama, { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: 'Struk Zho POS' });
+      return;
+    }
+    unduhBlob(blob, nama);
+    alert('Gambar struk sudah diunduh (' + nama + '). Buka WhatsApp, pilih kontak, lalu lampirkan gambar itu.');
+  } catch (e) { kirimWA(); }
+}
+function unduhBlob(blob, nama) {
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = nama;
+  document.body.appendChild(a); a.click();
+  setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+// Gambar struk di kanvas: logo toko di atas (bila ada), lalu isi struk teks.
+function gambarStruk() {
+  return new Promise(function (selesai, gagal) {
+    var logo = (DATA.pengaturan || {}).LogoToko || logoDataUrl || '';
+    var muatLogo = function (cb) {
+      if (!logo) return cb(null);
+      var img = new Image();
+      img.onload = function () { cb(img); };
+      img.onerror = function () { cb(null); };
+      img.src = logo;
+    };
+    muatLogo(function (imgLogo) {
+      try {
+        var W = 576, pad = 28, fs = 28, lh = 38;
+        var ctx2 = document.createElement('canvas').getContext('2d');
+        ctx2.font = 'bold ' + fs + 'px monospace';
+        var maksKar = Math.floor((W - pad * 2) / (fs * 0.6));
+        var baris = [];
+        lastStruk.split('\n').forEach(function (ln) {
+          var sisa = ln;
+          while (sisa.length > maksKar) {
+            var pot = sisa.slice(0, maksKar), sp = pot.lastIndexOf(' ');
+            if (sp > 8) { baris.push(pot.slice(0, sp)); sisa = sisa.slice(sp + 1); }
+            else { baris.push(pot); sisa = sisa.slice(maksKar); }
+          }
+          baris.push(sisa);
+        });
+        var logoH = 0;
+        if (imgLogo) { var sk = Math.min(1, 220 / imgLogo.width, 160 / imgLogo.height); logoH = Math.round(imgLogo.height * sk) + 16; }
+        var cv = document.createElement('canvas');
+        cv.width = W; cv.height = pad * 2 + logoH + baris.length * lh;
+        var c = cv.getContext('2d');
+        c.fillStyle = '#fff'; c.fillRect(0, 0, cv.width, cv.height);
+        c.fillStyle = '#111'; c.textBaseline = 'top';
+        var y = pad;
+        if (imgLogo) {
+          var sk2 = Math.min(1, 220 / imgLogo.width, 160 / imgLogo.height);
+          var lw = Math.round(imgLogo.width * sk2), lhh = Math.round(imgLogo.height * sk2);
+          c.drawImage(imgLogo, (W - lw) / 2, y, lw, lhh); y += lhh + 16;
+        }
+        baris.forEach(function (ln, i) {
+          var tengah = (i === 0) || /terima kasih/i.test(ln) || (i <= 3 && /^(telp|alamat)/i.test(ln));
+          c.font = (i === 0 ? 'bold ' : '') + fs + 'px monospace';
+          c.textAlign = tengah ? 'center' : 'left';
+          c.fillText(ln || ' ', tengah ? W / 2 : pad, y + i * lh);
+        });
+        cv.toBlob(function (b) { b ? selesai(b) : gagal(new Error('gagal membuat gambar')); }, 'image/png');
+      } catch (e) { gagal(e); }
+    });
+  });
+}
 
 /* ---------- RIWAYAT TRANSAKSI & RETUR ---------- */
 function renderTrx() {
