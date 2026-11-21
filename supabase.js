@@ -653,10 +653,13 @@
     var total = Number(payload.total || 0);
     var row = { ID: id, Tanggal: nowISO(), Pemasok: payload.pemasok || '', Total: total, Bayar: Number(payload.bayar || 0), Sisa: total - Number(payload.bayar || 0), Status: 'Draft', Catatan: payload.catatan || '', CabangID: payload.cabangId || cabangAktifId(DATA), Diskon: Number(payload.diskon || 0), Pajak: Number(payload.pajak || 0), BiayaLain: Number(payload.biayaLain || 0), Diproses: false };
     DATA.pembelian.unshift(row); await persist('pembelian', row);
-    (payload.items || []).forEach(function (it) {
-      var det = { PembelianID: id, ProdukID: it.id, NamaProduk: it.nama, Qty: Number(it.Qty || 0), HargaBeli: Number(it.HargaBeli || 0), HargaJual: Number(it.HargaJual || 0), Subtotal: Number(it.Qty || 0) * Number(it.HargaBeli || 0), Kedaluwarsa: it.Kedaluwarsa || '' };
-      DATA.pembelianDetail.push(det); persist('pembelian_detail', det);
+    var dets = (payload.items || []).map(function (it) {
+      var det = { PembelianID: id, ProdukID: it.id, NamaProduk: it.nama, Qty: Number(it.Qty || 0), HargaBeli: Number(it.HargaBeli || 0), HargaJual: Number(it.HargaJual || 0), Subtotal: Number(it.Qty || 0) * Number(it.HargaBeli || 0), Kedaluwarsa: it.Kedaluwarsa || null };
+      DATA.pembelianDetail.push(det); return det;
     });
+    // Detail WAJIB ditunggu (await): kalau insert gagal (mis. tanggal kosong),
+    // galatnya harus sampai ke layar, bukan hilang diam-diam.
+    for (var di = 0; di < dets.length; di++) await persist('pembelian_detail', dets[di]);
     addLog(DATA, '', 'Pembelian Draft', id + ' — ' + row.Pemasok + ' — ' + total);
     refreshRingkasan(); return { ok: true, id: id };
   }
@@ -668,6 +671,7 @@
     if (p.Diproses === true || p.Diproses === 'YA') throw new Error('Pembelian sudah diproses.');
     var cabangId = p.CabangID || cabangAktifId(DATA);
     var items = DATA.pembelianDetail.filter(function (x) { return x.PembelianID === id; });
+    if (!items.length) throw new Error('Pembelian ini tidak punya item — stok tidak bisa ditambah. Periksa detail pembelian.');
     await Promise.all(items.map(async function (it) {
       var prod = DATA.produk.find(function (x) { return x.ID === it.ProdukID; });
       if (!prod) return;
