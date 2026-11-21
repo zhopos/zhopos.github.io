@@ -34,12 +34,28 @@ function sembunyikanHPP() {
   try { var iz = JSON.parse(currentUser.IzinJSON || '{}'); return !!iz.sembunyikanHPP; } catch (e) { return false; }
 }
 function hideLoading() { var l = document.getElementById('loading'); if (l) l.style.display = 'none'; }
+/* ---------- IKON / FORMAT RINGKAS ---------- */
+var lastSyncAt = null;
+function fmtK(n) { n = Number(n || 0); if (n >= 1000000) return (Math.round(n / 100000) / 10) + ' jt'; if (n >= 1000) return Math.round(n / 1000) + ' rb'; return String(n); }
+function iconBayar(nama) {
+  var n = String(nama || '').toLowerCase();
+  if (n.indexOf('tunai') >= 0 || n.indexOf('cash') >= 0) return '💵';
+  if (n.indexOf('qris') >= 0) return '📱';
+  if (n.indexOf('gopay') >= 0) return '🟢';
+  if (n.indexOf('ovo') >= 0) return '🟣';
+  if (n.indexOf('shopee') >= 0 || n.indexOf('dana') >= 0) return '🟠';
+  if (n.indexOf('transfer') >= 0 || n.indexOf('bank') >= 0) return '🏦';
+  if (n.indexOf('debit') >= 0 || n.indexOf('kartu') >= 0 || n.indexOf('visa') >= 0 || n.indexOf('master') >= 0) return '💳';
+  if (n.indexOf('e-money') >= 0 || n.indexOf('emoney') >= 0 || n.indexOf('flazz') >= 0) return '💳';
+  return '💳';
+}
+
 function setModeLabel() {
   var contoh = DB.isSample;
   document.getElementById('modeLabel').textContent = contoh ? 'Mode Contoh (data demo)' : 'Supabase: Terhubung';
   document.getElementById('modeBadge').textContent = contoh ? 'Mode Contoh' : 'Supabase ✓';
   var ds = document.getElementById('drawerSync');
-  if (ds) { ds.innerHTML = contoh ? 'Supabase: <b>Mode Contoh</b> — isi config.js untuk terhubung' : 'Supabase: <span class="ok">Terhubung</span>'; }
+  if (ds) { ds.innerHTML = contoh ? 'Supabase: <b>Mode Contoh</b> — isi config.js untuk terhubung' : 'Supabase: <span class="ok">Terhubung</span>' + (lastSyncAt ? ' • Terakhir: ' + lastSyncAt.toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''); }
   var sb = document.getElementById('sSbStatus'); if (sb) sb.value = contoh ? 'Mode Contoh — Supabase belum dikonfigurasi' : 'Terhubung ke Supabase';
   var su = document.getElementById('sSbUrl'); if (su) su.value = (typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL) ? SUPABASE_URL : '';
 }
@@ -67,6 +83,7 @@ async function loadData() {
     var nd = document.getElementById('namaTokoDrawer'); if (nd) nd.textContent = p.NamaToko || 'Zho POS';
     document.getElementById('heroToko').textContent = p.NamaToko || 'Zho POS';
     document.body.classList.toggle('dark', p.ModeGelap === 'YA');
+    lastSyncAt = new Date();
     setModeLabel();
     sembunyiError();
     isiPengaturanForm();
@@ -169,12 +186,17 @@ function renderAll() {
   document.getElementById('heroOmzet').textContent = rp(r.omzetHariIni);
   var kem = Number(r.omzetKemarin || 0), kini = Number(r.omzetHariIni || 0);
   var pct = kem > 0 ? Math.round((kini - kem) / kem * 100) : (kini > 0 ? 100 : 0);
-  document.getElementById('heroOmzetVs').textContent = 'Penjualan Hari Ini • ' + (pct >= 0 ? '+' : '') + pct + '% vs kemarin';
+  var vsEl = document.getElementById('heroOmzetVs');
+  vsEl.textContent = (pct >= 0 ? '+' : '') + pct + '% vs kemarin';
+  vsEl.classList.toggle('down', pct < 0);
   document.getElementById('heroUser').textContent = currentUser ? ('Halo, ' + currentUser.nama + ' (' + currentUser.peran + ') — kasir siap melayani hari ini.') : 'Kasir siap melayani hari ini.';
+  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • ' + currentUser.peran) : 'Kasir • v4.0 Premium';
+  var bb = document.getElementById('bellBadge');
+  if (bb) { var sm = Number(r.stokMenipis || 0); bb.style.display = sm > 0 ? 'flex' : 'none'; bb.textContent = sm > 99 ? '99+' : String(sm); }
   document.getElementById('statTiles').innerHTML = [
-    ['Transaksi', r.jumlahTrxHariIni || 0], ['Produk', (DATA.produk || []).length],
-    ['Stok Menipis', r.stokMenipis || 0], ['Pelanggan', (DATA.pelanggan || []).length]
-  ].map(function (x) { return '<div class="tile"><b>' + x[1] + '</b><span>' + x[0] + '</span></div>'; }).join('');
+    ['🛒', 'Transaksi', r.jumlahTrxHariIni || 0], ['📦', 'Produk', (DATA.produk || []).length],
+    ['⚠️', 'Stok Menipis', r.stokMenipis || 0], ['👥', 'Pelanggan', (DATA.pelanggan || []).length]
+  ].map(function (x) { return '<div class="tile"><span class="tile-ic">' + x[0] + '</span><span>' + x[1] + '</span><b>' + x[2] + '</b></div>'; }).join('');
   document.getElementById('menuUtama').innerHTML = MENU_UTAMA.map(function (m) {
     return '<div class="menu-item" onclick="go(\'' + m[0] + '\')"><span class="ic">' + m[1] + '</span>' + m[2] + '</div>';
   }).join('');
@@ -197,9 +219,11 @@ function renderAll() {
   document.getElementById('analitikBox').innerHTML = '7 hari: omzet ' + rp(a7.omzet) + ' • laba ' + rp(a7.laba) + ' • ' + (a7.jumlah || 0) + ' transaksi<br>28 hari: omzet ' + rp(a28.omzet) + ' • laba ' + rp(a28.laba) + ' • ' + (a28.jumlah || 0) + ' transaksi';
   var perHari = a7.perHari || [];
   var max = 1; perHari.forEach(function (x) { if (x.omzet > max) max = x.omzet; });
+  var cy = document.getElementById('chartY');
+  if (cy) cy.innerHTML = '<span>' + fmtK(max) + '</span><span>' + fmtK(Math.round(max / 2)) + '</span><span>0</span>';
   document.getElementById('chart7').innerHTML = '<div class="chartbar">' + perHari.map(function (d) {
     var h = Math.max(3, Math.round(d.omzet / max * 100));
-    return '<div class="chartcol"><span style="font-size:11px;font-weight:600">' + (d.omzet ? rp(d.omzet).replace('Rp', 'Rp') : '') + '</span><div class="bar" style="height:' + h + '%"></div><small>' + esc(String(d.tanggal).slice(5)) + '</small></div>';
+    return '<div class="chartcol"><div class="bar" style="height:' + h + '%"></div><small>' + esc(String(d.tanggal).slice(5)) + '</small></div>';
   }).join('') + '</div>';
   var cbSel = document.getElementById('cabangPilih');
   cbSel.innerHTML = '<option value="">Semua Cabang (gabungan)</option>' + (DATA.cabang || []).map(function (c) { return '<option value="' + esc(c.ID) + '">' + esc(c.Nama) + '</option>'; }).join('');
@@ -284,7 +308,7 @@ function renderProdukKasir() {
       var kanan = diKeranjang > 0
         ? '<span class="qty-ctl"><button onclick="event.stopPropagation();ubahQtyKasir(\'' + esc(p.ID) + '\',-1)">−</button><b class="qty-badge">' + diKeranjang + '</b><button onclick="event.stopPropagation();ubahQtyKasir(\'' + esc(p.ID) + '\',1)">+</button></span>'
         : '<button class="qty-add" onclick="event.stopPropagation();addToCart(\'' + esc(p.ID) + '\')">+</button>';
-      return '<div class="prod-row" onclick="addToCart(\'' + esc(p.ID) + '\')"><span style="display:flex;gap:10px;align-items:center"><span class="prod-thumb">' + emojiProduk(p.Nama) + '</span><span><b>' + esc(p.Nama) + '</b><br><small>' + rp(p.HargaJual) + '</small><br><small class="' + (stok <= 0 ? 'red' : '') + '">Stok: ' + stok + '</small></span></span>' + kanan + '</div>';
+      return '<div class="prod-row" onclick="addToCart(\'' + esc(p.ID) + '\')"><span style="display:flex;gap:10px;align-items:center"><span class="prod-thumb">' + emojiProduk(p.Nama) + '</span><span><b>' + esc(p.Nama) + '</b><br><small class="price">' + rp(p.HargaJual) + '</small><br><small class="' + (stok <= 0 ? 'red' : '') + '">Stok: ' + stok + '</small></span></span>' + kanan + '</div>';
     }).join('') || 'Produk tidak ditemukan.';
 }
 function ubahQtyKasir(id, delta) {
@@ -442,7 +466,7 @@ function renderBayar() {
   if (!jb.length) jb = [{ Nama: 'Tunai' }];
   document.getElementById('bayarMetodeGrid').innerHTML = jb.map(function (j) {
     var sel = j.Nama === metode;
-    return '<div class="payopt' + (sel ? ' sel' : '') + '" onclick="pilihMetodeBayar(\'' + esc(j.Nama) + '\')">' + (sel ? '✓ ' : '') + esc(j.Nama) + '</div>';
+    return '<div class="payopt' + (sel ? ' sel' : '') + '" onclick="pilihMetodeBayar(\'' + esc(j.Nama) + '\')"><span class="payopt-ic">' + iconBayar(j.Nama) + '</span>' + (sel ? '✓ ' : '') + esc(j.Nama) + '</div>';
   }).join('');
   var bt = document.getElementById('bayarTunai');
   if (!bayarManual) bt.value = h.total;
@@ -460,7 +484,9 @@ function bayarTunaiInput() {
 function updateKembalian() {
   var h = hitungCart();
   var tunai = Number(document.getElementById('bayarTunai').value || 0);
-  document.getElementById('bayarKembalian').textContent = 'Kembalian: ' + rp(Math.max(0, tunai - h.total));
+  var el = document.getElementById('bayarKembalianVal');
+  if (el) el.textContent = rp(Math.max(0, tunai - h.total));
+  else document.getElementById('bayarKembalian').textContent = 'Kembalian: ' + rp(Math.max(0, tunai - h.total));
 }
 async function simpanTransaksi() {
   if (!cart.length) return alert('Keranjang masih kosong.');
