@@ -37,6 +37,60 @@ header small{opacity:.92;font-size:11px}
 .modebadge{background:rgba(255,255,255,.22);font-size:11px;padding:3px 8px;border-radius:999px;white-space:nowrap}
 .bell-badge{position:absolute;top:-4px;right:-4px;min-width:17px;height:17px;border-radius:999px;background:#ef4444;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px}
 
+/* --- Tombol + mengambang (FAB merah ala Griyo) --- */
+.fab{position:fixed;right:18px;bottom:88px;width:58px;height:58px;border-radius:50%;background:#dc2626;color:#fff;font-size:34px;line-height:1;border:0;box-shadow:0 8px 18px rgba(220,38,38,.45);z-index:40;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.fab:active{transform:scale(.94)}
+/* --- Halaman daftar / detail (form tersembunyi sampai dibuka) --- */
+.form-view{display:none}
+/* Daftar produk ala Griyo */
+.countbar{background:#2563eb;color:#fff;border-radius:10px;padding:9px 12px;display:flex;justify-content:space-between;font-size:14px;margin-bottom:10px}
+.plist{border-top:1px solid var(--line)}
+.prow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:13px 2px;border-bottom:1px solid var(--line);cursor:pointer}
+.prow:active{background:#f8fafc}
+.prow .pinfo b{font-size:16px;display:block}
+.prow .pinfo span{color:var(--muted);font-size:13px;display:block;margin-top:2px}
+.prow .pharga{text-align:right;flex:none}
+.prow .pharga b{color:#1d4ed8;font-size:17px;display:block}
+.prow .pharga span{color:var(--muted);font-size:13px;display:block;margin-top:2px}
+/* Baris isian detail ala Griyo */
+.frow{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--line)}
+.frow .fic{font-size:20px;width:28px;text-align:center;flex:none;padding-top:26px}
+.frow .fcol{flex:1;min-width:0}
+.frow .fcol label{display:block;font-size:13px;color:var(--muted);margin:0 0 2px}
+.frow .fcol input,.frow .fcol select{margin:2px 0}
+.frow2{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.frow2 .fcol label{display:block;font-size:13px;color:var(--muted);margin:0 0 2px}
+.frow2 .fcol input{margin:2px 0}
+.checkrow{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line);font-size:15px;color:var(--ink)}
+.checkrow input{width:auto;margin:0}
+/* Gambar produk di halaman detail */
+.gambar-box{width:150px;height:150px;border:1.5px solid #cbd5e1;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:44px;color:#94a3b8;margin:6px auto;overflow:hidden;background:#f8fafc}
+/* Tombol hapus yang dipersenjatai (ketuk kedua = yakin) */
+button.armed{background:#7f1d1d!important;border-color:#7f1d1d!important;color:#fff!important}
+/* --- Popup notif (toast modern) --- */
+#errBar{display:none;position:fixed;top:60px;left:0;right:0;z-index:80;pointer-events:none;padding:0 12px}
+.toast{pointer-events:auto;display:flex;gap:10px;align-items:flex-start;max-width:480px;margin:0 auto 8px;background:#fff;border:1px solid var(--line);border-left:5px solid #0ea5e9;border-radius:14px;box-shadow:0 10px 28px rgba(15,23,42,.18);padding:12px;animation:toastMasuk .25s ease}
+.toast.sukses{border-left-color:#16a34a}
+.toast.error{border-left-color:#dc2626}
+.toast.keluar{opacity:0;transform:translateY(-6px);transition:all .3s ease}
+.t-ic{width:30px;height:30px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;background:#0ea5e9}
+.toast.sukses .t-ic{background:#16a34a}
+.toast.error .t-ic{background:#dc2626}
+.t-body{flex:1;min-width:0}
+.t-body b{display:block;font-size:14px}
+.t-body span{display:block;font-size:13px;color:var(--muted);margin-top:1px;word-break:break-word}
+.t-x{background:transparent;border:0;color:#94a3b8;font-size:15px;cursor:pointer;padding:2px 6px;flex:none}
+@keyframes toastMasuk{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+/* --- Panel notifikasi (lonceng) --- */
+.notif-card{background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 12px 32px rgba(15,23,42,.22);padding:12px;max-height:70vh;overflow-y:auto}
+.notif-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.notif-head b{font-size:15px}
+.notif-item{display:flex;gap:10px;padding:10px 2px;border-bottom:1px solid var(--line);align-items:flex-start}
+.notif-item b{display:block;font-size:14px}
+.notif-item span{display:block;font-size:13px;color:var(--muted)}
+.notif-ic{font-size:18px;flex:none}
+.notif-kosong{color:var(--muted);font-size:14px;text-align:center;padding:18px 0}
+
 /* --- Drawer --- */
 #drawerBackdrop{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:40}
 nav#nav{position:fixed;left:0;top:0;bottom:0;width:min(300px,85vw);background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;padding:0;overflow-y:auto;transform:translateX(-105%);transition:transform .25s ease;z-index:50;box-shadow:0 0 24px rgba(15,23,42,.18)}
@@ -284,9 +338,11 @@ body.dark .menu-item{background:#1e293b}
 <body>
 <header>
   <div class="brand"><button class="burger" onclick="toggleDrawer()" aria-label="Menu">☰</button><span class="brand-z"><img src="icon-192.png" alt="ZPOS" style="width:100%;height:100%;border-radius:10px;display:block"></span><span class="brand-name"><b id="namaTokoHead">ZPOS</b><br><small id="modeLabel">Memuat data…</small> <small id="userLabel"></small></span></div>
-  <div style="display:flex;align-items:center;gap:6px"><span class="modebadge" id="modeBadge">Mode Contoh</span><button class="hbtn" onclick="go('laporan')" aria-label="Notifikasi">🔔<span id="bellBadge" class="bell-badge" style="display:none">0</span></button></div>
+  <div style="display:flex;align-items:center;gap:6px"><span class="modebadge" id="modeBadge">Mode Contoh</span><button class="hbtn" onclick="toggleNotifPanel()" aria-label="Notifikasi">🔔<span id="bellBadge" class="bell-badge" style="display:none">0</span></button></div>
 </header>
-<div id="errBar" style="display:none;position:fixed;top:60px;left:0;right:0;z-index:30;background:#fee2e2;color:#991b1b;border-bottom:1px solid #fca5a5;padding:10px 14px;font-size:14px;cursor:pointer" onclick="this.style.display='none'" title="Ketuk untuk menutup"></div>
+<div id="errBar"></div>
+<div id="notifBackdrop" style="display:none;position:fixed;inset:0;z-index:70" onclick="toggleNotifPanel()"></div>
+<div id="notifPanel" style="display:none;position:fixed;top:58px;right:10px;z-index:71;width:min(340px,calc(100vw - 20px))"></div>
 <div id="drawerBackdrop" onclick="closeDrawer()"></div>
 <nav id="nav">
   <div class="drawer-head"><div class="zmark"><img src="icon-192.png" alt="ZPOS" style="width:100%;height:100%;border-radius:14px;display:block"></div><div><b>ZPOS</b></div><button class="hbtn" style="margin-left:auto" onclick="closeDrawer()">✕</button></div>
@@ -413,22 +469,41 @@ body.dark .menu-item{background:#1e293b}
 </div>
 
 <section id="produk">
-<div class="card"><h3>Tambah / Edit Produk</h3>
-<input id="pId" type="hidden"><div class="flex">
-<input id="pNama" placeholder="Nama produk *"><input id="pKategori" placeholder="Kategori (Minuman / Makanan / Jasa)">
-<input id="pGrup" placeholder="Grup produk"><input id="pSKU" placeholder="SKU / Barcode">
-<input id="pJual" type="number" placeholder="Harga jual *"><input id="pModal" type="number" placeholder="Harga modal (otomatis dari resep kalau ada)">
-<input id="pStok" type="number" placeholder="Stok *"><input id="pStokMin" type="number" placeholder="Stok minimum (peringatan, default 5)" value="5">
-<input id="pSatuan" placeholder="Satuan (pcs / kg / porsi)" value="pcs"><input id="pGambar" placeholder="URL gambar produk">
-<input id="pKet" placeholder="Keterangan untuk katalog"></div>
+<div class="card form-view" id="formProduk">
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="tutupForm('produk')">← Kembali</button><h3 style="margin:0" id="produkFormJudul">Tambah Produk</h3></div>
+<input id="pId" type="hidden"><input id="pGambar" type="hidden">
+<div class="frow"><span class="fic">📝</span><div class="fcol"><label>Nama</label><input id="pNama" placeholder="Nama produk *"></div></div>
+<div class="frow"><span class="fic">💵</span><div class="fcol"><label>Harga Pokok</label><input id="pModal" type="number" placeholder="0" oninput="hitungLabaProduk()"></div></div>
+<div class="frow2">
+<div class="fcol"><label>Harga Jual</label><input id="pJual" type="number" placeholder="0" oninput="hitungLabaProduk()"></div>
+<div class="fcol"><label>Laba</label><div id="pLaba" style="padding:11px 12px;font-weight:700">Rp0</div></div>
+</div>
+<div class="frow"><span class="fic">📦</span><div class="fcol"><label>Stok</label><input id="pStok" type="number" placeholder="0"></div></div>
+<label class="checkrow"><input id="pTidakStok" type="checkbox"> Tidak termasuk produk stok</label>
 <label class="checkrow"><input id="pHargaGanti" type="checkbox" checked> Harga bisa diganti ketika transaksi</label>
-<label class="checkrow"><input id="pTermasukStok" type="checkbox" checked> Termasuk produk stok (matikan untuk jasa/ongkir)</label>
 <label class="checkrow"><input id="pTampilKatalog" type="checkbox" checked> Tampilkan di katalog</label>
+<h4 style="margin:14px 0 4px;text-align:center">Gambar Produk</h4>
+<div class="gambar-box" id="pGambarBox">🎁</div>
+<img id="pGambarPreview" alt="Gambar produk" style="display:none;width:150px;height:150px;object-fit:cover;border-radius:12px;border:1.5px solid #cbd5e1;margin:6px auto">
+<div style="display:flex;gap:8px;justify-content:center"><label style="padding:9px 14px;border-radius:10px;cursor:pointer;background:#2563eb;color:#fff;font-size:14px">🔄 Pilih Gambar<input id="pGambarFile" type="file" accept="image/*" style="display:none" onchange="pilihGambarProduk(this)"></label><button class="danger" id="pGambarHapusBtn" style="display:none" onclick="hapusGambarProduk()">✕ Hapus</button></div>
+<div class="frow"><span class="fic">💬</span><div class="fcol"><label>Keterangan untuk katalog</label><input id="pKet" placeholder="Keterangan"></div></div>
+<div class="frow"><span class="fic">🏷️</span><div class="fcol"><label>Kategori</label><input id="pKategori" placeholder="Kategori (Minuman / Makanan / Jasa)"></div></div>
+<div class="frow"><span class="fic">🗂️</span><div class="fcol"><label>Grup produk</label><input id="pGrup" placeholder="Grup produk"></div></div>
+<div class="frow"><span class="fic">🔢</span><div class="fcol"><label>SKU / Barcode</label><input id="pSKU" placeholder="SKU / Barcode"></div></div>
+<div class="frow"><span class="fic">⚖️</span><div class="fcol"><label>Satuan</label><input id="pSatuan" placeholder="Satuan (pcs / kg / porsi)" value="pcs"></div></div>
+<div class="frow"><span class="fic">⚠️</span><div class="fcol"><label>Stok minimum (peringatan)</label><input id="pStokMin" type="number" placeholder="5" value="5"></div></div>
 <div class="hr-block"><div class="hr-title">Harga Lain <span class="hr-hint">mis. harga grosir — pilih di kasir lewat tombol "Harga Lain"</span></div><div id="pHargaLain" class="hr-editor" data-kolom="label,harga"><button type="button" class="secondary" onclick="tambahBarisHarga('pHargaLain')">+ Tambah Harga Lain</button></div></div>
 <div class="hr-block"><div class="hr-title">Harga Jumlah (multi-tingkat) <span class="hr-hint">mis. beli ≥ 12 harganya berubah otomatis di kasir</span></div><div id="pHargaJumlah" class="hr-editor" data-kolom="minQty,harga"><button type="button" class="secondary" onclick="tambahBarisHarga('pHargaJumlah')">+ Tambah Tingkat Harga</button></div></div>
 <div class="hr-block"><div class="hr-title">Satuan Varian <span class="hr-hint">mis. "lsn" isi 12 — pilih di kasir lewat tombol "Varian"</span></div><div id="pVarian" class="hr-editor" data-kolom="label,isi,harga"><button type="button" class="secondary" onclick="tambahBarisHarga('pVarian')">+ Tambah Varian</button></div></div>
-<button class="primary" onclick="simpanProduk()">Simpan Produk</button> <button class="secondary" onclick="resetProduk()">Batal</button></div>
-<div class="card"><h3>Daftar Produk</h3><button class="secondary" onclick="exportProduk()">⬇ Export Produk (CSV)</button><div id="produkTable" style="margin-top:10px"></div></div>
+<button class="primary" style="width:100%;padding:14px;margin-top:12px;font-size:16px" onclick="simpanProduk()">💾 SIMPAN</button>
+<button class="danger" id="produkHapusBtn" style="display:none;width:100%;padding:12px;margin-top:8px" onclick="hapusProduk(document.getElementById('pId').value, this)">Hapus Produk</button>
+</div>
+<div class="card list-view">
+<div class="countbar"><span id="produkCount">Produk: 0</span><span id="produkStokCount">Stok: 0 pcs</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">Produk</h3><button class="secondary" onclick="exportProduk()">⬇ Export (CSV)</button></div>
+<div id="produkTable" style="margin-top:6px"></div>
+<button class="fab" onclick="resetProduk();bukaForm('produk')" aria-label="Tambah produk">+</button>
+</div>
 </section>
 
 <section id="stok">
@@ -443,8 +518,11 @@ body.dark .menu-item{background:#1e293b}
 </section>
 
 <section id="pembelian">
-<div class="card"><h3>Tambah Pemasok</h3><div class="flex"><input id="pmNama" placeholder="Nama pemasok *"><input id="pmTelp" placeholder="Telepon"><input id="pmAlamat" placeholder="Alamat"></div><button class="primary" onclick="simpanPemasok()">Simpan Pemasok</button><div id="pemasokTable" style="margin-top:12px"></div></div>
-<div class="card"><h3>Pembelian — DRAFT dulu, lalu PROSES</h3>
+<div class="card">
+<div class="form-view" id="formPemasok"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="tutupForm('pembelian')">← Kembali</button><h3 style="margin:0">Tambah Pemasok</h3></div><div class="flex"><input id="pmNama" placeholder="Nama pemasok *"><input id="pmTelp" placeholder="Telepon"><input id="pmAlamat" placeholder="Alamat"></div><button class="primary" onclick="simpanPemasok()">Simpan Pemasok</button></div>
+<div class="list-view"><h3>Pemasok</h3><div id="pemasokTable" style="margin-top:12px"></div><button class="fab" onclick="['pmNama','pmTelp','pmAlamat'].forEach(function(i){document.getElementById(i).value=''});bukaForm('pembelian','formPemasok')" aria-label="Tambah pemasok">+</button></div>
+</div>
+<div class="card list-view"><h3>Pembelian — DRAFT dulu, lalu PROSES</h3>
 <p style="color:#64748b;font-size:14px">Simpan sebagai DRAFT: stok belum bertambah, kas belum bergerak. Tombol PROSES: stok + pengeluaran + utang terbentuk sekaligus dan setelah itu tidak bisa diubah.</p>
 <label>Pemasok <select id="beliPemasok"></select></label>
 <label>Produk <select id="beliProduk"></select></label>
@@ -459,51 +537,73 @@ body.dark .menu-item{background:#1e293b}
 </section>
 
 <section id="pengeluaran">
-<div class="card"><h3>Catat Pengeluaran</h3><div class="flex"><select id="pgKategori"></select><input id="pgKet" placeholder="Keterangan"><input id="pgNominal" type="number" placeholder="Nominal Rp"></div>
+<div class="card form-view" id="formPengeluaran"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="tutupForm('pengeluaran')">← Kembali</button><h3 style="margin:0">Catat Pengeluaran</h3></div><div class="flex"><select id="pgKategori"></select><input id="pgKet" placeholder="Keterangan"><input id="pgNominal" type="number" placeholder="Nominal Rp"></div>
 <label>Efek ke laba <select id="pgEfek"><option value="TidakMengurangi">Tidak mengurangi</option><option value="MengurangiLaba">Mengurangi laba bersih</option><option value="MengurangiOngkir">Mengurangi ongkos kirim</option></select></label>
 <button class="primary" onclick="simpanPengeluaran()">Simpan Pengeluaran</button></div>
-<div class="card"><h3>Daftar Pengeluaran</h3><div id="pengeluaranTable"></div></div>
+<div class="card list-view"><h3>Daftar Pengeluaran</h3><div id="pengeluaranTable"></div><button class="fab" onclick="document.getElementById('pgKet').value='';document.getElementById('pgNominal').value='';bukaForm('pengeluaran')" aria-label="Catat pengeluaran">+</button></div>
 </section>
 
 <section id="aruskas">
-<div class="card"><h3>Uang Masuk / Keluar Manual</h3><div class="flex"><select id="ukJenis"><option>Masuk</option><option>Keluar</option></select><input id="ukKet" placeholder="Keterangan"><input id="ukNominal" type="number" placeholder="Nominal Rp"></div><button class="primary" onclick="simpanUangKas()">Simpan</button></div>
-<div class="card"><h3>Ringkasan Kas &amp; Laba</h3><div id="kasSummary"></div><button class="secondary" onclick="exportKasCSV()">⬇ Export Arus Kas (CSV)</button></div>
-<div class="card"><h3>Arus Kas Terakhir</h3><div id="kasTable"></div></div>
+<div class="card form-view" id="formArusKas"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="tutupForm('aruskas')">← Kembali</button><h3 style="margin:0">Uang Masuk / Keluar Manual</h3></div><div class="flex"><select id="ukJenis"><option>Masuk</option><option>Keluar</option></select><input id="ukKet" placeholder="Keterangan"><input id="ukNominal" type="number" placeholder="Nominal Rp"></div><button class="primary" onclick="simpanUangKas()">Simpan</button></div>
+<div class="card list-view"><h3>Ringkasan Kas &amp; Laba</h3><div id="kasSummary"></div><button class="secondary" onclick="exportKasCSV()">⬇ Export Arus Kas (CSV)</button></div>
+<div class="card list-view"><h3>Arus Kas Terakhir</h3><div id="kasTable"></div><button class="fab" onclick="document.getElementById('ukKet').value='';document.getElementById('ukNominal').value='';bukaForm('aruskas')" aria-label="Catat kas">+</button></div>
 </section>
 
 <section id="utang">
-<div class="card"><h3>Utang Pemasok</h3><p style="color:#64748b;font-size:14px">Utang terbentuk otomatis saat pembelian diproses dengan sisa bayar &gt; 0. Cicil dari sini; kas keluar tercatat.</p><div id="utangTable"></div></div>
-<div class="card"><h3>Cicil Utang</h3><label>Utang <select id="cicilUtangId"></select></label><div class="flex"><input id="cicilNominal" type="number" placeholder="Nominal cicilan (Rp)"><input id="cicilKet" placeholder="Keterangan"></div><button class="primary" onclick="cicilUtang()">Simpan Cicilan</button></div>
+<div class="card list-view"><h3>Utang Pemasok</h3><p style="color:#64748b;font-size:14px">Utang terbentuk otomatis saat pembelian diproses dengan sisa bayar &gt; 0. Cicil dari sini; kas keluar tercatat.</p><div id="utangTable"></div><button class="fab" onclick="document.getElementById('cicilNominal').value='';document.getElementById('cicilKet').value='';bukaForm('utang','formCicil')" aria-label="Cicil utang">+</button></div>
+<div class="card form-view" id="formCicil"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="tutupForm('utang')">← Kembali</button><h3 style="margin:0">Cicil Utang</h3></div><label>Utang <select id="cicilUtangId"></select></label><div class="flex"><input id="cicilNominal" type="number" placeholder="Nominal cicilan (Rp)"><input id="cicilKet" placeholder="Keterangan"></div><button class="primary" onclick="cicilUtang()">Simpan Cicilan</button></div>
 </section>
 
 <section id="pelanggan">
-<div class="card"><h3>Tambah / Edit Pelanggan</h3><input id="plId" type="hidden"><div class="flex"><input id="plNama" placeholder="Nama *"><input id="plTelp" placeholder="Telepon / WA"><input id="plAlamat" placeholder="Alamat"><input id="plLahir" type="date" placeholder="Tanggal lahir"></div><button class="primary" onclick="simpanPelanggan()">Simpan Pelanggan</button> <button class="secondary" onclick="resetPelanggan()">Batal</button></div>
-<div class="card"><h3>Daftar Pelanggan &amp; Piutang</h3><label class="checkrow"><input id="plFilterPiutang" type="checkbox" onchange="renderPelanggan()"> Hanya yang berpiutang</label><div id="pelangganTable" style="margin-top:10px"></div></div>
-<div class="card"><h3>Poin Pelanggan</h3><p style="color:#64748b;font-size:14px">Koreksi manual hanya untuk Admin. Riwayat poin: Dapat / Tukar / Koreksi.</p>
+<div class="card form-view" id="formPelanggan"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="tutupForm('pelanggan')">← Kembali</button><h3 style="margin:0">Tambah / Edit Pelanggan</h3></div><input id="plId" type="hidden"><div class="flex"><input id="plNama" placeholder="Nama *"><input id="plTelp" placeholder="Telepon / WA"><input id="plAlamat" placeholder="Alamat"><input id="plLahir" type="date" placeholder="Tanggal lahir"></div><button class="primary" onclick="simpanPelanggan()">Simpan Pelanggan</button> <button class="secondary" onclick="resetPelanggan()">Batal</button></div>
+<div class="card list-view"><h3>Daftar Pelanggan &amp; Piutang</h3><label class="checkrow"><input id="plFilterPiutang" type="checkbox" onchange="renderPelanggan()"> Hanya yang berpiutang</label><div id="pelangganTable" style="margin-top:10px"></div><button class="fab" onclick="resetPelanggan();bukaForm('pelanggan')" aria-label="Tambah pelanggan">+</button></div>
+<div class="card list-view"><h3>Poin Pelanggan</h3><p style="color:#64748b;font-size:14px">Koreksi manual hanya untuk Admin. Riwayat poin: Dapat / Tukar / Koreksi.</p>
 <label>Pelanggan <select id="poinPelanggan"></select></label>
 <div class="flex"><input id="poinJumlah" type="number" placeholder="Jumlah poin (+ tambah / - kurangi)"><input id="poinKet" placeholder="Keterangan koreksi"></div>
 <button class="primary" onclick="koreksiPoin()">Simpan Koreksi Poin</button> <button class="secondary" onclick="muatRiwayatPoin()">Lihat Riwayat Poin</button>
 <div id="riwayatPoinBox" style="margin-top:10px"></div></div>
-<div class="card"><h3>Tagihan Gabungan</h3><p style="color:#64748b;font-size:14px">Semua transaksi belum lunas satu pelanggan digabung jadi satu teks tagihan untuk dikirim via WhatsApp.</p><label>Pelanggan <select id="tagihanPelanggan"></select></label><button class="primary" onclick="tagihanGabungan()">Buat Tagihan Gabungan</button><div id="tagihanBox" style="margin-top:10px"></div></div>
-<div class="card"><h3>Pengingat Piutang (Jatuh Tempo)</h3><p style="color:#64748b;font-size:14px">Piutang yang transaksi tertuanya sudah lewat batas jatuh tempo (default 7 hari, atur di Pengaturan &gt; JatuhTempoHari). Ketuk "Ingatkan via WA" untuk mengirim pengingat ke nomor pelanggan. Pengiriman WA manual satu ketuk.</p><button class="primary" onclick="muatPengingatPiutang()">Muat Pengingat Piutang</button><div id="pengingatBox" style="margin-top:10px"></div></div>
-<div class="card"><h3>Pelanggan Lama Tidak Datang (Win-back)</h3><p style="color:#64748b;font-size:14px">Pelanggan yang terakhir belinya lebih dari 30 hari lalu — cocok dihubungi lagi.</p><div id="winbackBox"></div></div>
+<div class="card list-view"><h3>Tagihan Gabungan</h3><p style="color:#64748b;font-size:14px">Semua transaksi belum lunas satu pelanggan digabung jadi satu teks tagihan untuk dikirim via WhatsApp.</p><label>Pelanggan <select id="tagihanPelanggan"></select></label><button class="primary" onclick="tagihanGabungan()">Buat Tagihan Gabungan</button><div id="tagihanBox" style="margin-top:10px"></div></div>
+<div class="card list-view"><h3>Pengingat Piutang (Jatuh Tempo)</h3><p style="color:#64748b;font-size:14px">Piutang yang transaksi tertuanya sudah lewat batas jatuh tempo (default 7 hari, atur di Pengaturan &gt; JatuhTempoHari). Ketuk "Ingatkan via WA" untuk mengirim pengingat ke nomor pelanggan. Pengiriman WA manual satu ketuk.</p><button class="primary" onclick="muatPengingatPiutang()">Muat Pengingat Piutang</button><div id="pengingatBox" style="margin-top:10px"></div></div>
+<div class="card list-view"><h3>Pelanggan Lama Tidak Datang (Win-back)</h3><p style="color:#64748b;font-size:14px">Pelanggan yang terakhir belinya lebih dari 30 hari lalu — cocok dihubungi lagi.</p><div id="winbackBox"></div></div>
 </section>
 
 <section id="meja">
-<div class="card"><h3>Daftar Meja</h3><div class="flex"><input id="mjNama" placeholder="Nama meja (mis. Meja 1)"></div><button class="primary" onclick="simpanMeja()">Tambah Meja</button><div id="mejaTable" style="margin-top:12px"></div></div>
-<div class="card"><h3>Dapur — Pesanan</h3><button class="secondary" onclick="muatDapur()">Muat Ulang Dapur</button><div id="dapurBox" style="margin-top:10px"></div></div>
+<div class="card form-view" id="formMeja"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="tutupForm('meja')">← Kembali</button><h3 style="margin:0">Tambah Meja</h3></div><div class="flex"><input id="mjNama" placeholder="Nama meja (mis. Meja 1)"></div><button class="primary" onclick="simpanMeja()">Simpan Meja</button></div>
+<div class="card list-view"><h3>Daftar Meja</h3><div id="mejaTable" style="margin-top:12px"></div><button class="fab" onclick="document.getElementById('mjNama').value='';bukaForm('meja','formMeja')" aria-label="Tambah meja">+</button></div>
+<div class="card list-view"><h3>Dapur — Pesanan</h3><button class="secondary" onclick="muatDapur()">Muat Ulang Dapur</button><div id="dapurBox" style="margin-top:10px"></div></div>
 </section>
 
 <section id="master">
-<div class="card"><h3>Master</h3><div class="flex"><button class="secondary" onclick="go('produk')">Produk</button><button class="secondary" onclick="go('pelanggan')">Pelanggan</button><button class="secondary" onclick="go('pembelian')">Pemasok</button><button class="secondary" onclick="go('cepat')">Transaksi Cepat</button><button class="secondary" onclick="go('katalog')">Katalog</button><button class="secondary" onclick="go('promo')">Poin</button></div></div>
-<div class="card"><h3>Grup Produk</h3><input id="gId" type="hidden"><div class="flex"><input id="gNama" placeholder="Nama grup"></div><button class="primary" onclick="simpanGrup()">Simpan Grup</button><div id="grupTable" style="margin-top:10px"></div></div>
-<div class="card"><h3>Satuan</h3><input id="stId" type="hidden"><div class="flex"><input id="stNama" placeholder="Nama satuan"><input id="stSingkat" placeholder="Singkatan"><select id="stDesimal"><option value="TIDAK">Desimal: TIDAK</option><option value="YA">Desimal: YA</option></select></div><button class="primary" onclick="simpanSatuan()">Simpan Satuan</button><div id="satuanTable" style="margin-top:10px"></div></div>
-<div class="card"><h3>Jenis Pembayaran</h3><input id="jbId" type="hidden"><div class="flex"><input id="jbNama" placeholder="Nama jenis bayar (mis. QRIS)"></div><button class="primary" onclick="simpanJenisBayar()">Simpan</button><div id="jenisBayarTable" style="margin-top:10px"></div></div>
-<div class="card"><h3>Item Pengeluaran</h3><input id="ipId" type="hidden"><div class="flex"><input id="ipNama" placeholder="Nama item pengeluaran (mis. Listrik)"></div><button class="primary" onclick="simpanItemPengeluaran()">Simpan</button><div id="itemPengeluaranTable" style="margin-top:10px"></div></div>
-<div class="card"><h3>Daftar Teks (Template Catatan)</h3><input id="txId" type="hidden"><div class="flex"><input id="txNama" placeholder="Nama teks"><input id="txKet" placeholder="Keterangan / isi teks"><select id="txJenis"><option value="Item">Catatan Item</option><option value="Struk">Catatan Struk</option></select></div><button class="primary" onclick="simpanTeks()">Simpan Teks</button><div id="teksTable" style="margin-top:10px"></div></div>
-<div class="card"><h3>Pegawai (Target &amp; Komisi)</h3><input id="pgwId" type="hidden"><div class="flex"><input id="pgwNama" placeholder="Nama pegawai"><input id="pgwTelp" placeholder="Telepon"><input id="pgwJabatan" placeholder="Jabatan"><input id="pgwTarget" type="number" placeholder="Target (Rp)"><input id="pgwKomisi" type="number" placeholder="Komisi (%)"></div><button class="primary" onclick="simpanPegawai()">Simpan Pegawai</button><div id="pegawaiTable" style="margin-top:10px"></div></div>
-<div class="card"><h3>Bahan Baku</h3><div class="flex"><input id="bNama" placeholder="Nama bahan *"><input id="bSatuan" placeholder="Satuan (kg / liter / pcs)"><input id="bStok" type="number" placeholder="Stok"><input id="bHarga" type="number" placeholder="Harga per satuan"><input id="bMin" type="number" placeholder="Stok minimum" value="5"></div><button class="primary" onclick="simpanBahan()">Simpan Bahan</button><div id="bahanTable" style="margin-top:10px"></div></div>
-<div class="card"><h3>Resep &amp; HPP Kalkulator</h3><p style="color:#64748b;font-size:14px">Pilih produk, tambahkan bahan + jumlah pakai per 1 produk. Harga modal produk dihitung otomatis dari resep, dan stok bahan berkurang saat produk terjual.</p>
+<div class="card list-view"><h3>Master</h3><div class="flex"><button class="secondary" onclick="go('produk')">Produk</button><button class="secondary" onclick="go('pelanggan')">Pelanggan</button><button class="secondary" onclick="go('pembelian')">Pemasok</button><button class="secondary" onclick="go('cepat')">Transaksi Cepat</button><button class="secondary" onclick="go('katalog')">Katalog</button><button class="secondary" onclick="go('promo')">Poin</button></div></div>
+<div class="card">
+<div class="form-view" id="formGrup"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="tutupForm('master')">← Kembali</button><h3 style="margin:0">Tambah Grup</h3></div><input id="gId" type="hidden"><div class="flex"><input id="gNama" placeholder="Nama grup"></div><button class="primary" onclick="simpanGrup()">Simpan Grup</button></div>
+<div class="list-view"><h3>Grup Produk</h3><div id="grupTable" style="margin-top:10px"></div><button class="fab" onclick="document.getElementById('gNama').value='';bukaForm('master','formGrup')" aria-label="Tambah grup">+</button></div>
+</div>
+<div class="card">
+<div class="form-view" id="formSatuan"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="tutupForm('master')">← Kembali</button><h3 style="margin:0">Tambah Satuan</h3></div><input id="stId" type="hidden"><div class="flex"><input id="stNama" placeholder="Nama satuan"><input id="stSingkat" placeholder="Singkatan"><select id="stDesimal"><option value="TIDAK">Desimal: TIDAK</option><option value="YA">Desimal: YA</option></select></div><button class="primary" onclick="simpanSatuan()">Simpan Satuan</button></div>
+<div class="list-view"><h3>Satuan</h3><div id="satuanTable" style="margin-top:10px"></div><button class="fab" onclick="document.getElementById('stNama').value='';document.getElementById('stSingkat').value='';bukaForm('master','formSatuan')" aria-label="Tambah satuan">+</button></div>
+</div>
+<div class="card">
+<div class="form-view" id="formJenisBayar"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="tutupForm('master')">← Kembali</button><h3 style="margin:0">Tambah Jenis Pembayaran</h3></div><input id="jbId" type="hidden"><div class="flex"><input id="jbNama" placeholder="Nama jenis bayar (mis. QRIS)"></div><button class="primary" onclick="simpanJenisBayar()">Simpan</button></div>
+<div class="list-view"><h3>Jenis Pembayaran</h3><div id="jenisBayarTable" style="margin-top:10px"></div><button class="fab" onclick="document.getElementById('jbNama').value='';bukaForm('master','formJenisBayar')" aria-label="Tambah jenis bayar">+</button></div>
+</div>
+<div class="card">
+<div class="form-view" id="formItemPengeluaran"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="tutupForm('master')">← Kembali</button><h3 style="margin:0">Tambah Item Pengeluaran</h3></div><input id="ipId" type="hidden"><div class="flex"><input id="ipNama" placeholder="Nama item pengeluaran (mis. Listrik)"></div><button class="primary" onclick="simpanItemPengeluaran()">Simpan</button></div>
+<div class="list-view"><h3>Item Pengeluaran</h3><div id="itemPengeluaranTable" style="margin-top:10px"></div><button class="fab" onclick="document.getElementById('ipNama').value='';bukaForm('master','formItemPengeluaran')" aria-label="Tambah item pengeluaran">+</button></div>
+</div>
+<div class="card">
+<div class="form-view" id="formTeks"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="tutupForm('master')">← Kembali</button><h3 style="margin:0">Tambah Teks</h3></div><input id="txId" type="hidden"><div class="flex"><input id="txNama" placeholder="Nama teks"><input id="txKet" placeholder="Keterangan / isi teks"><select id="txJenis"><option value="Item">Catatan Item</option><option value="Struk">Catatan Struk</option></select></div><button class="primary" onclick="simpanTeks()">Simpan Teks</button></div>
+<div class="list-view"><h3>Daftar Teks (Template Catatan)</h3><div id="teksTable" style="margin-top:10px"></div><button class="fab" onclick="document.getElementById('txNama').value='';document.getElementById('txKet').value='';bukaForm('master','formTeks')" aria-label="Tambah teks">+</button></div>
+</div>
+<div class="card">
+<div class="form-view" id="formPegawai"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="tutupForm('master')">← Kembali</button><h3 style="margin:0">Tambah Pegawai</h3></div><input id="pgwId" type="hidden"><div class="flex"><input id="pgwNama" placeholder="Nama pegawai"><input id="pgwTelp" placeholder="Telepon"><input id="pgwJabatan" placeholder="Jabatan"><input id="pgwTarget" type="number" placeholder="Target (Rp)"><input id="pgwKomisi" type="number" placeholder="Komisi (%)"></div><button class="primary" onclick="simpanPegawai()">Simpan Pegawai</button></div>
+<div class="list-view"><h3>Pegawai (Target &amp; Komisi)</h3><div id="pegawaiTable" style="margin-top:10px"></div><button class="fab" onclick="['pgwNama','pgwTelp','pgwJabatan','pgwTarget','pgwKomisi'].forEach(function(i){document.getElementById(i).value=''});bukaForm('master','formPegawai')" aria-label="Tambah pegawai">+</button></div>
+</div>
+<div class="card">
+<div class="form-view" id="formBahan"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="tutupForm('master')">← Kembali</button><h3 style="margin:0">Tambah Bahan Baku</h3></div><div class="flex"><input id="bNama" placeholder="Nama bahan *"><input id="bSatuan" placeholder="Satuan (kg / liter / pcs)"><input id="bStok" type="number" placeholder="Stok"><input id="bHarga" type="number" placeholder="Harga per satuan"><input id="bMin" type="number" placeholder="Stok minimum" value="5"></div><button class="primary" onclick="simpanBahan()">Simpan Bahan</button></div>
+<div class="list-view"><h3>Bahan Baku</h3><div id="bahanTable" style="margin-top:10px"></div><button class="fab" onclick="['bNama','bSatuan','bStok','bHarga'].forEach(function(i){document.getElementById(i).value=''});bukaForm('master','formBahan')" aria-label="Tambah bahan">+</button></div>
+</div>
+<div class="card list-view"><h3>Resep &amp; HPP Kalkulator</h3><p style="color:#64748b;font-size:14px">Pilih produk, tambahkan bahan + jumlah pakai per 1 produk. Harga modal produk dihitung otomatis dari resep, dan stok bahan berkurang saat produk terjual.</p>
 <label>Produk <select id="resepProduk" onchange="renderBahan()"></select></label>
 <div class="flex"><select id="resepBahan"></select><input id="resepQty" type="number" step="0.01" placeholder="Qty pakai per produk"></div>
 <button class="primary" onclick="tambahResepRow()">Tambah ke Resep</button>
@@ -512,7 +612,7 @@ body.dark .menu-item{background:#1e293b}
 </section>
 
 <section id="katalog">
-<div class="card"><h3>Tambah / Edit Katalog</h3><p style="color:#64748b;font-size:14px">Nama wajib diisi. Katalog dibuka lewat tautan publik — pelanggan tidak perlu aplikasi.</p>
+<div class="card form-view" id="formKatalog"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="tutupForm('katalog')">← Kembali</button><h3 style="margin:0">Tambah / Edit Katalog</h3></div><p style="color:#64748b;font-size:14px">Nama wajib diisi. Katalog dibuka lewat tautan publik — pelanggan tidak perlu aplikasi.</p>
 <input id="ktgId" type="hidden"><input id="ktgNama" placeholder="Nama katalog *">
 <label class="checkrow"><input id="ktgGambar" type="checkbox" checked> Tampilkan gambar</label>
 <label class="checkrow"><input id="ktgHarga" type="checkbox" checked> Tampilkan harga</label>
@@ -521,12 +621,12 @@ body.dark .menu-item{background:#1e293b}
 <label class="checkrow"><input id="ktgKet" type="checkbox"> Tampilkan keterangan</label>
 <input id="ktgFooter" placeholder="Footer katalog (mis. Terima kasih)">
 <button class="primary" onclick="simpanKatalog()">Simpan Katalog</button> <button class="secondary" onclick="resetKatalog()">Batal</button></div>
-<div class="card"><h3>Daftar Katalog</h3><div id="katalogTable"></div><div id="katalogLinkBox" style="margin-top:10px"></div></div>
-<div class="card"><h3>Pratinjau Katalog Publik</h3><div id="katalogPreview"></div></div>
+<div class="card list-view"><h3>Daftar Katalog</h3><div id="katalogTable"></div><div id="katalogLinkBox" style="margin-top:10px"></div><button class="fab" onclick="resetKatalog();bukaForm('katalog')" aria-label="Tambah katalog">+</button></div>
+<div class="card list-view"><h3>Pratinjau Katalog Publik</h3><div id="katalogPreview"></div></div>
 </section>
 
 <section id="promo">
-<div class="card"><h3>Tambah / Edit Promo</h3><input id="prmId" type="hidden"><div class="flex">
+<div class="card form-view" id="formPromo"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="tutupForm('promo')">← Kembali</button><h3 style="margin:0">Tambah / Edit Promo</h3></div><input id="prmId" type="hidden"><div class="flex">
 <input id="prmNama" placeholder="Nama promo *">
 <select id="prmJenis"><option value="BeliXGratisY">Beli X Gratis Y</option><option value="DiskonPersen">Diskon Persen</option><option value="DiskonNominal">Diskon Nominal</option><option value="HappyHour">Happy Hour</option><option value="Bundling">Bundling</option></select>
 <input id="prmNilai" type="number" placeholder="Nilai (persen / nominal / sesuai jenis)">
@@ -534,10 +634,10 @@ body.dark .menu-item{background:#1e293b}
 <div class="flex"><input id="prmMulai" type="date"><input id="prmSelesai" type="date"><input id="prmJamMulai" type="time"><input id="prmJamSelesai" type="time"></div>
 <div class="flex"><input id="prmHari" placeholder="Hari berlaku (mis. Senin,Selasa)"><input id="prmCabang" placeholder="Cabang ID (kosong = semua cabang)"></div>
 <button class="primary" onclick="simpanPromo()">Simpan Promo</button> <button class="secondary" onclick="resetPromo()">Batal</button></div>
-<div class="card"><h3>Daftar Promo</h3><div id="promoTable"></div></div>
-<div class="card"><h3>Tier Member</h3><p style="color:#64748b;font-size:14px">Tier dihitung otomatis dari TotalBeli pelanggan. Silver dan Gold contoh bawaan; tambah/ubah tier dari form di bawah.</p><div id="tierTable"></div>
+<div class="card list-view"><h3>Daftar Promo</h3><div id="promoTable"></div><button class="fab" onclick="resetPromo();bukaForm('promo')" aria-label="Tambah promo">+</button></div>
+<div class="card list-view"><h3>Tier Member</h3><p style="color:#64748b;font-size:14px">Tier dihitung otomatis dari TotalBeli pelanggan. Silver dan Gold contoh bawaan; tambah/ubah tier dari form di bawah.</p><div id="tierTable"></div>
 <div class="flex"><input id="tierNama" placeholder="Nama tier (mis. Silver)"><input id="tierMin" type="number" placeholder="Min total beli (Rp)"><input id="tierDiskon" type="number" placeholder="Diskon (%)"><input id="tierManfaat" placeholder="Manfaat tier"></div><button class="secondary" onclick="catatTier()">Simpan Tier</button></div>
-<div class="card"><h3>Ulang Tahun Bulan Ini — Promo Ulang Tahun</h3><div id="ulangTahunBox"></div></div>
+<div class="card list-view"><h3>Ulang Tahun Bulan Ini — Promo Ulang Tahun</h3><div id="ulangTahunBox"></div></div>
 </section>
 
 <section id="laporan">
@@ -561,16 +661,16 @@ body.dark .menu-item{background:#1e293b}
 </section>
 
 <section id="pengguna">
-<div class="card"><h3>Tambah / Edit Pengguna (Multi-User &amp; Peran)</h3><p style="color:#64748b;font-size:14px">Admin bisa semua menu. Kasir hanya Home, Transaksi Baru, dan Pelanggan &amp; Piutang (plus batas izin di bawah). Kalau belum ada pengguna sama sekali, login dilewati.</p>
+<div class="card form-view" id="formPengguna"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="tutupForm('pengguna')">← Kembali</button><h3 style="margin:0">Tambah / Edit Pengguna</h3></div><p style="color:#64748b;font-size:14px">Admin bisa semua menu. Kasir hanya Home, Transaksi Baru, dan Pelanggan &amp; Piutang (plus batas izin di bawah). Kalau belum ada pengguna sama sekali, login dilewati.</p>
 <input id="uId" type="hidden"><div class="flex"><input id="uNama" placeholder="Nama pengguna *"><input id="uPin" placeholder="PIN (angka) *"><select id="uPeran"><option>Kasir</option><option>Admin</option></select><select id="uCabang"><option value="">— Semua cabang —</option></select>
 <select id="uAkses"><option>Tidak dibatasi</option><option>1 Jam</option><option>3 Jam</option><option>Hari ini</option><option>7 Hari</option><option>30 Hari</option></select></div>
 <h4>Izin Granular</h4><div id="izinBox" class="flex"></div>
 <button class="primary" onclick="simpanPengguna()">Simpan Pengguna</button> <button class="secondary" onclick="resetPengguna()">Batal</button></div>
-<div class="card"><h3>Daftar Pengguna</h3><div id="penggunaTable"></div></div>
+<div class="card list-view"><h3>Daftar Pengguna</h3><div id="penggunaTable"></div><button class="fab" onclick="resetPengguna();bukaForm('pengguna')" aria-label="Tambah pengguna">+</button></div>
 </section>
 
 <section id="pengaturan">
-<div class="card"><h3>Profil Toko</h3>
+<div class="card list-view"><h3>Profil Toko</h3>
 <p style="color:#64748b;font-size:14px;margin-top:0">Yang tampil di struk: logo, nama, slogan, alamat, kota, telepon, dan Print Footer di bawah struk — seperti Profil di Griyo. Kosongkan alamat/kota/telepon bila tidak ingin tampil di struk.</p>
 <h4 style="margin:14px 0 6px">Logo Struk</h4>
 <p style="color:#64748b;font-size:13px;margin:0 0 8px">Tiap slot ada gunanya: Logo 1 di atas struk, Logo 2 dipakai di gambar struk (WhatsApp), Watermark tampil samar di belakang isi struk. Kosongkan slot yang tidak dipakai.</p>
@@ -588,7 +688,7 @@ body.dark .menu-item{background:#1e293b}
 <h4 style="margin:14px 0 6px">Pratinjau Struk</h4>
 <div id="profilPreview" style="background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:14px"></div>
 <button class="primary" onclick="simpanPengaturan()" style="margin-top:12px">Simpan Profil Toko</button></div>
-<div class="card"><h3>Pengaturan Operasional</h3>
+<div class="card list-view"><h3>Pengaturan Operasional</h3>
 <label>Target Omzet Harian (Rp) <input id="sTarget" type="number"></label>
 <label>Cabang Aktif <select id="sCabangAktif"></select></label>
 <label>Nomor WhatsApp Pemilik (format 628xx tanpa +) <input id="sWa" placeholder="62812xxxx"></label>
@@ -610,9 +710,12 @@ body.dark .menu-item{background:#1e293b}
 <label>Multi Cabang Aktif <select id="sMultiCabang"><option value="YA">YA</option><option value="TIDAK">TIDAK</option></select></label>
 </div>
 <button class="primary" onclick="simpanPengaturan()">Simpan Pengaturan</button></div>
-<div class="card"><h3>Cabang</h3><input id="cbId" type="hidden"><div class="flex"><input id="cbNama" placeholder="Nama cabang *"><input id="cbAlamat" placeholder="Alamat"><input id="cbTelp" placeholder="Telepon"></div><button class="primary" onclick="simpanCabang()">Simpan Cabang</button><div id="cabangTable" style="margin-top:10px"></div></div>
-<div class="card"><h3>Terjemahan Bebas (Istilah Struk)</h3><p style="color:#64748b;font-size:14px">Ubah istilah struk, mis. Kasir → “Petugas”, Pelanggan → “Mitra”.</p><div id="terjemahanBox"></div><button class="secondary" onclick="simpanTerjemahan()">Simpan Terjemahan</button></div>
-<div class="card"><h3>Logs — Jejak Audit (100 terbaru)</h3><button class="secondary" onclick="muatLogs()">Muat Logs</button><div id="logsBox" style="margin-top:10px"></div></div>
+<div class="card">
+<div class="form-view" id="formCabang"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="tutupForm('pengaturan')">← Kembali</button><h3 style="margin:0">Tambah Cabang</h3></div><input id="cbId" type="hidden"><div class="flex"><input id="cbNama" placeholder="Nama cabang *"><input id="cbAlamat" placeholder="Alamat"><input id="cbTelp" placeholder="Telepon"></div><button class="primary" onclick="simpanCabang()">Simpan Cabang</button></div>
+<div class="list-view"><h3>Cabang</h3><div id="cabangTable" style="margin-top:10px"></div><button class="fab" onclick="['cbNama','cbAlamat','cbTelp'].forEach(function(i){document.getElementById(i).value=''});bukaForm('pengaturan','formCabang')" aria-label="Tambah cabang">+</button></div>
+</div>
+<div class="card list-view"><h3>Terjemahan Bebas (Istilah Struk)</h3><p style="color:#64748b;font-size:14px">Ubah istilah struk, mis. Kasir → “Petugas”, Pelanggan → “Mitra”.</p><div id="terjemahanBox"></div><button class="secondary" onclick="simpanTerjemahan()">Simpan Terjemahan</button></div>
+<div class="card list-view"><h3>Logs — Jejak Audit (100 terbaru)</h3><button class="secondary" onclick="muatLogs()">Muat Logs</button><div id="logsBox" style="margin-top:10px"></div></div>
 </section>
 
 <section id="printArea"><div id="strukPrint"></div></section>
