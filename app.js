@@ -75,6 +75,15 @@ function tampilError(msg) {
   var el = document.getElementById('errBar');
   if (!el) return;
   el.textContent = msg;
+  el.style.background = '#fee2e2'; el.style.color = '#991b1b'; el.style.borderBottom = '1px solid #fca5a5';
+  el.style.display = 'block';
+}
+// Pesan info (hijau) di banner yang sama — terlihat di layar, bukan hanya alert.
+function tampilInfo(msg) {
+  var el = document.getElementById('errBar');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.background = '#dcfce7'; el.style.color = '#166534'; el.style.borderBottom = '1px solid #86efac';
   el.style.display = 'block';
 }
 function sembunyiError() {
@@ -569,11 +578,17 @@ async function kirimWAGambar() {
     var file = new File([blob], nama, { type: 'image/png' });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       await navigator.share({ files: [file], title: 'Struk Zho POS' });
+      tampilInfo('Struk dibagikan. Pilih WhatsApp di menu berbagi.');
       return;
     }
     unduhBlob(blob, nama);
-    alert('Gambar struk sudah diunduh (' + nama + '). Buka WhatsApp, pilih kontak, lalu lampirkan gambar itu.');
-  } catch (e) { kirimWA(); }
+    tampilInfo('Gambar struk sudah diunduh (' + nama + '). Buka WhatsApp, pilih kontak, lalu lampirkan gambar itu.');
+  } catch (e) {
+    // Pengguna membatalkan menu berbagi: jangan kirim teks tiba-tiba.
+    if (e && e.name === 'AbortError') return;
+    tampilError('Gagal membuat gambar struk (' + (e && e.message ? e.message : e) + '). Mengirim struk teks…');
+    kirimWA();
+  }
 }
 function unduhBlob(blob, nama) {
   var a = document.createElement('a');
