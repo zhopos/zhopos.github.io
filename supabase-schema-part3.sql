@@ -51,7 +51,6 @@ insert into pengaturan (kunci, nilai) values
   ('FooterStruk', 'Terima kasih'),
   ('Logo2', ''),
   ('Watermark', ''),
-  ('LogoBawah', ''),
   ('StrukUkuranKertas', '58')
 on conflict (kunci) do nothing;
 

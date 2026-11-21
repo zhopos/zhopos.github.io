@@ -171,7 +171,7 @@ function isiPengaturanForm() {
   set('sPoinAktif', p.PoinAktif || 'YA'); set('sPajakAktif', p.PajakAktif || 'TIDAK'); set('sGelap', p.ModeGelap || 'TIDAK');
   set('sPoinStruk', p.TampilkanPoinStruk || 'YA'); set('sWatermark', p.WatermarkStruk || 'TIDAK'); set('sKertas', p.StrukUkuranKertas || '58');
   set('sMeja', p.ModeMejaAktif || 'TIDAK'); set('sPromo', p.PromoAktif || 'YA'); set('sMultiCabang', p.MultiCabangAktif || 'YA');
-  logoDataUrl = p.LogoToko || ''; logo2DataUrl = p.Logo2 || ''; watermarkDataUrl = p.Watermark || ''; logoBawahDataUrl = p.LogoBawah || ''; tampilLogoPreview();
+  logoDataUrl = p.LogoToko || ''; logo2DataUrl = p.Logo2 || ''; watermarkDataUrl = p.Watermark || ''; tampilLogoPreview();
   var cb = document.getElementById('sCabangAktif');
   cb.innerHTML = (DATA.cabang || []).map(function (c) { return '<option value="' + esc(c.ID) + '"' + (String(c.ID) === String(p.CabangAktif) ? ' selected' : '') + '>' + esc(c.Nama) + '</option>'; }).join('');
   pratinjauProfil();
@@ -188,7 +188,7 @@ function pratinjauProfil() {
     kota: document.getElementById('sKota').value || '',
     telepon: document.getElementById('sTelp').value || '',
     footer: document.getElementById('sFooter').value || 'Terima kasih',
-    logo: logoDataUrl || p.LogoToko || '', logo2: logo2DataUrl || p.Logo2 || '', watermark: watermarkDataUrl || p.Watermark || '', logoBawah: logoBawahDataUrl || p.LogoBawah || '',
+    logo: logoDataUrl || p.LogoToko || '', logo2: logo2DataUrl || p.Logo2 || '', watermark: watermarkDataUrl || p.Watermark || '',
     tanggal: new Date(), nomor: 8, kode: 'ABCC9B', pelanggan: 'Shopee', kasir: 'Admin', metode: 'Tunai',
     items: [{ nama: 'Bakwan beku 250gr', qty: 1, harga: 1000, subtotal: 1000 }, { nama: 'Buku gambar', qty: 1, harga: 1000, subtotal: 1000 }, { nama: 'Buku tulis', qty: 1, harga: 1000, subtotal: 1000 }],
     rincian: [], total: 3000, bayar: 3000, kembali: 0, sisa: 0, status: 'Lunas', catatan: '', poin: '', rugi: false
@@ -562,7 +562,7 @@ function strukDataDariTrx(t) {
   return {
     id: t.ID, kode: t.KodeAlternatif || '', nomor: trxNomor[t.ID] || '',
     toko: p.NamaToko || 'Zho POS', slogan: p.SloganToko || '', alamat: p.AlamatToko || '', kota: p.KotaToko || '', telepon: p.TeleponToko || '', footer: p.FooterStruk || 'Terima kasih',
-    logo: p.LogoToko || logoDataUrl || '', logo2: p.Logo2 || logo2DataUrl || '', watermark: p.Watermark || watermarkDataUrl || '', logoBawah: p.LogoBawah || logoBawahDataUrl || '', tanggal: new Date(t.Tanggal), pelanggan: t.Pelanggan || 'Umum', kasir: t.Kasir || '',
+    logo: p.LogoToko || logoDataUrl || '', logo2: p.Logo2 || logo2DataUrl || '', watermark: p.Watermark || watermarkDataUrl || '', tanggal: new Date(t.Tanggal), pelanggan: t.Pelanggan || 'Umum', kasir: t.Kasir || '',
     metode: t.Metode || 'Tunai', items: items, rincian: rincian, total: Number(t.Total || 0), bayar: Number(t.Bayar || 0),
     kembali: Math.max(0, Number(t.Bayar || 0) - Number(t.Total || 0)), sisa: Number(t.Sisa || 0),
     status: t.StatusBayar || '', catatan: t.CatatanStruk || '', poin: '', rugi: false
@@ -625,7 +625,6 @@ function strukHtml(d) {
   if (d.poin) h += '<div class="struk-info" style="margin-top:6px">' + esc(d.poin) + '</div>';
   if (d.catatan) h += '<div class="struk-info" style="margin-top:6px">Catatan: ' + esc(d.catatan) + '</div>';
   h += '<div class="struk-thanks">' + esc(d.footer || 'Terima kasih') + '</div>';
-  if (d.logoBawah) h += '<div style="text-align:center;margin-top:10px"><img src="' + d.logoBawah + '" style="max-width:120px;max-height:120px"></div>';
   h += '</div></div>';
   return h;
 }
@@ -643,7 +642,7 @@ function buatStruk(res, payload, h, pl) {
   lastStrukData = {
     id: res.id || '', kode: res.kodeAlternatif || '', nomor: (DATA.transaksi || []).length + 1,
     toko: p.NamaToko || 'Zho POS', slogan: p.SloganToko || '', alamat: p.AlamatToko || '', kota: p.KotaToko || '', telepon: p.TeleponToko || '', footer: p.FooterStruk || 'Terima kasih',
-    logo: p.LogoToko || logoDataUrl || '', logo2: p.Logo2 || logo2DataUrl || '', watermark: p.Watermark || watermarkDataUrl || '', logoBawah: p.LogoBawah || logoBawahDataUrl || '', tanggal: new Date(), pelanggan: payload.pelanggan, kasir: payload.kasir || '',
+    logo: p.LogoToko || logoDataUrl || '', logo2: p.Logo2 || logo2DataUrl || '', watermark: p.Watermark || watermarkDataUrl || '', tanggal: new Date(), pelanggan: payload.pelanggan, kasir: payload.kasir || '',
     metode: payload.metode || 'Tunai',
     items: payload.items.map(function (it) { return { nama: it.nama, qty: it.Qty, harga: it.Harga - (it.diskonItem || 0), subtotal: it.Harga * it.Qty - (it.diskonItem || 0) * it.Qty }; }),
     rincian: rincian, total: h.total, bayar: payload.bayar,
@@ -698,8 +697,8 @@ function gambarStruk() {
   return new Promise(function (selesai, gagal) {
     var d = lastStrukData;
     if (!d) return gambarStrukTeks().then(selesai, gagal);
-    // Muat 3 gambar sekaligus: logo atas (Logo 2 bila ada, kalau tidak Logo 1),
-    // watermark, dan logo bawah. Yang kosong dilewati.
+    // Muat 2 gambar sekaligus: logo atas (Logo 2 bila ada, kalau tidak Logo 1)
+    // dan watermark. Yang kosong dilewati.
     var muatSatu = function (src, cb) {
       if (!src) return cb(null);
       var img = new Image();
@@ -738,7 +737,6 @@ function gambarStruk() {
         if (d.catatan) baris.push({ t: 'Catatan: ' + d.catatan, a: 'c', s: 24, w: '#333' });
         baris.push({ sp: 8 });
         baris.push({ t: d.footer || 'Terima kasih', a: 'c', s: 26 });
-        if (g.bawah) baris.push({ logo: g.bawah });
         var tinggi = pad * 2;
         baris.forEach(function (r) {
           if (r.logo) { var sk = Math.min(1, 220 / r.logo.width, 160 / r.logo.height); tinggi += Math.round(r.logo.height * sk) + 16; }
@@ -783,11 +781,10 @@ function gambarStruk() {
         cv.toBlob(function (b) { b ? selesai(b) : gagal(new Error('gagal membuat gambar')); }, 'image/png');
       } catch (e) { gagal(e); }
     };
-    var gambar = {}, tinggal = 3;
+    var gambar = {}, tinggal = 2;
     var siap = function () { if (--tinggal === 0) gambarSemua(gambar); };
     muatSatu(logoGrafis(d), function (im) { gambar.atas = im; siap(); });
     muatSatu(d.watermark || '', function (im) { gambar.wm = im; siap(); });
-    muatSatu(d.logoBawah || '', function (im) { gambar.bawah = im; siap(); });
   });
 }
 // Jalan darurat: struk lama tanpa data terstruktur, gambar apa adanya dari teks.
@@ -1545,18 +1542,16 @@ async function simpanPengguna() {
 }
 async function hapusPengguna(id) { if (confirm('Hapus pengguna ini?')) { await DB.hapusPengguna({ id: id }); await loadData(); } }
 
-/* ---------- LOGO STRUK (4 slot ala Griyo) ----------
+/* ---------- LOGO STRUK (3 slot ala Griyo) ----------
    LogoToko  = Logo 1, Mode teks — logo utama di atas struk.
    Logo2     = Logo 2, Mode grafis & WhatsApp — logo di gambar struk (kanvas PNG).
                Kosong = pakai Logo 1.
-   Watermark = logo samar di belakang isi struk (layar, cetak, gambar).
-   LogoBawah = logo di bawah struk, sesudah kalimat penutup. */
-var logoDataUrl = '', logo2DataUrl = '', watermarkDataUrl = '', logoBawahDataUrl = '';
+   Watermark = logo samar di belakang isi struk (layar, cetak, gambar). */
+var logoDataUrl = '', logo2DataUrl = '', watermarkDataUrl = '';
 var LOGO_SLOT = {
   LogoToko: { get: function () { return logoDataUrl; }, set: function (v) { logoDataUrl = v; }, file: 'logoFile', img: 'logoPreview', hapus: 'logoHapusBtn' },
   Logo2: { get: function () { return logo2DataUrl; }, set: function (v) { logo2DataUrl = v; }, file: 'logo2File', img: 'logo2Preview', hapus: 'logo2HapusBtn' },
-  Watermark: { get: function () { return watermarkDataUrl; }, set: function (v) { watermarkDataUrl = v; }, file: 'wmFile', img: 'wmPreview', hapus: 'wmHapusBtn' },
-  LogoBawah: { get: function () { return logoBawahDataUrl; }, set: function (v) { logoBawahDataUrl = v; }, file: 'bawahFile', img: 'bawahPreview', hapus: 'bawahHapusBtn' }
+  Watermark: { get: function () { return watermarkDataUrl; }, set: function (v) { watermarkDataUrl = v; }, file: 'wmFile', img: 'wmPreview', hapus: 'wmHapusBtn' }
 };
 function tampilLogoPreview() {
   var p = DATA.pengaturan || {};
@@ -1610,7 +1605,7 @@ function strukKeHtml(teks) {
 
 /* ---------- PENGATURAN / CABANG / LOGS ---------- */
 async function simpanPengaturan() {
-  var payload = { NamaToko: document.getElementById('sNama').value, AlamatToko: document.getElementById('sAlamat').value, KotaToko: document.getElementById('sKota').value, TeleponToko: document.getElementById('sTelp').value, FooterStruk: document.getElementById('sFooter').value, SloganToko: document.getElementById('sSlogan').value, TargetHarian: document.getElementById('sTarget').value, NomorPemilikWA: document.getElementById('sWa').value, JatuhTempoHari: document.getElementById('sJatuhTempo').value, PoinAktif: document.getElementById('sPoinAktif').value, PoinPerRupiah: document.getElementById('sPoinPer').value, PoinTukarRate: document.getElementById('sPoinRate').value, PajakAktif: document.getElementById('sPajakAktif').value, PajakPersen: document.getElementById('sPajakPersen').value, Bahasa: document.getElementById('sBahasa').value, FormatTanggal: document.getElementById('sFormatTanggal').value, ModeGelap: document.getElementById('sGelap').value, TampilkanPoinStruk: document.getElementById('sPoinStruk').value, WatermarkStruk: document.getElementById('sWatermark').value, StrukUkuranKertas: document.getElementById('sKertas').value, ModeMejaAktif: document.getElementById('sMeja').value, PromoAktif: document.getElementById('sPromo').value, MultiCabangAktif: document.getElementById('sMultiCabang').value, LogoToko: logoDataUrl, Logo2: logo2DataUrl, Watermark: watermarkDataUrl, LogoBawah: logoBawahDataUrl };
+  var payload = { NamaToko: document.getElementById('sNama').value, AlamatToko: document.getElementById('sAlamat').value, KotaToko: document.getElementById('sKota').value, TeleponToko: document.getElementById('sTelp').value, FooterStruk: document.getElementById('sFooter').value, SloganToko: document.getElementById('sSlogan').value, TargetHarian: document.getElementById('sTarget').value, NomorPemilikWA: document.getElementById('sWa').value, JatuhTempoHari: document.getElementById('sJatuhTempo').value, PoinAktif: document.getElementById('sPoinAktif').value, PoinPerRupiah: document.getElementById('sPoinPer').value, PoinTukarRate: document.getElementById('sPoinRate').value, PajakAktif: document.getElementById('sPajakAktif').value, PajakPersen: document.getElementById('sPajakPersen').value, Bahasa: document.getElementById('sBahasa').value, FormatTanggal: document.getElementById('sFormatTanggal').value, ModeGelap: document.getElementById('sGelap').value, TampilkanPoinStruk: document.getElementById('sPoinStruk').value, WatermarkStruk: document.getElementById('sWatermark').value, StrukUkuranKertas: document.getElementById('sKertas').value, ModeMejaAktif: document.getElementById('sMeja').value, PromoAktif: document.getElementById('sPromo').value, MultiCabangAktif: document.getElementById('sMultiCabang').value, LogoToko: logoDataUrl, Logo2: logo2DataUrl, Watermark: watermarkDataUrl };
   await DB.simpanPengaturan(payload);
   document.body.classList.toggle('dark', payload.ModeGelap === 'YA');
   var cb = document.getElementById('sCabangAktif').value;

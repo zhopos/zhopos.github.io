@@ -115,7 +115,7 @@
     opname: [], lapor_bos: [],
     pengaturan: {
       nama_toko: 'Zho POS', alamat_toko: '', kota_toko: '', telepon_toko: '', footer_struk: 'Terima kasih', target_harian: 0,
-      logo_toko: '', logo_2: '', watermark: '', logo_bawah: '',
+      logo_toko: '', logo_2: '', watermark: '',
       cabang_aktif: 'CBG-UTAMA', nomor_pemilik_wa: '', jatuh_tempo_hari: 7,
       poin_aktif: 'YA', poin_per_rupiah: 1000, poin_tukar_rate: 100,
       pajak_aktif: 'TIDAK', pajak_persen: 0, bahasa: 'id', format_tanggal: 'dd-mm-yyyy',
