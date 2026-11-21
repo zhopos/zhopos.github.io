@@ -1120,7 +1120,8 @@ function renderEditorHarga(id, jsonStr) {
   var wadah = document.getElementById(id); if (!wadah) return;
   var kolom = kolomEditor(id);
   var rows = [];
-  try { rows = JSON.parse(jsonStr || '[]'); } catch (e) { rows = []; }
+  if (Array.isArray(jsonStr)) rows = jsonStr;
+  else { try { rows = JSON.parse(jsonStr || '[]'); } catch (e) { rows = []; } }
   if (!Array.isArray(rows)) rows = [];
   wadah.innerHTML = rows.map(function (r, i) {
     return '<div class="hr-row">' + kolom.map(function (k) {
@@ -1161,7 +1162,8 @@ async function simpanProduk() {
   var payload = { ID: document.getElementById('pId').value || '', Nama: document.getElementById('pNama').value, Kategori: document.getElementById('pKategori').value, Grup: document.getElementById('pGrup').value, SKU: document.getElementById('pSKU').value, HargaJual: document.getElementById('pJual').value, HargaModal: document.getElementById('pModal').value, Stok: document.getElementById('pStok').value, StokMinimum: document.getElementById('pStokMin').value, Satuan: document.getElementById('pSatuan').value, GambarURL: document.getElementById('pGambar').value, Keterangan: document.getElementById('pKet').value, HargaBisaDiganti: document.getElementById('pHargaGanti').checked, TermasukStok: document.getElementById('pTermasukStok').checked, TampilkanDiKatalog: document.getElementById('pTampilKatalog').checked, HargaLainJSON: kumpulEditorHarga('pHargaLain'), HargaJumlahJSON: kumpulEditorHarga('pHargaJumlah'), VarianJSON: kumpulEditorHarga('pVarian'), CabangID: cabangAktifId() };
   if (!payload.Nama || !payload.HargaJual) return alert('Nama dan harga jual wajib diisi.');
   try { JSON.parse(payload.HargaLainJSON || '[]'); JSON.parse(payload.HargaJumlahJSON || '[]'); JSON.parse(payload.VarianJSON || '[]'); } catch (e) { return alert('JSON Harga Lain / Harga Jumlah / Varian tidak valid.'); }
-  await DB.upsertProduk(payload); resetProduk(); await loadData();
+  try { await DB.upsertProduk(payload); } catch (e) { return alert('Gagal menyimpan produk: ' + (e.message || e)); }
+  resetProduk(); await loadData();
 }
 async function hapusProduk(id) { if (confirm('Hapus produk ini?')) { await DB.hapusProduk(id); await loadData(); } }
 async function exportProduk() {

@@ -61,12 +61,13 @@
   function toPascal(row) {
     var o = {};
     Object.keys(row || {}).forEach(function (k) { o[snakeToPascal(k)] = row[k]; });
+    if (o.SKUBarcode != null) o.SKU = o.SKUBarcode;
     return o;
   }
   function toSnake(obj) {
     var o = {};
     Object.keys(obj || {}).forEach(function (k) {
-      if (k === 'SKU/Barcode') { o.sku = obj[k]; return; }
+      if (k === 'SKU/Barcode') { o.sku_barcode = obj[k]; return; }
       o[pascalToSnake(k)] = obj[k];
     });
     return o;
@@ -91,7 +92,7 @@
   var JAM = '09:28:24';            // jam transaksi contoh (sesuai contoh V12)
   var SAMPLE_DATA = {
     cabang: [{ id: 'CBG-UTAMA', nama: 'Cabang Utama', alamat: '', telepon: '', aktif: 'YA' }],
-    produk: [{ id: 'PRD-TESKOPI', nama: 'TES Kopi', kategori: 'Minuman', sku: 'TESKOPI', harga_jual: 10000, harga_modal: 5000, stok: 9, satuan: 'pcs', aktif: 'YA', stok_minimum: 5, grup: '', gambar_url: '', keterangan: 'Produk contoh', harga_bisa_diganti: 'YA', termasuk_stok: 'YA', harga_lain_json: '', harga_jumlah_json: '', varian_json: '', tampilkan_di_katalog: 'YA', cabang_id: 'CBG-UTAMA' }],
+    produk: [{ id: 'PRD-TESKOPI', nama: 'TES Kopi', kategori: 'Minuman', sku_barcode: 'TESKOPI', harga_jual: 10000, harga_modal: 5000, stok: 9, satuan: 'pcs', aktif: 'YA', stok_minimum: 5, grup: '', gambar_url: '', keterangan: 'Produk contoh', harga_bisa_diganti: 'YA', termasuk_stok: 'YA', harga_lain_json: '', harga_jumlah_json: '', varian_json: '', tampilkan_di_katalog: 'YA', cabang_id: 'CBG-UTAMA' }],
     transaksi: [{ id: 'TRX-8250237222', tanggal: TGL + ' ' + JAM, pelanggan: 'Umum', kasir: 'Admin', total: 10000, diskon: 0, bayar: 10000, sisa: 0, metode: 'Tunai', status_bayar: 'Lunas', status_pesanan: 'Selesai', catatan: '', cabang_id: 'CBG-UTAMA', ongkir: 0, diskon_persen: 0, poin_dipakai: 0, poin_didapat: 10, kode_alternatif: '3SNQKW', meja: '', catatan_struk: '', catatan_internal: '', laba: 5000, promo_id: '' }],
     transaksi_detail: [{ transaksi_id: 'TRX-8250237222', produk_id: 'PRD-TESKOPI', nama_produk: 'TES Kopi', qty: 1, harga: 10000, subtotal: 10000, modal: 5000, diskon_item: 0, laba: 5000, satuan_dipakai: '' }],
     pelanggan: [{ id: 'PLG-UMUM', nama: 'Umum', telepon: '', alamat: '', total_beli: 10000, piutang: 0, poin: 0, tier: '', tanggal_lahir: '', terakhir_beli: TGL }],
@@ -545,25 +546,25 @@
   }
 
   /* ---------- helper upsert generik ---------- */
-  function upsertInto(key, table, row, prefix, idField) {
+  async function upsertInto(key, table, row, prefix, idField) {
     if (!DATA) throw new Error('Data belum dimuat.');
     var arr = DATA[key];
     var id = row[idField || 'ID'] || row.id;
     if (id) {
       var ex = arr.find(function (x) { return String(x.ID) === String(id); });
-      if (ex) { Object.keys(row).forEach(function (k) { ex[k] = row[k]; }); persist(table, ex); refreshRingkasan(); return ex; }
+      if (ex) { Object.keys(row).forEach(function (k) { ex[k] = row[k]; }); await persist(table, ex); refreshRingkasan(); return ex; }
     }
     row.ID = id || uid(prefix);
     arr.unshift(row);
-    persist(table, row);
+    await persist(table, row);
     refreshRingkasan();
     return row;
   }
-  function hapusDari(key, table, id) {
+  async function hapusDari(key, table, id) {
     var arr = DATA[key];
     var i = arr.findIndex(function (x) { return String(x.ID) === String(id); });
     if (i >= 0) arr.splice(i, 1);
-    removeRow(table, id);
+    await removeRow(table, id);
     refreshRingkasan();
   }
   function csvCell(v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; }
@@ -574,7 +575,7 @@
     if (!DATA) await loadAll();
     var row = {
       ID: payload.ID || '', Nama: payload.Nama, Kategori: payload.Kategori || '', Grup: payload.Grup || '',
-      SKU: payload.SKU || '', HargaJual: Number(payload.HargaJual || 0), HargaModal: Number(payload.HargaModal || 0),
+      SKUBarcode: payload.SKU || '', HargaJual: Number(payload.HargaJual || 0), HargaModal: Number(payload.HargaModal || 0),
       Stok: Number(payload.Stok == null || payload.Stok === '' ? 0 : payload.Stok),
       Satuan: payload.Satuan || 'pcs', Aktif: true, StokMinimum: Number(payload.StokMinimum || 5),
       GambarURL: payload.GambarURL || '', Keterangan: payload.Keterangan || '',
@@ -585,7 +586,7 @@
     };
     return upsertInto('produk', 'produk', row, 'PRD');
   }
-  async function hapusProduk(id) { if (!DATA) await loadAll(); hapusDari('produk', 'produk', id); return { ok: true }; }
+  async function hapusProduk(id) { if (!DATA) await loadAll(); await hapusDari('produk', 'produk', id); return { ok: true }; }
   async function upsertPelanggan(payload) {
     if (!DATA) await loadAll();
     var row = {
