@@ -601,6 +601,11 @@
     refreshRingkasan();
     return { ok: true };
   }
+  async function updateProdukStokHarga(prod) {
+    if (MODE !== 'supabase' || !client) return;
+    var res = await client.from('produk').update({ stok: Number(prod.Stok || 0), harga_modal: Number(prod.HargaModal || 0), harga_jual: Number(prod.HargaJual || 0) }).eq('id', prod.ID);
+    if (res.error) throw new Error(res.error.message);
+  }
   async function upsertPelanggan(payload) {
     if (!DATA) await loadAll();
     var row = {
@@ -649,7 +654,7 @@
     var row = { ID: id, Tanggal: nowISO(), Pemasok: payload.pemasok || '', Total: total, Bayar: Number(payload.bayar || 0), Sisa: total - Number(payload.bayar || 0), Status: 'Draft', Catatan: payload.catatan || '', CabangID: payload.cabangId || cabangAktifId(DATA), Diskon: Number(payload.diskon || 0), Pajak: Number(payload.pajak || 0), BiayaLain: Number(payload.biayaLain || 0), Diproses: 'TIDAK' };
     DATA.pembelian.unshift(row); await persist('pembelian', row);
     (payload.items || []).forEach(function (it) {
-      var det = { PembelianID: id, ProdukID: it.id, NamaProduk: it.nama, Qty: Number(it.Qty || 0), HargaBeli: Number(it.HargaBeli || 0), Subtotal: Number(it.Qty || 0) * Number(it.HargaBeli || 0), Kedaluwarsa: it.Kedaluwarsa || '' };
+      var det = { PembelianID: id, ProdukID: it.id, NamaProduk: it.nama, Qty: Number(it.Qty || 0), HargaBeli: Number(it.HargaBeli || 0), HargaJual: Number(it.HargaJual || 0), Subtotal: Number(it.Qty || 0) * Number(it.HargaBeli || 0), Kedaluwarsa: it.Kedaluwarsa || '' };
       DATA.pembelianDetail.push(det); persist('pembelian_detail', det);
     });
     addLog(DATA, '', 'Pembelian Draft', id + ' — ' + row.Pemasok + ' — ' + total);
@@ -663,17 +668,18 @@
     if (p.Diproses === 'YA') throw new Error('Pembelian sudah diproses.');
     var cabangId = p.CabangID || cabangAktifId(DATA);
     var items = DATA.pembelianDetail.filter(function (x) { return x.PembelianID === id; });
-    items.forEach(function (it) {
+    await Promise.all(items.map(async function (it) {
       var prod = DATA.produk.find(function (x) { return x.ID === it.ProdukID; });
-      if (prod) {
-        prod.Stok = Number(prod.Stok || 0) + Number(it.Qty || 0);
-        persist('produk', prod);
-        if (it.Kedaluwarsa) {
-          var batch = { ID: uid('BTH'), ProdukID: it.ProdukID, CabangID: cabangId, Qty: Number(it.Qty || 0), Kedaluwarsa: it.Kedaluwarsa, PembelianID: id, TanggalMasuk: todayStr() };
-          DATA.stokBatch.push(batch); persist('stok_batch', batch);
-        }
+      if (!prod) return;
+      prod.Stok = Number(prod.Stok || 0) + Number(it.Qty || 0);
+      if (Number(it.HargaBeli || 0) > 0) prod.HargaModal = Number(it.HargaBeli);
+      if (Number(it.HargaJual || 0) > 0) prod.HargaJual = Number(it.HargaJual);
+      await updateProdukStokHarga(prod);
+      if (it.Kedaluwarsa) {
+        var batch = { ID: uid('BTH'), ProdukID: it.ProdukID, CabangID: cabangId, Qty: Number(it.Qty || 0), Kedaluwarsa: it.Kedaluwarsa, PembelianID: id, TanggalMasuk: todayStr() };
+        DATA.stokBatch.push(batch); await persist('stok_batch', batch);
       }
-    });
+    }));
     p.Diproses = 'YA'; p.Status = 'Diproses';
     await persist('pembelian', p);
     // pengeluaran + kas keluar sebesar Bayar
