@@ -33,7 +33,6 @@ header small{opacity:.92;font-size:11px}
 .brand-name{line-height:1.15;white-space:nowrap}
 .burger{background:rgba(255,255,255,.18);color:#fff;border:0;font-size:20px;line-height:1;padding:8px 11px;border-radius:10px;cursor:pointer}
 .hbtn{background:rgba(255,255,255,.18);color:#fff;border:0;font-size:15px;padding:8px 10px;border-radius:10px;cursor:pointer;position:relative}
-.premium{background:#fbbf24;color:#451a03;font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;white-space:nowrap;vertical-align:2px}
 .modebadge{background:rgba(255,255,255,.22);font-size:11px;padding:3px 8px;border-radius:999px;white-space:nowrap}
 .bell-badge{position:absolute;top:-4px;right:-4px;min-width:17px;height:17px;border-radius:999px;background:#ef4444;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px}
 
@@ -44,7 +43,6 @@ nav#nav.open{transform:none}
 .drawer-head{background:linear-gradient(135deg,#0f766e,#0d9488);color:#fff;padding:18px 16px 14px;display:flex;align-items:center;gap:12px}
 .drawer-head .zmark{width:48px;height:48px;border-radius:14px;background:rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800}
 .drawer-head b{font-size:20px;display:block;line-height:1.1}
-.drawer-head .premium{margin-top:4px;display:inline-block}
 .drawer-head .hbtn{margin-left:auto}
 .zmark{width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800}
 .drawer-store{margin:12px 14px 4px;padding:12px;border:1px solid var(--line);border-radius:14px;background:#f8fafc;font-size:14px;display:flex;gap:10px;align-items:center}
@@ -57,7 +55,6 @@ nav#nav button.menu .mi{font-size:17px;flex:none}
 nav#nav button.menu[data-sec]::after{content:'›';margin-left:auto;color:#94a3b8;font-size:18px}
 nav#nav button.menu.active{background:var(--teal);color:#fff;border-color:var(--teal)}
 nav#nav button.menu.active::after{color:#fff}
-nav#nav button.menu.premium-item{color:var(--gold);font-weight:600}
 .drawer-foot{margin-top:auto;padding:12px 14px;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}
 .drawer-foot .ok{color:var(--teal);font-weight:600}
 .drawer-foot .foot-btns{display:flex;gap:8px;margin-top:8px}
@@ -229,14 +226,14 @@ body.dark .menu-item{background:#1e293b}
 </head>
 <body>
 <header>
-  <div class="brand"><button class="burger" onclick="toggleDrawer()" aria-label="Menu">☰</button><span class="brand-z">Z</span><span class="brand-name"><b id="namaTokoHead">Zho POS</b> <span class="premium">Premium</span><br><small id="modeLabel">Memuat data…</small> <small id="userLabel"></small></span></div>
+  <div class="brand"><button class="burger" onclick="toggleDrawer()" aria-label="Menu">☰</button><span class="brand-z">Z</span><span class="brand-name"><b id="namaTokoHead">Zho POS</b><br><small id="modeLabel">Memuat data…</small> <small id="userLabel"></small></span></div>
   <div style="display:flex;align-items:center;gap:6px"><span class="modebadge" id="modeBadge">Mode Contoh</span><button class="hbtn" onclick="go('laporan')" aria-label="Notifikasi">🔔<span id="bellBadge" class="bell-badge" style="display:none">0</span></button></div>
 </header>
 <div id="errBar" style="display:none;position:fixed;top:60px;left:0;right:0;z-index:30;background:#fee2e2;color:#991b1b;border-bottom:1px solid #fca5a5;padding:10px 14px;font-size:14px;cursor:pointer" onclick="this.style.display='none'" title="Ketuk untuk menutup"></div>
 <div id="drawerBackdrop" onclick="closeDrawer()"></div>
 <nav id="nav">
-  <div class="drawer-head"><div class="zmark">Z</div><div><b>Zho POS</b><span class="premium">Premium</span></div><button class="hbtn" style="margin-left:auto" onclick="closeDrawer()">✕</button></div>
-  <div class="drawer-store"><span class="store-ic">🏪</span><span><b id="namaTokoDrawer">Zho POS</b><small id="drawerStoreRole">Kasir • v4.0 Premium</small></span></div>
+  <div class="drawer-head"><div class="zmark">Z</div><div><b>Zho POS</b></div><button class="hbtn" style="margin-left:auto" onclick="closeDrawer()">✕</button></div>
+  <div class="drawer-store"><span class="store-ic">🏪</span><span><b id="namaTokoDrawer">Zho POS</b><small id="drawerStoreRole">Kasir • v4.0</small></span></div>
   <div class="navgroup">Utama</div>
   <button class="menu active" data-sec="dashboard" onclick="show('dashboard',this)"><span class="mi">🏠</span> Dashboard</button>
   <div class="navgroup">Transaksi</div>
@@ -262,7 +259,6 @@ body.dark .menu-item{background:#1e293b}
   <button class="menu" data-sec="promo" onclick="show('promo',this)"><span class="mi">🎁</span> Promo &amp; Member</button>
   <button class="menu" data-sec="pengguna" onclick="show('pengguna',this)"><span class="mi">👤</span> Pengguna &amp; Peran</button>
   <button class="menu" data-sec="pengaturan" onclick="show('pengaturan',this)"><span class="mi">⚙️</span> Pengaturan</button>
-  <button class="menu premium-item" onclick="alert('Premium: semua fitur v4 sudah aktif di paket ini.')"><span class="mi">⭐</span> Premium</button>
   <button class="menu" onclick="alert('Zho POS v4.0 — Supabase.\nBantuan: lihat PANDUAN di folder proyek atau hubungi pemilik toko.')"><span class="mi">❓</span> Bantuan</button>
   <button class="menu" onclick="alert('Zho POS v4.0 Supabase\nSistem Informasi & Kasir Toko.\nDibangun untuk Bos — Mahdi.')"><span class="mi">ℹ️</span> Tentang</button>
   <div class="drawer-foot"><div id="drawerSync">Supabase: Mode Contoh</div><div class="foot-btns"><button class="secondary" onclick="loadData()">↻ Muat Ulang</button><button class="secondary" onclick="logout()">Keluar</button></div></div>
@@ -486,7 +482,7 @@ body.dark .menu-item{background:#1e293b}
 <div id="pieBox" style="margin-top:12px"></div>
 <div id="topKasirBox" style="margin-top:12px"></div></div>
 <div class="card"><h3>Ringkasan</h3><div id="laporanSummary"></div><h3>Semua Transaksi</h3><div id="laporanTable"></div></div>
-<div class="card"><h3>Laporan Premium — 7 Hari Terakhir</h3><div id="laporanPremium"></div></div>
+<div class="card"><h3>Laporan 7 Hari Terakhir</h3><div id="laporanPremium"></div></div>
 </section>
 
 <section id="laporbos">
