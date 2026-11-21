@@ -1122,7 +1122,19 @@
     return { teks: lines.join('\n') };
   }
 
-  /* ---------- Lapor Bos (MANUAL saja: pratinjau -> wa.me / cetak) ---------- */
+  /* ---------- UBAH TRANSAKSI (dari sheet "Lebih" di Detail) ---------- */
+  async function ubahTransaksi(payload) {
+    if (!DATA) await loadAll();
+    var ex = (DATA.transaksi || []).find(function (x) { return String(x.ID) === String(payload.id); });
+    if (!ex) throw new Error('Transaksi tidak ditemukan.');
+    ['Tanggal', 'KodeAlternatif', 'Pelanggan', 'CatatanStruk', 'CatatanInternal'].forEach(function (k) {
+      if (payload[k] != null) ex[k] = payload[k];
+    });
+    await persist('transaksi', ex);
+    refreshRingkasan();
+    return ex;
+  }
+
   async function kirimLaporBos(payload) {
     if (!DATA) await loadAll();
     var tanggal = (payload && payload.tanggal) || todayStr();
@@ -1231,6 +1243,7 @@
     upsertPengguna: upsertPengguna, hapusPengguna: hapusPengguna,
     upsertCabang: upsertCabang, hapusCabang: hapusCabang, setCabangAktif: setCabangAktif,
     tambahPembayaran: tambahPembayaran, ubahStatusPesanan: ubahStatusPesanan,
+    ubahTransaksi: ubahTransaksi,
     batalkanTransaksi: batalkanTransaksi, koreksiPoin: koreksiPoin,
     simpanTeks: simpanTeks, upsertTeks: simpanTeks, hapusTeks: hapusTeks,
     upsertGrup: upsertGrup, hapusGrup: hapusGrup,

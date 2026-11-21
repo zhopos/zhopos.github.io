@@ -649,6 +649,18 @@ function gambarStruk() {
 }
 
 /* ---------- RIWAYAT TRANSAKSI & RETUR ---------- */
+/* ---------- DAFTAR TRANSAKSI ala Griyo: kelompok per tanggal ---------- */
+var trxNomor = {};
+var BULAN_ID = ['JAN', 'FEB', 'MAR', 'APR', 'MEI', 'JUN', 'JUL', 'AGU', 'SEP', 'OKT', 'NOV', 'DES'];
+function fmtTglGrup(d) { return d.getDate() + ' ' + BULAN_ID[d.getMonth()] + ' ' + d.getFullYear(); }
+function jamMenit(d) { return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+function hitungNomorTrx() {
+  trxNomor = {};
+  (DATA.transaksi || []).slice().sort(function (a, b) { return String(a.Tanggal || '') < String(b.Tanggal || '') ? -1 : 1; }).forEach(function (t, i) { trxNomor[t.ID] = i + 1; });
+}
+function ringkasItem(id) {
+  return (DATA.detail || []).filter(function (d) { return d.TransaksiID === id; }).map(function (d) { return String(d.NamaProduk || '').slice(0, 10) + ':' + d.Qty; }).join(' ');
+}
 function renderTrx() {
   var q = (document.getElementById('trxCari').value || '').toLowerCase();
   var dari = document.getElementById('trxDari').value, sampai = document.getElementById('trxSampai').value;
@@ -659,10 +671,25 @@ function renderTrx() {
     if (sampai && tg > sampai) return false;
     return true;
   }).sort(function (a, b) { return String(b.Tanggal || '') < String(a.Tanggal || '') ? -1 : 1; }).slice(0, 100);
-  var html = list.map(function (t) {
-    var rugi = (t.Laba != null && Number(t.Laba) < 0) ? ' <span class="badge bad">Rugi</span>' : '';
-    return '<div class="trx-card" onclick="bukaDetailTrx(\'' + esc(t.ID) + '\')"><div class="trx-main"><div class="trx-id">' + esc(t.ID) + '</div><div class="trx-sub">' + new Date(t.Tanggal).toLocaleString('id-ID') + ' • ' + esc(t.Pelanggan || '') + '</div><div class="trx-sub" style="margin-top:6px"><span class="badge ' + (t.StatusBayar === 'Lunas' ? '' : 'warn') + '">' + esc(t.StatusBayar) + '</span>' + (t.StatusPesanan ? ' • ' + esc(t.StatusPesanan) : '') + rugi + '</div></div><div class="trx-total"><b>' + rp(t.Total) + '</b><div class="trx-sub">Bayar ' + rp(t.Bayar) + (Number(t.Sisa) > 0 ? '<br>Sisa ' + rp(t.Sisa) : '') + '</div></div><div class="trx-chev">›</div></div>';
-  }).join('') || '<p style="color:#64748b">Belum ada transaksi.</p>';
+  hitungNomorTrx();
+  var html = '', grupTerakhir = '';
+  list.forEach(function (t) {
+    var d = new Date(t.Tanggal);
+    var kunci = String(t.Tanggal || '').slice(0, 10);
+    if (kunci !== grupTerakhir) {
+      grupTerakhir = kunci;
+      var hariIni = list.filter(function (x) { return String(x.Tanggal || '').slice(0, 10) === kunci; });
+      var totalHari = hariIni.reduce(function (s, x) { return s + Number(x.Total || 0); }, 0);
+      html += '<div class="trx-grup"><span>' + fmtTglGrup(d) + '</span><span class="trx-grup-total">' + rp(totalHari) + '</span><span>' + hariIni.length + '</span></div>';
+    }
+    var rugi = (t.Laba != null && Number(t.Laba) < 0);
+    html += '<div class="trx-row" onclick="bukaDetailTrx(\'' + esc(t.ID) + '\')">'
+      + '<div class="trx-r1"><b class="trx-biru">' + rp(t.Total) + '</b><span>' + jamMenit(d) + '</span><span>#' + (trxNomor[t.ID] || '') + '</span></div>'
+      + '<div class="trx-r2"><span>' + esc(t.Pelanggan || '') + '</span><span class="trx-ringkas">' + esc(ringkasItem(t.ID)) + '</span></div>'
+      + '<div class="trx-r3">' + (rugi ? '<span class="trx-rugi">Rugi</span>' : '<span></span>') + '<span class="' + (t.StatusBayar === 'Lunas' ? 'trx-lunas' : 'trx-hutang') + '">' + esc(t.StatusBayar) + '</span></div>'
+      + '</div>';
+  });
+  html = html || '<p style="color:#64748b">Belum ada transaksi.</p>';
   document.getElementById('trxTable').innerHTML = html;
   document.getElementById('laporanTable').innerHTML = html;
 }
@@ -682,27 +709,15 @@ async function strukUlang(id) {
     show('kasir', document.querySelector('nav button.menu[data-sec="kasir"]'));
   } catch (e) { alert(e.message); }
 }
-/* ---------- DETAIL TRANSAKSI (ketuk kartu di Daftar Transaksi) ---------- */
+/* ---------- DETAIL TRANSAKSI ala Griyo (ketuk baris di Daftar) ---------- */
+var detailTrxId = '', detailTab = 'detail';
+function detailTersortir() {
+  return (DATA.transaksi || []).slice().sort(function (a, b) { return String(b.Tanggal || '') < String(a.Tanggal || '') ? -1 : 1; });
+}
 async function bukaDetailTrx(id) {
+  detailTrxId = id; detailTab = 'detail';
   var t = (DATA.transaksi || []).find(function (x) { return x.ID === id; });
   if (!t) return;
-  var items = (DATA.detail || []).filter(function (d) { return d.TransaksiID === id; });
-  var kembali = Math.max(0, Number(t.Bayar || 0) - Number(t.Total || 0));
-  var html = '<div class="trx-id" style="font-size:17px">' + esc(t.ID) + '</div>'
-    + '<div class="trx-sub">' + new Date(t.Tanggal).toLocaleString('id-ID') + (t.KodeAlternatif ? ' • Kode: ' + esc(t.KodeAlternatif) : '') + '</div>'
-    + '<div style="margin:8px 0"><span class="badge ' + (t.StatusBayar === 'Lunas' ? '' : 'warn') + '">' + esc(t.StatusBayar) + '</span>' + (t.StatusPesanan ? ' <span class="badge">' + esc(t.StatusPesanan) + '</span>' : '') + '</div>'
-    + '<div class="drow"><span class="k">Pelanggan</span><b>' + esc(t.Pelanggan || '') + '</b></div>'
-    + '<div class="drow"><span class="k">Kasir</span><span>' + esc(t.Kasir || '') + '</span></div>'
-    + '<div class="drow"><span class="k">Metode Bayar</span><span>' + esc(t.Metode || 'Tunai') + '</span></div>'
-    + '<h4 style="margin:14px 0 6px">Item</h4>'
-    + (items.length ? items.map(function (d) { return '<div class="cart-item"><span>' + esc(d.NamaProduk) + ' x' + d.Qty + '</span><b>' + rp(d.Subtotal) + '</b></div>'; }).join('') : '<p style="color:#64748b">Tidak ada rincian item.</p>')
-    + '<div class="drow" style="margin-top:8px"><span class="k">Total</span><b>' + rp(t.Total) + '</b></div>'
-    + '<div class="drow"><span class="k">Bayar</span><span>' + rp(t.Bayar) + '</span></div>'
-    + '<div class="drow"><span class="k">Kembali</span><span>' + rp(kembali) + '</span></div>'
-    + (Number(t.Sisa) > 0 ? '<div class="drow"><span class="k">Sisa</span><b>' + rp(t.Sisa) + '</b></div>' : '')
-    + '<div class="flex noprint" style="margin-top:14px"><button class="primary" onclick="window.print()">🖨 Cetak Struk</button><button class="secondary" onclick="kirimWAGambar()">💬 Kirim Struk via WhatsApp (Gambar)</button><button class="secondary" onclick="kirimWA()">💬 Kirim Struk via WhatsApp (Teks)</button></div>'
-    + '<div class="flex noprint" style="margin-top:10px"><button class="secondary" onclick="lunasiDetail(\'' + esc(t.ID) + '\')">+ Bayar</button><select onchange="ubahStatusDetail(\'' + esc(t.ID) + '\',this.value)"><option value="">Ubah status…</option><option>Antri</option><option>Proses</option><option>Selesai</option><option>Diambil</option></select><button class="danger" onclick="batalkanDetail(\'' + esc(t.ID) + '\')">Batalkan</button></div>';
-  document.getElementById('detailTrxBody').innerHTML = html;
   // Struk transaksi lama: nomor WA pelanggan tidak tersimpan, jadi kosongkan
   // agar kirim teks membuka wa.me dan Bos memilih sendiri kontaknya.
   lastWaTelp = '';
@@ -711,11 +726,117 @@ async function bukaDetailTrx(id) {
     lastStruk = res.teks || ('Struk ' + id);
     document.getElementById('strukPrint').innerHTML = strukKeHtml(lastStruk);
   } catch (e) { tampilError('Gagal memuat struk: ' + e.message); }
+  renderDetailTrx();
   show('detailTrx');
 }
-async function lunasiDetail(id) { await lunasi(id); renderTrx(); bukaDetailTrx(id); }
-async function ubahStatusDetail(id, status) { if (!status) return; await ubahStatus(id, status); renderTrx(); bukaDetailTrx(id); }
-async function batalkanDetail(id) { await batalkanTransaksi(id); renderTrx(); bukaDetailTrx(id); }
+function detailTabKe(tab) { detailTab = tab; renderDetailTrx(); }
+function renderDetailTrx() {
+  var t = (DATA.transaksi || []).find(function (x) { return x.ID === detailTrxId; });
+  var el = document.getElementById('detailTrxBody');
+  if (!t) { el.innerHTML = '<p style="color:#64748b">Transaksi tidak ditemukan.</p>'; return; }
+  if (!trxNomor[t.ID]) hitungNomorTrx();
+  var d = new Date(t.Tanggal);
+  var kembali = Math.max(0, Number(t.Bayar || 0) - Number(t.Total || 0));
+  var items = (DATA.detail || []).filter(function (x) { return x.TransaksiID === t.ID; });
+  var no = trxNomor[t.ID] || '';
+  var kode = t.KodeAlternatif || String(t.ID).slice(-6);
+  var html = '<div class="dhead"><button class="dhead-btn" onclick="show(\'daftar\',document.querySelector(\'nav button.menu[data-sec=daftar]\'))">←</button><b>Transaksi #' + no + '</b><button class="dhead-btn" onclick="show(\'pengaturan\',document.querySelector(\'nav button.menu[data-sec=pengaturan]\'))">⚙</button></div>';
+  if (detailTab === 'struk') {
+    html += '<div class="struk-preview">' + (lastStruk ? '<div class="struk-box">' + strukKeHtml(lastStruk) + '</div>' : '<p style="color:#94a3b8;text-align:center">Struk tidak tersedia.</p>') + '</div>'
+      + '<div class="detail-tabs"><button class="detail-tab" onclick="show(\'pengaturan\',document.querySelector(\'nav button.menu[data-sec=pengaturan]\'))"><span>⚙</span>Pengaturan</button><button class="detail-tab" onclick="window.print()"><span>🖨</span>Cetak</button><button class="detail-tab" onclick="kirimWAGambar()"><span>💬</span>WhatsApp</button></div>';
+  } else if (detailTab === 'bayar') {
+    html += '<div class="card" style="margin:12px"><h4 style="margin:0 0 8px">💵 Detil Pembayaran</h4>'
+      + '<div class="drow"><span class="k">' + d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + jamMenit(d) + '</span><span>Total ' + rp(t.Total) + '</span></div>'
+      + '<div class="drow"><span class="k">' + esc(t.Metode || 'Tunai') + '</span><b>' + rp(t.Bayar) + '</b></div>'
+      + (Number(t.Sisa) > 0 ? '<div class="drow"><span class="k">Sisa</span><b>' + rp(t.Sisa) + '</b></div>' : '<div class="drow"><span class="k">Kembali</span><span>' + rp(kembali) + '</span></div>')
+      + '<div class="drow"><span class="k">Status</span><span class="' + (t.StatusBayar === 'Lunas' ? 'trx-lunas' : 'trx-hutang') + '">' + esc(t.StatusBayar) + '</span></div>'
+      + (Number(t.Sisa) > 0 ? '<div style="margin-top:12px"><button class="primary" onclick="lunasiDetail(\'' + esc(t.ID) + '\')">+ Bayar Sisa ' + rp(t.Sisa) + '</button></div>' : '')
+      + '</div>'
+      + '<div class="detail-tabs"><button class="detail-tab" onclick="bukaLebih(\'' + esc(t.ID) + '\')"><span>•••</span>Lebih</button><button class="detail-tab" onclick="detailTabKe(\'struk\')"><span>🧾</span>Struk</button><button class="detail-tab active"><span>💵</span>Pembayaran</button></div>';
+  } else {
+    var list = detailTersortir();
+    var idx = -1; list.forEach(function (x, i) { if (x.ID === t.ID) idx = i; });
+    var sblm = idx > 0 ? list[idx - 1].ID : '', ssdh = (idx >= 0 && idx < list.length - 1) ? list[idx + 1].ID : '';
+    html += '<div class="dtop"><div><div class="dtop-total">' + rp(t.Total) + '</div><div style="margin-top:6px"><span class="dkode">' + esc(kode) + '</span></div></div>'
+      + '<div style="text-align:right"><div>' + d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + jamMenit(d) + '</div><div style="margin-top:6px;font-size:16px">' + esc(t.Pelanggan || '') + '</div></div></div>'
+      + '<div class="ditems">' + (items.length ? items.map(function (x) {
+        return '<div class="ditem"><div><b>' + esc(x.NamaProduk) + '</b><div class="ditem-sub">' + x.Qty + ' x ' + rp(x.Harga) + '</div></div><b>' + rp(x.Subtotal) + '</b></div>';
+      }).join('') : '<p style="color:#64748b">Tidak ada rincian item.</p>') + '</div>'
+      + '<div class="dtotal"><span>Total</span><b>' + rp(t.Total) + '</b></div>'
+      + '<div class="dtotal-lunas">' + esc(t.StatusBayar).toUpperCase() + '</div>'
+      + '<div class="card" style="margin:12px 0"><h4 style="margin:0 0 8px">💵 Detil Pembayaran</h4>'
+      + '<div class="drow"><span class="k">' + d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + jamMenit(d) + '</span><span>Total ' + rp(t.Total) + '</span></div>'
+      + '<div class="drow"><span class="k">' + esc(t.Metode || 'Tunai') + '</span><b>' + rp(t.Bayar) + '</b></div></div>'
+      + '<div style="text-align:right;color:#64748b;margin:0 4px">- ' + esc(t.Kasir || '') + '</div>'
+      + '<div style="display:flex;justify-content:space-between;margin:14px 4px"><button class="nav-arrow" ' + (sblm ? 'onclick="bukaDetailTrx(\'' + esc(sblm) + '\')"' : 'disabled') + '>‹</button><button class="nav-arrow" ' + (ssdh ? 'onclick="bukaDetailTrx(\'' + esc(ssdh) + '\')"' : 'disabled') + '>›</button></div>'
+      + '<div class="detail-tabs"><button class="detail-tab" onclick="bukaLebih(\'' + esc(t.ID) + '\')"><span>•••</span>Lebih</button><button class="detail-tab" onclick="detailTabKe(\'struk\')"><span>🧾</span>Struk</button><button class="detail-tab" onclick="detailTabKe(\'bayar\')"><span>💵</span>Pembayaran</button></div>';
+  }
+  el.innerHTML = html;
+}
+async function lunasiDetail(id) { await lunasi(id); renderTrx(); renderDetailTrx(); }
+async function ubahStatusDetail(id, status) { if (!status) return; await ubahStatus(id, status); renderTrx(); renderDetailTrx(); }
+async function batalkanDetail(id) { await batalkanTransaksi(id); renderTrx(); renderDetailTrx(); }
+/* ---------- SHEET "LEBIH" di Detail Transaksi ---------- */
+function bukaLebih(id) {
+  var t = (DATA.transaksi || []).find(function (x) { return x.ID === id; });
+  if (!t) return;
+  var item = function (ikon, label, fn, merah) {
+    return '<button class="lebih-item' + (merah ? ' merah' : '') + '" onclick="' + fn + '(\'' + esc(id) + '\')"><span class="lebih-ikon">' + ikon + '</span>' + label + '</button>';
+  };
+  document.getElementById('lebihItems').innerHTML =
+    item('📅', 'Ganti Tanggal', 'lebihGantiTanggal')
+    + item('🔤', 'Ganti Kode Transaksi', 'lebihGantiKode')
+    + item('👤', 'Ganti Pelanggan', 'lebihGantiPelanggan')
+    + item('🧾', 'Catatan Struk', 'lebihCatatanStruk')
+    + item('📝', 'Catatan Internal', 'lebihCatatanInternal')
+    + item('✕', 'Batalkan Transaksi', 'lebihBatalkan', true);
+  document.getElementById('lebihBackdrop').style.display = 'block';
+  document.getElementById('lebihSheet').style.display = 'block';
+}
+function tutupLebih() {
+  document.getElementById('lebihBackdrop').style.display = 'none';
+  document.getElementById('lebihSheet').style.display = 'none';
+}
+function pad2(n) { return String(n).padStart(2, '0'); }
+async function lebihGantiTanggal(id) {
+  var t = (DATA.transaksi || []).find(function (x) { return x.ID === id; });
+  if (!t) return;
+  var d = new Date(t.Tanggal);
+  var awal = d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  var baru = prompt('Tanggal baru (YYYY-MM-DD):', awal);
+  if (!baru || !/^\d{4}-\d{2}-\d{2}$/.test(baru)) { tutupLebih(); return; }
+  var nd = new Date(baru + 'T' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds()));
+  try { await DB.ubahTransaksi({ id: id, Tanggal: nd.toISOString() }); await loadData(); tutupLebih(); renderDetailTrx(); } catch (e) { alert(e.message); }
+}
+async function lebihGantiKode(id) {
+  var t = (DATA.transaksi || []).find(function (x) { return x.ID === id; });
+  if (!t) return;
+  var baru = prompt('Kode transaksi baru:', t.KodeAlternatif || '');
+  if (baru === null) { tutupLebih(); return; }
+  try { await DB.ubahTransaksi({ id: id, KodeAlternatif: baru.trim() }); await loadData(); tutupLebih(); renderDetailTrx(); } catch (e) { alert(e.message); }
+}
+async function lebihGantiPelanggan(id) {
+  var t = (DATA.transaksi || []).find(function (x) { return x.ID === id; });
+  if (!t) return;
+  var baru = prompt('Pelanggan baru:', t.Pelanggan || 'Umum');
+  if (baru === null) { tutupLebih(); return; }
+  try { await DB.ubahTransaksi({ id: id, Pelanggan: baru.trim() || 'Umum' }); await loadData(); tutupLebih(); renderDetailTrx(); } catch (e) { alert(e.message); }
+}
+async function lebihCatatanStruk(id) {
+  var t = (DATA.transaksi || []).find(function (x) { return x.ID === id; });
+  if (!t) return;
+  var baru = prompt('Catatan struk (tampil di struk):', t.CatatanStruk || '');
+  if (baru === null) { tutupLebih(); return; }
+  try { await DB.ubahTransaksi({ id: id, CatatanStruk: baru }); await loadData(); tutupLebih(); renderDetailTrx(); } catch (e) { alert(e.message); }
+}
+async function lebihCatatanInternal(id) {
+  var t = (DATA.transaksi || []).find(function (x) { return x.ID === id; });
+  if (!t) return;
+  var baru = prompt('Catatan internal (tidak tampil di struk):', t.CatatanInternal || '');
+  if (baru === null) { tutupLebih(); return; }
+  try { await DB.ubahTransaksi({ id: id, CatatanInternal: baru }); await loadData(); tutupLebih(); renderDetailTrx(); } catch (e) { alert(e.message); }
+}
+async function lebihBatalkan(id) { tutupLebih(); await batalkanDetail(id); }
 function renderRetur() {
   document.getElementById('returTable').innerHTML = '<table><tr><th>Tanggal</th><th>Transaksi</th><th>Produk</th><th>Qty</th><th>Nominal</th><th>Alasan</th></tr>' + (DATA.retur || []).map(function (r) { return '<tr><td>' + new Date(r.Tanggal).toLocaleString('id-ID') + '</td><td>' + esc(r.TransaksiID) + '</td><td>' + esc(r.Produk) + '</td><td>' + r.Qty + '</td><td>' + rp(r.Nominal) + '</td><td>' + esc(r.Alasan || '') + '</td></tr>'; }).join('') + '</table>';
 }
