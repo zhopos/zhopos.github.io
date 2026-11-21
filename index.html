@@ -9,11 +9,11 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<title>Zho POS v4</title>
+<title>ZPOS</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 /* ============================================================
-   Zho POS v4 — mobile-first, clean & professional (Teal Klasik)
+   ZPOS v4 — mobile-first, clean & professional (Teal Klasik)
    Base = ponsel (~360px). Tablet/desktop via min-width.
    ============================================================ */
 *{box-sizing:border-box}
@@ -230,6 +230,7 @@ th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04
 #bottomNav button{flex:1;background:none;border:0;padding:8px 0 7px;cursor:pointer;font-size:11px;color:var(--muted)}
 #bottomNav button .bn-ic{font-size:21px;display:block;line-height:1.25}
 #bottomNav button.active{color:var(--teal);font-weight:700}
+body.belum-login header,body.belum-login nav#nav,body.belum-login #bottomNav,body.belum-login #drawerBackdrop{display:none!important}
 
 /* --- Dark mode --- */
 body.dark{background:#0f172a;color:#e2e8f0}
@@ -279,14 +280,14 @@ body.dark .menu-item{background:#1e293b}
 </head>
 <body>
 <header>
-  <div class="brand"><button class="burger" onclick="toggleDrawer()" aria-label="Menu">☰</button><span class="brand-z">Z</span><span class="brand-name"><b id="namaTokoHead">Zho POS</b><br><small id="modeLabel">Memuat data…</small> <small id="userLabel"></small></span></div>
+  <div class="brand"><button class="burger" onclick="toggleDrawer()" aria-label="Menu">☰</button><span class="brand-z"><img src="icon-192.png" alt="ZPOS" style="width:100%;height:100%;border-radius:10px;display:block"></span><span class="brand-name"><b id="namaTokoHead">ZPOS</b><br><small id="modeLabel">Memuat data…</small> <small id="userLabel"></small></span></div>
   <div style="display:flex;align-items:center;gap:6px"><span class="modebadge" id="modeBadge">Mode Contoh</span><button class="hbtn" onclick="go('laporan')" aria-label="Notifikasi">🔔<span id="bellBadge" class="bell-badge" style="display:none">0</span></button></div>
 </header>
 <div id="errBar" style="display:none;position:fixed;top:60px;left:0;right:0;z-index:30;background:#fee2e2;color:#991b1b;border-bottom:1px solid #fca5a5;padding:10px 14px;font-size:14px;cursor:pointer" onclick="this.style.display='none'" title="Ketuk untuk menutup"></div>
 <div id="drawerBackdrop" onclick="closeDrawer()"></div>
 <nav id="nav">
-  <div class="drawer-head"><div class="zmark">Z</div><div><b>Zho POS</b></div><button class="hbtn" style="margin-left:auto" onclick="closeDrawer()">✕</button></div>
-  <div class="drawer-store"><span class="store-ic">🏪</span><span><b id="namaTokoDrawer">Zho POS</b><small id="drawerStoreRole">Kasir • v4.0</small></span></div>
+  <div class="drawer-head"><div class="zmark"><img src="icon-192.png" alt="ZPOS" style="width:100%;height:100%;border-radius:14px;display:block"></div><div><b>ZPOS</b></div><button class="hbtn" style="margin-left:auto" onclick="closeDrawer()">✕</button></div>
+  <div class="drawer-store"><span class="store-ic">🏪</span><span><b id="namaTokoDrawer">ZPOS</b><small id="drawerStoreRole">Kasir • v4.0</small></span></div>
   <div class="navgroup">Utama</div>
   <button class="menu active" data-sec="dashboard" onclick="show('dashboard',this)"><span class="mi">🏠</span> Dashboard</button>
   <div class="navgroup">Transaksi</div>
@@ -312,16 +313,16 @@ body.dark .menu-item{background:#1e293b}
   <button class="menu" data-sec="promo" onclick="show('promo',this)"><span class="mi">🎁</span> Promo &amp; Member</button>
   <button class="menu" data-sec="pengguna" onclick="show('pengguna',this)"><span class="mi">👤</span> Pengguna &amp; Peran</button>
   <button class="menu" data-sec="pengaturan" onclick="show('pengaturan',this)"><span class="mi">⚙️</span> Pengaturan</button>
-  <button class="menu" onclick="alert('Zho POS v4.0 — Supabase.\nBantuan: lihat PANDUAN di folder proyek atau hubungi pemilik toko.')"><span class="mi">❓</span> Bantuan</button>
-  <button class="menu" onclick="alert('Zho POS v4.0 Supabase\nSistem Informasi & Kasir Toko.\nDibangun untuk Bos — Mahdi.')"><span class="mi">ℹ️</span> Tentang</button>
-  <div class="drawer-foot"><div id="drawerSync">Supabase: Mode Contoh</div><div class="foot-btns"><button class="secondary" onclick="loadData()">↻ Muat Ulang</button><button class="secondary" onclick="logout()">Keluar</button></div></div>
+  <button class="menu" onclick="alert('ZPOS v4.0\nBantuan: lihat PANDUAN di folder proyek atau hubungi pemilik toko.')"><span class="mi">❓</span> Bantuan</button>
+  <button class="menu" onclick="alert('ZPOS v4.0\nSistem Informasi & Kasir Toko.\nDibangun untuk Bos — Mahdi.')"><span class="mi">ℹ️</span> Tentang</button>
+  <div class="drawer-foot"><div id="drawerSync">Mode Contoh</div><div class="foot-btns"><button class="secondary" onclick="loadData()">↻ Muat Ulang</button><button class="secondary" onclick="logout()">Keluar</button></div></div>
 </nav>
 <main>
-<div id="loading" style="position:fixed;inset:0;background:#fff;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px"><div style="font-size:42px">🛒</div><b style="font-size:18px">Zho POS</b><span style="color:#64748b;font-size:14px">Memuat data…</span></div>
-<div id="loginBox" class="card login-wrap" style="display:none"><div class="login-logo">Z</div><h3>Masuk — Pengguna</h3><p>Aplikasi ini memakai daftar Pengguna. Kalau daftar Pengguna masih kosong, login dilewati.</p><div class="flex"><input id="loginNama" placeholder="Nama pengguna"><input id="loginPin" type="password" placeholder="PIN"></div><button class="primary" onclick="doLogin()">Masuk</button></div>
+<div id="loading" style="position:fixed;inset:0;background:#fff;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px"><div style="font-size:42px">🛒</div><b style="font-size:18px">ZPOS</b><span style="color:#64748b;font-size:14px">Memuat data…</span></div>
+<div id="loginBox" class="card login-wrap" style="display:none"><div class="login-logo"><img src="icon-192.png" alt="ZPOS" style="width:100%;height:100%;border-radius:20px;display:block"></div><h3>Masuk — Pengguna</h3><p>Aplikasi ini memakai daftar Pengguna. Kalau daftar Pengguna masih kosong, login dilewati.</p><div class="flex"><input id="loginNama" placeholder="Nama pengguna"><input id="loginPin" type="password" placeholder="PIN"></div><button class="primary" onclick="doLogin()">Masuk</button></div>
 
 <section id="dashboard" class="active">
-  <div class="hero"><p class="hero-hi">Selamat Datang 👋</p><h2 id="heroToko">Zho POS</h2><p class="hero-sub" id="heroUser">Kasir siap melayani hari ini.</p>
+  <div class="hero"><p class="hero-hi">Selamat Datang 👋</p><h2 id="heroToko">ZPOS</h2><p class="hero-sub" id="heroUser">Kasir siap melayani hari ini.</p>
   </div>
   <div class="card sale-card"><div><span class="sale-label">Penjualan Hari Ini</span><div class="sale-big" id="heroOmzet">Rp0</div><div class="sale-vs" id="heroOmzetVs">—</div></div><div class="sale-ic">📊</div></div>
   <div class="tiles" id="statTiles"></div>
@@ -609,11 +610,6 @@ body.dark .menu-item{background:#1e293b}
 <div class="card"><h3>Cabang</h3><input id="cbId" type="hidden"><div class="flex"><input id="cbNama" placeholder="Nama cabang *"><input id="cbAlamat" placeholder="Alamat"><input id="cbTelp" placeholder="Telepon"></div><button class="primary" onclick="simpanCabang()">Simpan Cabang</button><div id="cabangTable" style="margin-top:10px"></div></div>
 <div class="card"><h3>Terjemahan Bebas (Istilah Struk)</h3><p style="color:#64748b;font-size:14px">Ubah istilah struk, mis. Kasir → “Petugas”, Pelanggan → “Mitra”.</p><div id="terjemahanBox"></div><button class="secondary" onclick="simpanTerjemahan()">Simpan Terjemahan</button></div>
 <div class="card"><h3>Logs — Jejak Audit (100 terbaru)</h3><button class="secondary" onclick="muatLogs()">Muat Logs</button><div id="logsBox" style="margin-top:10px"></div></div>
-<div class="card"><h3>Koneksi Supabase</h3><p style="color:#64748b;font-size:14px">Backend v4 memakai Supabase (bukan Google Sheets). Isi URL dan Anon Key proyek Supabase di <b>config.js</b> (Project Settings → API), lalu muat ulang halaman ini.</p>
-<label>Supabase URL <input id="sSbUrl" readonly placeholder="Belum dikonfigurasi — isi di config.js"></label>
-<label>Status Koneksi <input id="sSbStatus" readonly value="Mode Contoh"></label>
-<p style="font-size:13px;color:#64748b" id="sbNote">Mode Contoh: aplikasi memakai data contoh di perangkat ini (tidak tersimpan permanen). Setelah Supabase dikonfigurasi, data tersimpan di proyek Supabase Bos dan tersinkron ke semua perangkat.</p>
-<button class="secondary" onclick="loadData()">↻ Muat Ulang Data</button></div>
 </section>
 
 <section id="printArea"><div id="strukPrint"></div></section>

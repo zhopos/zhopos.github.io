@@ -1,5 +1,5 @@
 /* ============================================================
-   Zho POS v4 — Lapisan Data (Supabase + Mode Contoh)
+   ZPOS v4 — Lapisan Data
    - Bila SUPABASE_URL / SUPABASE_ANON_KEY di config.js terisi,
      semua baca/tulis memakai Supabase (tabel snake_case).
    - Bila kosong, dipakai DATA CONTOH di bawah (in-memory) sehingga
@@ -114,7 +114,7 @@
     terjemahan: ['Kasir', 'Pelanggan', 'Lunas', 'Kurang', 'Belum Dibayar', 'Total', 'Subtotal', 'Kembali', 'Proses', 'Selesai', 'Diambil', 'Antri'].map(function (k) { return { istilah: k, terjemahan: k }; }),
     opname: [], lapor_bos: [],
     pengaturan: {
-      nama_toko: 'Zho POS', alamat_toko: '', kota_toko: '', telepon_toko: '', footer_struk: 'Terima kasih', target_harian: 0,
+      nama_toko: 'ZPOS', alamat_toko: '', kota_toko: '', telepon_toko: '', footer_struk: 'Terima kasih', target_harian: 0,
       logo_toko: '', logo_2: '', watermark: '',
       cabang_aktif: 'CBG-UTAMA', nomor_pemilik_wa: '', jatuh_tempo_hari: 7,
       poin_aktif: 'YA', poin_per_rupiah: 1000, poin_tukar_rate: 100,
@@ -299,7 +299,7 @@
     var results = await Promise.all(TABLES.map(function (t) { return client.from(t).select('*'); }));
     for (var i = 0; i < TABLES.length; i++) {
       var t = TABLES[i], res = results[i];
-      if (res.error) throw new Error('Supabase: gagal memuat ' + t + ' — ' + res.error.message);
+      if (res.error) throw new Error('Gagal memuat ' + t + ' — ' + res.error.message);
       d[TABLE_KEY[t]] = (res.data || []).map(toPascal);
     }
     // pengaturan: tabel kunci/nilai -> object
@@ -1007,7 +1007,7 @@
       var tertua = list.map(function (t) { return new Date(String(t.Tanggal || '').replace(' ', 'T')); }).sort(function (a, b) { return a - b; })[0];
       var hari = Math.floor((now - tertua) / 86400000);
       if (hari >= batas) {
-        var teks = 'Halo ' + pl.Nama + ', ini pengingat dari ' + (DATA.pengaturan.NamaToko || 'Zho POS') + ': piutang Anda sebesar Rp' + Number(pl.Piutang).toLocaleString('id-ID') + ' sudah jatuh tempo (' + hari + ' hari). Mohon segera dilunasi. Terima kasih.';
+        var teks = 'Halo ' + pl.Nama + ', ini pengingat dari ' + (DATA.pengaturan.NamaToko || 'ZPOS') + ': piutang Anda sebesar Rp' + Number(pl.Piutang).toLocaleString('id-ID') + ' sudah jatuh tempo (' + hari + ' hari). Mohon segera dilunasi. Terima kasih.';
         var telp = String(pl.Telepon || '').replace(/\D/g, '');
         daftar.push({ nama: pl.Nama, piutang: Number(pl.Piutang), jumlah: list.length, hariTertunggak: hari, waLink: telp ? 'https://wa.me/' + telp + '?text=' + encodeURIComponent(teks) : '' });
       }
@@ -1018,7 +1018,7 @@
     if (!DATA) await loadAll();
     var nama = payload.pelanggan || payload.nama;
     var list = (DATA.transaksi || []).filter(function (t) { return t.Pelanggan === nama && t.StatusBayar !== 'Lunas'; });
-    var lines = ['TAGIHAN — ' + (DATA.pengaturan.NamaToko || 'Zho POS'), 'Pelanggan: ' + nama, '------------------------------'];
+    var lines = ['TAGIHAN — ' + (DATA.pengaturan.NamaToko || 'ZPOS'), 'Pelanggan: ' + nama, '------------------------------'];
     var total = 0;
     list.forEach(function (t) { lines.push(t.ID + ' — ' + String(t.Tanggal || '').slice(0, 10) + ' — Rp' + Number(t.Sisa || 0).toLocaleString('id-ID') + ' (' + t.StatusBayar + ')'); total += Number(t.Sisa || 0); });
     lines.push('------------------------------');
@@ -1121,7 +1121,7 @@
     var kanan = function (kiri, kan) { kiri = String(kiri); kan = String(kan); return kiri + ' '.repeat(Math.max(1, W - kiri.length - kan.length)) + kan; };
     var rpN = function (n) { return 'Rp' + Number(n || 0).toLocaleString('id-ID'); };
     var angka = function (n) { return Number(n || 0).toLocaleString('id-ID'); };
-    var lines = [tengah(p.NamaToko || 'Zho POS')];
+    var lines = [tengah(p.NamaToko || 'ZPOS')];
     if (p.SloganToko) lines.push(tengah(p.SloganToko));
     if (p.AlamatToko) lines.push(tengah(p.AlamatToko));
     if (p.KotaToko) lines.push(tengah(p.KotaToko));
@@ -1168,7 +1168,7 @@
     var lunas = list.filter(function (t) { return t.StatusBayar === 'Lunas'; });
     var omzet = lunas.reduce(function (a, t) { return a + Number(t.Total || 0); }, 0);
     var laba = lunas.reduce(function (a, t) { return a + Number(t.Laba || 0); }, 0);
-    var lines = ['LAPOR BOS — ' + (DATA.pengaturan.NamaToko || 'Zho POS'), 'Tanggal: ' + tanggal,
+    var lines = ['LAPOR BOS — ' + (DATA.pengaturan.NamaToko || 'ZPOS'), 'Tanggal: ' + tanggal,
       '------------------------------', 'Omzet: Rp' + omzet.toLocaleString('id-ID'),
       'Transaksi: ' + list.length + ' (Lunas: ' + lunas.length + ')',
       'Laba: Rp' + laba.toLocaleString('id-ID'), '------------------------------'];

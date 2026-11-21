@@ -1,5 +1,5 @@
 // ============================================================
-// Zho POS v4 — Konfigurasi Supabase
+// ZPOS v4 — Konfigurasi
 // ============================================================
 // CARA MENGISI:
 // 1. Buat proyek gratis di https://supabase.com (akun Bos sendiri).

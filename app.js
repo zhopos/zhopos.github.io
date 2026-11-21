@@ -1,4 +1,4 @@
-/* Zho POS v4 — Logika UI (cermin V12, backend: DB Supabase / Mode Contoh) */
+/* ZPOS v4 — Logika UI (cermin V12) */
 var DATA = { produk: [], transaksi: [], detail: [], pelanggan: [], pemasok: [], pembelian: [], pembelianDetail: [], pengeluaran: [], kas: [], pengaturan: {}, ringkasan: {}, bahan: [], resep: [], pengguna: [], retur: [], cabang: [], stokCabang: [], stokBatch: [], riwayatPoin: [], tier: [], utang: [], cicilanUtang: [], transaksiCepat: [], transaksiTertunda: [], meja: [], pesananDapur: [], promo: [], katalog: [], daftarTeks: [], grup: [], satuan: [], jenisBayar: [], itemPengeluaran: [], pegawai: [], logs: [], terjemahan: {}, opname: [], laporBos: [] };
 var cart = []; var lastStruk = ''; var lastStrukData = null; var lastWaTelp = ''; var resepDraft = []; var beliItems = []; var currentUser = null; var promoTerpakai = []; var promoDiskon = 0; var poinDipakai = 0; var laporBosTeks = ''; var laporBosWa = '';
 var rp = function (n) { return 'Rp ' + (Math.round(n || 0)).toLocaleString('id-ID'); };
@@ -24,7 +24,7 @@ function stokProduk(p) {
   if (sc.length) return Number(sc[0].Stok || 0);
   return Number(p.Stok || 0);
 }
-// Produk aktif? Menangani boolean (Supabase) dan 'YA'/'TIDAK' (Mode Contoh / V12).
+// Produk aktif? Menangani boolean (database) dan 'YA'/'TIDAK' (Mode Contoh / V12).
 // Produk nonaktif (mis. TES Kopi setelah dinonaktifkan) tidak tampil di kasir
 // dan tidak dihitung di dashboard/laporan — tapi tetap ada di master & riwayat.
 function produkAktif(p) { return p.Aktif !== false && String(p.Aktif == null ? 'YA' : p.Aktif).toUpperCase() !== 'TIDAK'; }
@@ -59,12 +59,12 @@ function iconBayar(nama) {
 
 function setModeLabel() {
   var contoh = DB.isSample;
-  document.getElementById('modeLabel').textContent = contoh ? 'Mode Contoh (data demo)' : 'Supabase: Terhubung';
-  document.getElementById('modeBadge').textContent = contoh ? 'Mode Contoh' : 'Supabase ✓';
+  document.getElementById('modeLabel').textContent = contoh ? 'Mode Contoh (data demo)' : '';
+  var mb = document.getElementById('modeBadge');
+  mb.textContent = contoh ? 'Mode Contoh' : '';
+  mb.style.display = contoh ? '' : 'none';
   var ds = document.getElementById('drawerSync');
-  if (ds) { ds.innerHTML = contoh ? 'Supabase: <b>Mode Contoh</b> — isi config.js untuk terhubung' : 'Supabase: <span class="ok">Terhubung</span>' + (lastSyncAt ? ' • Terakhir: ' + lastSyncAt.toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''); }
-  var sb = document.getElementById('sSbStatus'); if (sb) sb.value = contoh ? 'Mode Contoh — Supabase belum dikonfigurasi' : 'Terhubung ke Supabase';
-  var su = document.getElementById('sSbUrl'); if (su) su.value = (typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL) ? SUPABASE_URL : '';
+  if (ds) { ds.innerHTML = contoh ? '<b>Mode Contoh</b> — isi config.js untuk terhubung' : 'Terhubung' + (lastSyncAt ? ' • Terakhir: ' + lastSyncAt.toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''); }
 }
 
 /* ---------- MUAT DATA / LOGIN / PERAN ---------- */
@@ -92,12 +92,12 @@ function sembunyiError() {
 }
 async function loadData() {
   try {
-    var d = await withTimeout(DB.loadAll(), 20000, 'Supabase tidak menjawab dalam 20 detik. Periksa koneksi internet, lalu muat ulang halaman.');
+    var d = await withTimeout(DB.loadAll(), 20000, 'Server tidak menjawab dalam 20 detik. Periksa koneksi internet, lalu muat ulang halaman.');
     DATA = Object.assign(DATA, d || {});
     var p = DATA.pengaturan || {};
-    document.getElementById('namaTokoHead').textContent = p.NamaToko || 'Zho POS';
-    var nd = document.getElementById('namaTokoDrawer'); if (nd) nd.textContent = p.NamaToko || 'Zho POS';
-    document.getElementById('heroToko').textContent = p.NamaToko || 'Zho POS';
+    document.getElementById('namaTokoHead').textContent = p.NamaToko || 'ZPOS';
+    var nd = document.getElementById('namaTokoDrawer'); if (nd) nd.textContent = p.NamaToko || 'ZPOS';
+    document.getElementById('heroToko').textContent = p.NamaToko || 'ZPOS';
     document.body.classList.toggle('dark', p.ModeGelap === 'YA');
     lastSyncAt = new Date();
     setModeLabel();
@@ -106,6 +106,7 @@ async function loadData() {
     var saved = null; try { saved = JSON.parse(sessionStorage.getItem('pos_user') || 'null'); } catch (e) { }
     if ((DATA.pengguna || []).length && !saved) {
       document.getElementById('loginBox').style.display = 'block';
+      document.body.classList.add('belum-login');
       document.querySelectorAll('main section').forEach(function (s) { s.style.display = 'none'; });
       hideLoading();
       return;
@@ -113,6 +114,7 @@ async function loadData() {
     currentUser = saved;
     if (currentUser) document.getElementById('userLabel').textContent = '• ' + currentUser.nama + ' (' + currentUser.peran + ')';
     document.getElementById('loginBox').style.display = 'none';
+    document.body.classList.remove('belum-login');
     document.querySelectorAll('main section').forEach(function (s) { s.style.display = ''; });
     renderAll(); applyRole(); hideLoading();
   } catch (e) { hideLoading(); tampilError('Gagal memuat data: ' + e.message); alert('Gagal memuat data: ' + e.message); }
@@ -126,6 +128,7 @@ async function doLogin() {
     currentUser = res;
     document.getElementById('userLabel').textContent = '• ' + res.nama + ' (' + res.peran + ')';
     document.getElementById('loginBox').style.display = 'none';
+    document.body.classList.remove('belum-login');
     document.querySelectorAll('main section').forEach(function (s) { s.style.display = ''; });
     renderAll(); applyRole(); hideLoading();
   } catch (e) { alert('Login gagal: ' + e.message); }
@@ -138,9 +141,11 @@ function logout() {
   var kb = document.getElementById('kasirBayar'); if (kb) kb.value = '';
   if ((DATA.pengguna || []).length) {
     document.getElementById('loginBox').style.display = 'block';
+    document.body.classList.add('belum-login');
     document.querySelectorAll('main section').forEach(function (s) { s.style.display = 'none'; });
   } else {
     document.getElementById('loginBox').style.display = 'none';
+    document.body.classList.remove('belum-login');
     document.querySelectorAll('main section').forEach(function (s) { s.style.display = ''; });
     renderAll(); applyRole();
   }
@@ -182,7 +187,7 @@ function pratinjauProfil() {
   if (!el) return;
   var p = DATA.pengaturan || {};
   var d = {
-    toko: document.getElementById('sNama').value || 'Zho POS',
+    toko: document.getElementById('sNama').value || 'ZPOS',
     slogan: document.getElementById('sSlogan').value || '',
     alamat: document.getElementById('sAlamat').value || '',
     kota: document.getElementById('sKota').value || '',
@@ -535,7 +540,7 @@ async function simpanTransaksi() {
   var payload = { pelanggan: namaPelanggan, kasir: currentUser ? currentUser.nama : 'Kasir', cabangId: cabangAktifId(), meja: document.getElementById('kasirMeja').value || '', items: cart, diskon: h.diskonTotal, diskonPersen: document.getElementById('kasirDiskonJenis').value === 'persen' ? Number(document.getElementById('kasirDiskon').value || 0) : 0, ongkir: h.ongkir, bayar: Number(document.getElementById('kasirBayar').value || 0), metode: document.getElementById('kasirMetode').value, statusPesanan: document.getElementById('kasirStatus').value, catatan: '', catatanStruk: document.getElementById('kasirCatatanStruk').value, catatanInternal: document.getElementById('kasirCatatanInternal').value, poinDipakai: poinDipakai, promoId: promoTerpakai.length ? (promoTerpakai[0].id || promoTerpakai[0].ID || '') : '', kodeAlternatif: '' };
   try {
     sembunyiError();
-    var res = await withTimeout(DB.saveTransaksi(payload), 15000, 'Supabase tidak menjawab saat menyimpan (15 detik). Periksa koneksi internet, lalu coba lagi.');
+    var res = await withTimeout(DB.saveTransaksi(payload), 15000, 'Server tidak menjawab saat menyimpan (15 detik). Periksa koneksi internet, lalu coba lagi.');
     lastStruk = buatStruk(res, payload, h, pl);
     var el = document.getElementById('struk'); el.style.display = 'block'; el.innerHTML = strukKeHtml(lastStruk);
     document.getElementById('strukPrint').innerHTML = strukKeHtml(lastStruk);
@@ -561,7 +566,7 @@ function strukDataDariTrx(t) {
   if (Number(t.Ongkir || 0) > 0) rincian.push({ label: 'Ongkir', nilai: rp(t.Ongkir) });
   return {
     id: t.ID, kode: t.KodeAlternatif || '', nomor: trxNomor[t.ID] || '',
-    toko: p.NamaToko || 'Zho POS', slogan: p.SloganToko || '', alamat: p.AlamatToko || '', kota: p.KotaToko || '', telepon: p.TeleponToko || '', footer: p.FooterStruk || 'Terima kasih',
+    toko: p.NamaToko || 'ZPOS', slogan: p.SloganToko || '', alamat: p.AlamatToko || '', kota: p.KotaToko || '', telepon: p.TeleponToko || '', footer: p.FooterStruk || 'Terima kasih',
     logo: p.LogoToko || logoDataUrl || '', logo2: p.Logo2 || logo2DataUrl || '', watermark: p.Watermark || watermarkDataUrl || '', tanggal: new Date(t.Tanggal), pelanggan: t.Pelanggan || 'Umum', kasir: t.Kasir || '',
     metode: t.Metode || 'Tunai', items: items, rincian: rincian, total: Number(t.Total || 0), bayar: Number(t.Bayar || 0),
     kembali: Math.max(0, Number(t.Bayar || 0) - Number(t.Total || 0)), sisa: Number(t.Sisa || 0),
@@ -641,7 +646,7 @@ function buatStruk(res, payload, h, pl) {
   var sisa = res.sisa != null ? res.sisa : Math.max(0, h.total - payload.bayar);
   lastStrukData = {
     id: res.id || '', kode: res.kodeAlternatif || '', nomor: (DATA.transaksi || []).length + 1,
-    toko: p.NamaToko || 'Zho POS', slogan: p.SloganToko || '', alamat: p.AlamatToko || '', kota: p.KotaToko || '', telepon: p.TeleponToko || '', footer: p.FooterStruk || 'Terima kasih',
+    toko: p.NamaToko || 'ZPOS', slogan: p.SloganToko || '', alamat: p.AlamatToko || '', kota: p.KotaToko || '', telepon: p.TeleponToko || '', footer: p.FooterStruk || 'Terima kasih',
     logo: p.LogoToko || logoDataUrl || '', logo2: p.Logo2 || logo2DataUrl || '', watermark: p.Watermark || watermarkDataUrl || '', tanggal: new Date(), pelanggan: payload.pelanggan, kasir: payload.kasir || '',
     metode: payload.metode || 'Tunai',
     items: payload.items.map(function (it) { return { nama: it.nama, qty: it.Qty, harga: it.Harga - (it.diskonItem || 0), subtotal: it.Harga * it.Qty - (it.diskonItem || 0) * it.Qty }; }),
@@ -672,7 +677,7 @@ async function kirimWAGambar() {
     var nama = 'struk-' + (lastStrukData && lastStrukData.id ? lastStrukData.id : ((lastStruk.match(/No:\s*(\S+)/) || [])[1] || 'zho-pos')) + '.png';
     var file = new File([blob], nama, { type: 'image/png' });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], title: 'Struk Zho POS' });
+      await navigator.share({ files: [file], title: 'Struk ZPOS' });
       tampilInfo('Struk dibagikan. Pilih WhatsApp di menu berbagi.');
       return;
     }

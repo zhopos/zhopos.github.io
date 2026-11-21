@@ -1,5 +1,5 @@
 // ============================================================
-// Zho POS v4 — Service Worker (PWA)
+// ZPOS v4 — Service Worker (PWA)
 // ============================================================
 // - App shell (file lokal)  : cache-first, diperbarui di background.
 // - API Supabase            : network-first, TIDAK PERNAH di-cache
@@ -8,7 +8,7 @@
 // - Naikkan CACHE_NAME setiap kali app shell berubah.
 // ============================================================
 
-var CACHE_NAME = 'zho-pos-v4-2';
+var CACHE_NAME = 'zho-pos-v4-3';
 
 var APP_SHELL = [
   './',
