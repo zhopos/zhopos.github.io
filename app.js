@@ -1,6 +1,6 @@
 /* Zho POS v4 — Logika UI (cermin V12, backend: DB Supabase / Mode Contoh) */
 var DATA = { produk: [], transaksi: [], detail: [], pelanggan: [], pemasok: [], pembelian: [], pembelianDetail: [], pengeluaran: [], kas: [], pengaturan: {}, ringkasan: {}, bahan: [], resep: [], pengguna: [], retur: [], cabang: [], stokCabang: [], stokBatch: [], riwayatPoin: [], tier: [], utang: [], cicilanUtang: [], transaksiCepat: [], transaksiTertunda: [], meja: [], pesananDapur: [], promo: [], katalog: [], daftarTeks: [], grup: [], satuan: [], jenisBayar: [], itemPengeluaran: [], pegawai: [], logs: [], terjemahan: {}, opname: [], laporBos: [] };
-var cart = []; var lastStruk = ''; var lastWaTelp = ''; var resepDraft = []; var beliItems = []; var currentUser = null; var promoTerpakai = []; var promoDiskon = 0; var poinDipakai = 0; var laporBosTeks = ''; var laporBosWa = '';
+var cart = []; var lastStruk = ''; var lastStrukData = null; var lastWaTelp = ''; var resepDraft = []; var beliItems = []; var currentUser = null; var promoTerpakai = []; var promoDiskon = 0; var poinDipakai = 0; var laporBosTeks = ''; var laporBosWa = '';
 var rp = function (n) { return 'Rp ' + (Math.round(n || 0)).toLocaleString('id-ID'); };
 var esc = function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
 function todayStr(d) { var x = d ? new Date(d) : new Date(); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); }
@@ -164,6 +164,7 @@ function isiPengaturanForm() {
   var p = DATA.pengaturan || {};
   var set = function (id, v) { var el = document.getElementById(id); if (el) el.value = (v == null ? '' : v); };
   set('sNama', p.NamaToko); set('sAlamat', p.AlamatToko); set('sTelp', p.TeleponToko); set('sTarget', p.TargetHarian);
+  set('sSlogan', p.SloganToko);
   set('sWa', p.NomorPemilikWA); set('sJatuhTempo', p.JatuhTempoHari || 7); set('sPoinPer', p.PoinPerRupiah || 1000); set('sPoinRate', p.PoinTukarRate || 100);
   set('sPajakPersen', p.PajakPersen || 0); set('sBahasa', p.Bahasa || 'id'); set('sFormatTanggal', p.FormatTanggal || 'dd-mm-yyyy');
   set('sPoinAktif', p.PoinAktif || 'YA'); set('sPajakAktif', p.PajakAktif || 'TIDAK'); set('sGelap', p.ModeGelap || 'TIDAK');
@@ -172,6 +173,24 @@ function isiPengaturanForm() {
   logoDataUrl = p.LogoToko || ''; tampilLogoPreview();
   var cb = document.getElementById('sCabangAktif');
   cb.innerHTML = (DATA.cabang || []).map(function (c) { return '<option value="' + esc(c.ID) + '"' + (String(c.ID) === String(p.CabangAktif) ? ' selected' : '') + '>' + esc(c.Nama) + '</option>'; }).join('');
+  pratinjauProfil();
+}
+/* Pratinjau struk langsung dari isi Profil Toko — contoh transaksi, bukan data asli. */
+function pratinjauProfil() {
+  var el = document.getElementById('profilPreview');
+  if (!el) return;
+  var p = DATA.pengaturan || {};
+  var d = {
+    toko: document.getElementById('sNama').value || 'Zho POS',
+    slogan: document.getElementById('sSlogan').value || '',
+    alamat: document.getElementById('sAlamat').value || '',
+    telepon: document.getElementById('sTelp').value || '',
+    logo: logoDataUrl || p.LogoToko || '',
+    tanggal: new Date(), nomor: 8, kode: 'ABCC9B', pelanggan: 'Shopee', kasir: 'Admin', metode: 'Tunai',
+    items: [{ nama: 'Bakwan beku 250gr', qty: 1, harga: 1000, subtotal: 1000 }, { nama: 'Buku gambar', qty: 1, harga: 1000, subtotal: 1000 }, { nama: 'Buku tulis', qty: 1, harga: 1000, subtotal: 1000 }],
+    rincian: [], total: 3000, bayar: 3000, kembali: 0, sisa: 0, status: 'Lunas', catatan: '', poin: '', rugi: false
+  };
+  el.innerHTML = strukHtml(d);
 }
 
 /* ---------- CODE39 (tanpa library) ---------- */
@@ -524,41 +543,109 @@ async function simpanTransaksi() {
     alert('Transaksi tersimpan. ID: ' + (res.id || '') + (res.rugi ? ' — RUGI (total di bawah HPP)' : ''));
   } catch (e) { var m = 'Gagal menyimpan: ' + (e && e.message ? e.message : e); tampilError(m); alert(m); }
 }
+/* ---------- STRUK ala Griyo: satu model, tiga tampilan (teks / HTML / gambar) ---------- */
+var BLN_PDK = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+function fmtTglStruk(d) { d = new Date(d); return d.getDate() + ' ' + BLN_PDK[d.getMonth()] + ' ' + d.getFullYear() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+function angka(n) { return Number(n || 0).toLocaleString('id-ID'); }
+function strukDataDariTrx(t) {
+  var p = DATA.pengaturan || {};
+  if (!trxNomor[t.ID]) hitungNomorTrx();
+  var items = (DATA.detail || []).filter(function (x) { return x.TransaksiID === t.ID; }).map(function (x) {
+    return { nama: x.NamaProduk, qty: Number(x.Qty), harga: Number(x.Harga), subtotal: Number(x.Subtotal) };
+  });
+  var rincian = [];
+  if (Number(t.Diskon || 0) > 0) rincian.push({ label: 'Diskon', nilai: '-' + rp(t.Diskon) });
+  if (Number(t.Ongkir || 0) > 0) rincian.push({ label: 'Ongkir', nilai: rp(t.Ongkir) });
+  return {
+    id: t.ID, kode: t.KodeAlternatif || '', nomor: trxNomor[t.ID] || '',
+    toko: p.NamaToko || 'Zho POS', slogan: p.SloganToko || '', alamat: p.AlamatToko || '', telepon: p.TeleponToko || '',
+    logo: p.LogoToko || logoDataUrl || '', tanggal: new Date(t.Tanggal), pelanggan: t.Pelanggan || 'Umum', kasir: t.Kasir || '',
+    metode: t.Metode || 'Tunai', items: items, rincian: rincian, total: Number(t.Total || 0), bayar: Number(t.Bayar || 0),
+    kembali: Math.max(0, Number(t.Bayar || 0) - Number(t.Total || 0)), sisa: Number(t.Sisa || 0),
+    status: t.StatusBayar || '', catatan: t.CatatanStruk || '', poin: '', rugi: false
+  };
+}
+function strukTeks(d) {
+  var W = 32;
+  var tengah = function (s) { s = String(s || ''); if (s.length >= W) return s; return ' '.repeat(Math.floor((W - s.length) / 2)) + s; };
+  var kanan = function (kiri, kan) { kiri = String(kiri); kan = String(kan); return kiri + ' '.repeat(Math.max(1, W - kiri.length - kan.length)) + kan; };
+  var L = [tengah(d.toko)];
+  if (d.slogan) L.push(tengah(d.slogan));
+  if (d.alamat) L.push(tengah(d.alamat));
+  if (d.telepon) L.push(tengah('Telp: ' + d.telepon));
+  L.push('');
+  L.push(fmtTglStruk(d.tanggal) + (d.nomor ? '  #' + d.nomor : ''));
+  L.push(d.pelanggan);
+  L.push('--------------------------------');
+  d.items.forEach(function (it) {
+    L.push(it.nama);
+    var kiri = '  ' + it.qty + ' x ' + angka(it.harga);
+    L.push(kiri + ' '.repeat(Math.max(1, W - kiri.length - rp(it.subtotal).length)) + rp(it.subtotal));
+  });
+  L.push('--------------------------------');
+  (d.rincian || []).forEach(function (r) { L.push(kanan(r.label, r.nilai)); });
+  L.push(kanan('Total', rp(d.total)));
+  L.push(kanan(d.metode, rp(d.bayar)));
+  if (d.kembali > 0) L.push(kanan('Kembali', rp(d.kembali)));
+  if (d.sisa > 0) L.push(kanan('Sisa', rp(d.sisa)));
+  if (d.rugi) L.push('** RUGI **');
+  if (d.poin) L.push(d.poin);
+  if (d.catatan) L.push('Catatan: ' + d.catatan);
+  L.push('', tengah('Terima kasih sudah berbelanja!'));
+  return L.join('\n');
+}
+function strukHtml(d) {
+  var h = '<div class="struk">';
+  if (d.logo) h += '<div style="text-align:center;margin-bottom:6px"><img src="' + d.logo + '" style="max-width:120px;max-height:120px"></div>';
+  h += '<div class="struk-nama">' + esc(d.toko) + '</div>';
+  if (d.slogan) h += '<div class="struk-info">' + esc(d.slogan) + '</div>';
+  if (d.alamat) h += '<div class="struk-info">' + esc(d.alamat) + '</div>';
+  if (d.telepon) h += '<div class="struk-info">Telp: ' + esc(d.telepon) + '</div>';
+  h += '<div class="struk-bar"><span>' + fmtTglStruk(d.tanggal) + '</span><span>#' + (d.nomor || '') + '</span></div>';
+  h += '<div class="struk-plg">' + esc(d.pelanggan) + '</div>';
+  h += '<hr class="struk-hr">';
+  d.items.forEach(function (it) {
+    h += '<div class="struk-item"><div><b>' + esc(it.nama) + '</b><div class="struk-qty">' + it.qty + ' x ' + angka(it.harga) + '</div></div><b>' + angka(it.subtotal) + '</b></div>';
+  });
+  h += '<hr class="struk-hr">';
+  (d.rincian || []).forEach(function (r) { h += '<div class="struk-tot"><span>' + esc(r.label) + '</span><span>' + esc(r.nilai) + '</span></div>'; });
+  h += '<div class="struk-tot"><span>Total</span><b>' + rp(d.total) + '</b></div>';
+  h += '<div class="struk-tot"><span>' + esc(d.metode) + '</span><span>' + rp(d.bayar) + '</span></div>';
+  if (d.kembali > 0) h += '<div class="struk-tot"><span>Kembali</span><span>' + rp(d.kembali) + '</span></div>';
+  if (d.sisa > 0) h += '<div class="struk-tot"><span>Sisa</span><b>' + rp(d.sisa) + '</b></div>';
+  if (d.rugi) h += '<div class="struk-info" style="color:#c5221f;font-weight:700;margin-top:6px">** RUGI **</div>';
+  if (d.poin) h += '<div class="struk-info" style="margin-top:6px">' + esc(d.poin) + '</div>';
+  if (d.catatan) h += '<div class="struk-info" style="margin-top:6px">Catatan: ' + esc(d.catatan) + '</div>';
+  h += '<div class="struk-thanks">Terima kasih</div></div>';
+  return h;
+}
 function buatStruk(res, payload, h, pl) {
   var p = DATA.pengaturan || {};
-  var t = terjemah;
-  var lines = [];
-  if (p.WatermarkStruk === 'YA') lines.push('~~~ ' + (p.NamaToko || 'Zho POS') + ' ~~~');
-  lines.push(p.NamaToko || 'Zho POS');
-  if (p.AlamatToko) lines.push(p.AlamatToko);
-  if (p.TeleponToko) lines.push('Telp: ' + p.TeleponToko);
-  lines.push('------------------------------');
-  lines.push('No: ' + (res.id || '') + (res.kodeAlternatif ? ' (' + res.kodeAlternatif + ')' : ''));
-  lines.push('Tanggal: ' + new Date().toLocaleString('id-ID'));
-  lines.push(t('Kasir') + ': ' + (payload.kasir || ''));
-  lines.push(t('Pelanggan') + ': ' + payload.pelanggan);
-  if (payload.meja) lines.push('Meja: ' + payload.meja);
-  lines.push('------------------------------');
-  payload.items.forEach(function (it) { lines.push(it.nama + ' x' + it.Qty + '  ' + rp(it.Harga * it.Qty - (it.diskonItem || 0) * it.Qty)); });
-  lines.push('------------------------------');
-  lines.push(t('Subtotal') + ': ' + rp(h.sub));
-  if (h.diskonItemTotal) lines.push('Diskon item: -' + rp(h.diskonItemTotal));
-  if (h.diskonTotal) lines.push('Diskon: -' + rp(h.diskonTotal));
-  if (promoDiskon) lines.push('Promo: -' + rp(promoDiskon));
-  if (h.poinDiskon) lines.push('Tukar poin: -' + rp(h.poinDiskon));
-  if (h.pajak) lines.push('Pajak: ' + rp(h.pajak));
-  if (h.ongkir) lines.push('Ongkir: ' + rp(h.ongkir));
-  lines.push(t('Total') + ': ' + rp(h.total));
-  lines.push('Bayar: ' + rp(payload.bayar));
+  var rincian = [];
+  rincian.push({ label: 'Subtotal', nilai: rp(h.sub) });
+  if (h.diskonItemTotal) rincian.push({ label: 'Diskon item', nilai: '-' + rp(h.diskonItemTotal) });
+  if (h.diskonTotal) rincian.push({ label: 'Diskon', nilai: '-' + rp(h.diskonTotal) });
+  if (promoDiskon) rincian.push({ label: 'Promo', nilai: '-' + rp(promoDiskon) });
+  if (h.poinDiskon) rincian.push({ label: 'Tukar poin', nilai: '-' + rp(h.poinDiskon) });
+  if (h.pajak) rincian.push({ label: 'Pajak', nilai: rp(h.pajak) });
+  if (h.ongkir) rincian.push({ label: 'Ongkir', nilai: rp(h.ongkir) });
   var sisa = res.sisa != null ? res.sisa : Math.max(0, h.total - payload.bayar);
-  lines.push(t('Kembali') + ': ' + rp(Math.max(0, payload.bayar - h.total)));
-  lines.push('Status: ' + (sisa === 0 ? t('Lunas') : t('Kurang')));
-  if (res.rugi) lines.push('** RUGI **');
-  if (promoTerpakai.length) lines.push('Promo dipakai: ' + promoTerpakai.map(function (x) { return x.nama || x; }).join(', '));
-  if (p.TampilkanPoinStruk !== 'TIDAK' && pl) lines.push('Poin: ' + (pl.Poin || 0) + (res.poinDidapat ? ' (+' + res.poinDidapat + ' baru)' : ''));
-  if (payload.catatanStruk) lines.push('Catatan: ' + payload.catatanStruk);
-  lines.push('Terima kasih sudah berbelanja!');
-  return lines.join('\n');
+  lastStrukData = {
+    id: res.id || '', kode: res.kodeAlternatif || '', nomor: (DATA.transaksi || []).length + 1,
+    toko: p.NamaToko || 'Zho POS', slogan: p.SloganToko || '', alamat: p.AlamatToko || '', telepon: p.TeleponToko || '',
+    logo: p.LogoToko || logoDataUrl || '', tanggal: new Date(), pelanggan: payload.pelanggan, kasir: payload.kasir || '',
+    metode: payload.metode || 'Tunai',
+    items: payload.items.map(function (it) { return { nama: it.nama, qty: it.Qty, harga: it.Harga - (it.diskonItem || 0), subtotal: it.Harga * it.Qty - (it.diskonItem || 0) * it.Qty }; }),
+    rincian: rincian, total: h.total, bayar: payload.bayar,
+    kembali: Math.max(0, payload.bayar - h.total), sisa: sisa,
+    status: sisa === 0 ? 'Lunas' : 'Kurang', catatan: payload.catatanStruk || '',
+    poin: (p.TampilkanPoinStruk !== 'TIDAK' && pl) ? ('Poin: ' + (pl.Poin || 0) + (res.poinDidapat ? ' (+' + res.poinDidapat + ' baru)' : '')) : '',
+    rugi: !!res.rugi
+  };
+  var teks = strukTeks(lastStrukData);
+  if (p.WatermarkStruk === 'YA') teks = '~~~ ' + lastStrukData.toko + ' ~~~\n' + teks;
+  if (promoTerpakai.length) teks += '\nPromo dipakai: ' + promoTerpakai.map(function (x) { return x.nama || x; }).join(', ');
+  return teks;
 }
 function kirimWA() {
   if (!lastStruk) return alert('Belum ada struk. Simpan transaksi dulu.');
@@ -573,8 +660,7 @@ async function kirimWAGambar() {
   if (!lastStruk) return alert('Belum ada struk. Simpan transaksi dulu.');
   try {
     var blob = await gambarStruk();
-    var m = lastStruk.match(/No:\s*(\S+)/);
-    var nama = 'struk-' + (m ? m[1] : 'zho-pos') + '.png';
+    var nama = 'struk-' + (lastStrukData && lastStrukData.id ? lastStrukData.id : ((lastStruk.match(/No:\s*(\S+)/) || [])[1] || 'zho-pos')) + '.png';
     var file = new File([blob], nama, { type: 'image/png' });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       await navigator.share({ files: [file], title: 'Struk Zho POS' });
@@ -596,8 +682,90 @@ function unduhBlob(blob, nama) {
   document.body.appendChild(a); a.click();
   setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 }
-// Gambar struk di kanvas: logo toko di atas (bila ada), lalu isi struk teks.
+// Gambar struk di kanvas ala Griyo: nama toko besar di tengah, tanggal + #nomor,
+// item "nama / qty x harga / subtotal kanan", Total dan metode di kanan bawah.
 function gambarStruk() {
+  return new Promise(function (selesai, gagal) {
+    var d = lastStrukData;
+    if (!d) return gambarStrukTeks().then(selesai, gagal);
+    var logo = d.logo || '';
+    var muatLogo = function (cb) {
+      if (!logo) return cb(null);
+      var img = new Image();
+      img.onload = function () { cb(img); };
+      img.onerror = function () { cb(null); };
+      img.src = logo;
+    };
+    muatLogo(function (imgLogo) {
+      try {
+        var W = 576, pad = 28, lh = 38;
+        // Susun baris dulu agar tinggi kanvas pas.
+        var baris = [];
+        if (imgLogo) baris.push({ logo: imgLogo });
+        baris.push({ t: d.toko, a: 'c', b: 1, s: 36 });
+        if (d.slogan) baris.push({ t: d.slogan, a: 'c', s: 24, w: '#555' });
+        if (d.alamat) baris.push({ t: d.alamat, a: 'c', s: 24, w: '#333' });
+        if (d.telepon) baris.push({ t: 'Telp: ' + d.telepon, a: 'c', s: 24, w: '#333' });
+        baris.push({ sp: 8 });
+        baris.push({ t: fmtTglStruk(d.tanggal), k: d.nomor ? '#' + d.nomor : '', s: 26 });
+        baris.push({ t: d.pelanggan, s: 26 });
+        baris.push({ hr: 1 });
+        d.items.forEach(function (it) {
+          baris.push({ t: it.nama, k: angka(it.subtotal), b: 1, s: 26 });
+          baris.push({ t: '  ' + it.qty + ' x ' + angka(it.harga), s: 24, w: '#333' });
+        });
+        baris.push({ hr: 1 });
+        (d.rincian || []).forEach(function (r) { baris.push({ t: r.label, k: r.nilai, s: 26 }); });
+        baris.push({ t: 'Total', k: rp(d.total), b: 1, s: 28 });
+        baris.push({ t: d.metode, k: rp(d.bayar), s: 26 });
+        if (d.kembali > 0) baris.push({ t: 'Kembali', k: rp(d.kembali), s: 26 });
+        if (d.sisa > 0) baris.push({ t: 'Sisa', k: rp(d.sisa), b: 1, s: 26 });
+        if (d.rugi) baris.push({ t: '** RUGI **', a: 'c', s: 26, w: '#c5221f' });
+        if (d.poin) baris.push({ t: d.poin, a: 'c', s: 24, w: '#333' });
+        if (d.catatan) baris.push({ t: 'Catatan: ' + d.catatan, a: 'c', s: 24, w: '#333' });
+        baris.push({ sp: 8 });
+        baris.push({ t: 'Terima kasih', a: 'c', s: 26 });
+        var tinggi = pad * 2;
+        baris.forEach(function (r) {
+          if (r.logo) { var sk = Math.min(1, 220 / r.logo.width, 160 / r.logo.height); tinggi += Math.round(r.logo.height * sk) + 16; }
+          else if (r.hr) tinggi += 22;
+          else if (r.sp) tinggi += r.sp;
+          else tinggi += lh;
+        });
+        var cv = document.createElement('canvas');
+        cv.width = W; cv.height = tinggi;
+        var c = cv.getContext('2d');
+        c.fillStyle = '#fff'; c.fillRect(0, 0, W, tinggi);
+        c.fillStyle = '#111'; c.textBaseline = 'top';
+        var y = pad;
+        baris.forEach(function (r) {
+          if (r.logo) {
+            var sk2 = Math.min(1, 220 / r.logo.width, 160 / r.logo.height);
+            var lw = Math.round(r.logo.width * sk2), lhh = Math.round(r.logo.height * sk2);
+            c.drawImage(r.logo, (W - lw) / 2, y, lw, lhh); y += lhh + 16;
+          } else if (r.hr) {
+            c.strokeStyle = '#666'; c.setLineDash([8, 6]); c.lineWidth = 2;
+            c.beginPath(); c.moveTo(pad, y + 10); c.lineTo(W - pad, y + 10); c.stroke();
+            c.setLineDash([]); y += 22;
+          } else if (r.sp) { y += r.sp; }
+          else {
+            c.font = (r.b ? 'bold ' : '') + (r.s || 26) + 'px Arial, sans-serif';
+            c.fillStyle = r.w || '#111';
+            if (r.a === 'c') { c.textAlign = 'center'; c.fillText(r.t, W / 2, y); }
+            else {
+              c.textAlign = 'left'; c.fillText(r.t, pad, y);
+              if (r.k) { c.textAlign = 'right'; c.fillText(r.k, W - pad, y); }
+            }
+            y += lh;
+          }
+        });
+        cv.toBlob(function (b) { b ? selesai(b) : gagal(new Error('gagal membuat gambar')); }, 'image/png');
+      } catch (e) { gagal(e); }
+    });
+  });
+}
+// Jalan darurat: struk lama tanpa data terstruktur, gambar apa adanya dari teks.
+function gambarStrukTeks() {
   return new Promise(function (selesai, gagal) {
     var logo = (DATA.pengaturan || {}).LogoToko || logoDataUrl || '';
     var muatLogo = function (cb) {
@@ -701,13 +869,14 @@ async function batalkanTransaksi(id) {
   var alasan = prompt('Alasan pembatalan:', ''); if (alasan === null) return;
   try { await DB.batalkanTransaksi({ id: id, alasan: alasan }); await loadData(); } catch (e) { alert(e.message); }
 }
-async function strukUlang(id) {
-  try {
-    var res = await DB.getStruk({ transaksiId: id }); lastStruk = res.teks || ('Struk ' + id);
-    var el = document.getElementById('struk'); el.style.display = 'block'; el.innerHTML = strukKeHtml(lastStruk);
-    document.getElementById('strukPrint').innerHTML = strukKeHtml(lastStruk);
-    show('kasir', document.querySelector('nav button.menu[data-sec="kasir"]'));
-  } catch (e) { alert(e.message); }
+function strukUlang(id) {
+  var t = (DATA.transaksi || []).find(function (x) { return x.ID === id; });
+  if (!t) return alert('Transaksi tidak ditemukan.');
+  lastStrukData = strukDataDariTrx(t);
+  lastStruk = strukTeks(lastStrukData);
+  var el = document.getElementById('struk'); el.style.display = 'block'; el.innerHTML = strukKeHtml(lastStruk);
+  document.getElementById('strukPrint').innerHTML = strukKeHtml(lastStruk);
+  show('kasir', document.querySelector('nav button.menu[data-sec="kasir"]'));
 }
 /* ---------- DETAIL TRANSAKSI ala Griyo (ketuk baris di Daftar) ---------- */
 var detailTrxId = '', detailTab = 'detail';
@@ -721,11 +890,9 @@ async function bukaDetailTrx(id) {
   // Struk transaksi lama: nomor WA pelanggan tidak tersimpan, jadi kosongkan
   // agar kirim teks membuka wa.me dan Bos memilih sendiri kontaknya.
   lastWaTelp = '';
-  try {
-    var res = await DB.getStruk({ transaksiId: id });
-    lastStruk = res.teks || ('Struk ' + id);
-    document.getElementById('strukPrint').innerHTML = strukKeHtml(lastStruk);
-  } catch (e) { tampilError('Gagal memuat struk: ' + e.message); }
+  lastStrukData = strukDataDariTrx(t);
+  lastStruk = strukTeks(lastStrukData);
+  document.getElementById('strukPrint').innerHTML = strukKeHtml(lastStruk);
   renderDetailTrx();
   show('detailTrx');
 }
@@ -1369,7 +1536,7 @@ function pilihLogo(input) {
     img.onload = function () {
       var url = kecilkanLogo(img, 512);
       if (url.length > 200000) url = kecilkanLogo(img, 256);
-      logoDataUrl = url; tampilLogoPreview();
+      logoDataUrl = url; tampilLogoPreview(); pratinjauProfil();
     };
     img.onerror = function () { alert('File gambar tidak bisa dibaca.'); };
     img.src = rd.result;
@@ -1383,9 +1550,10 @@ function kecilkanLogo(img, maks) {
   cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
   return cv.toDataURL('image/png');
 }
-function hapusLogo() { logoDataUrl = ''; tampilLogoPreview(); var inp = document.getElementById('logoFile'); if (inp) inp.value = ''; }
+function hapusLogo() { logoDataUrl = ''; tampilLogoPreview(); pratinjauProfil(); var inp = document.getElementById('logoFile'); if (inp) inp.value = ''; }
 // Struk teks -> HTML untuk layar & cetak: logo (bila ada) di atas, lalu isi struk.
 function strukKeHtml(teks) {
+  if (lastStrukData) return strukHtml(lastStrukData);
   var logo = (DATA.pengaturan || {}).LogoToko || logoDataUrl || '';
   var html = esc(teks).replace(/\n/g, '<br>');
   if (logo) html = '<div style="text-align:center;margin-bottom:6px"><img src="' + logo + '" style="max-width:120px;max-height:120px"></div>' + html;
@@ -1394,7 +1562,7 @@ function strukKeHtml(teks) {
 
 /* ---------- PENGATURAN / CABANG / LOGS ---------- */
 async function simpanPengaturan() {
-  var payload = { NamaToko: document.getElementById('sNama').value, AlamatToko: document.getElementById('sAlamat').value, TeleponToko: document.getElementById('sTelp').value, TargetHarian: document.getElementById('sTarget').value, NomorPemilikWA: document.getElementById('sWa').value, JatuhTempoHari: document.getElementById('sJatuhTempo').value, PoinAktif: document.getElementById('sPoinAktif').value, PoinPerRupiah: document.getElementById('sPoinPer').value, PoinTukarRate: document.getElementById('sPoinRate').value, PajakAktif: document.getElementById('sPajakAktif').value, PajakPersen: document.getElementById('sPajakPersen').value, Bahasa: document.getElementById('sBahasa').value, FormatTanggal: document.getElementById('sFormatTanggal').value, ModeGelap: document.getElementById('sGelap').value, TampilkanPoinStruk: document.getElementById('sPoinStruk').value, WatermarkStruk: document.getElementById('sWatermark').value, StrukUkuranKertas: document.getElementById('sKertas').value, ModeMejaAktif: document.getElementById('sMeja').value, PromoAktif: document.getElementById('sPromo').value, MultiCabangAktif: document.getElementById('sMultiCabang').value, LogoToko: logoDataUrl };
+  var payload = { NamaToko: document.getElementById('sNama').value, AlamatToko: document.getElementById('sAlamat').value, TeleponToko: document.getElementById('sTelp').value, SloganToko: document.getElementById('sSlogan').value, TargetHarian: document.getElementById('sTarget').value, NomorPemilikWA: document.getElementById('sWa').value, JatuhTempoHari: document.getElementById('sJatuhTempo').value, PoinAktif: document.getElementById('sPoinAktif').value, PoinPerRupiah: document.getElementById('sPoinPer').value, PoinTukarRate: document.getElementById('sPoinRate').value, PajakAktif: document.getElementById('sPajakAktif').value, PajakPersen: document.getElementById('sPajakPersen').value, Bahasa: document.getElementById('sBahasa').value, FormatTanggal: document.getElementById('sFormatTanggal').value, ModeGelap: document.getElementById('sGelap').value, TampilkanPoinStruk: document.getElementById('sPoinStruk').value, WatermarkStruk: document.getElementById('sWatermark').value, StrukUkuranKertas: document.getElementById('sKertas').value, ModeMejaAktif: document.getElementById('sMeja').value, PromoAktif: document.getElementById('sPromo').value, MultiCabangAktif: document.getElementById('sMultiCabang').value, LogoToko: logoDataUrl };
   await DB.simpanPengaturan(payload);
   document.body.classList.toggle('dark', payload.ModeGelap === 'YA');
   var cb = document.getElementById('sCabangAktif').value;

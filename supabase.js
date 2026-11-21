@@ -1109,16 +1109,34 @@
     if (!DATA) await loadAll();
     var trx = DATA.transaksi.find(function (x) { return x.ID === payload.transaksiId; });
     if (!trx) throw new Error('Transaksi tidak ditemukan.');
-    var lines = [(DATA.pengaturan.NamaToko || 'Zho POS'), '------------------------------',
-      'No: ' + trx.ID + (trx.KodeAlternatif ? ' (' + trx.KodeAlternatif + ')' : ''),
-      'Tanggal: ' + trx.Tanggal, 'Kasir: ' + trx.Kasir, 'Pelanggan: ' + trx.Pelanggan, '------------------------------'];
-    DATA.detail.filter(function (d) { return d.TransaksiID === trx.ID; }).forEach(function (d) {
-      lines.push(d.NamaProduk + ' x' + d.Qty + '  Rp' + Number(d.Subtotal || 0).toLocaleString('id-ID'));
+    var p = DATA.pengaturan || {};
+    var d = new Date(trx.Tanggal);
+    var BLN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    var tgl = d.getDate() + ' ' + BLN[d.getMonth()] + ' ' + d.getFullYear() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    var no = 0;
+    DATA.transaksi.slice().sort(function (a, b) { return String(a.Tanggal || '') < String(b.Tanggal || '') ? -1 : 1; }).forEach(function (x, i) { if (x.ID === trx.ID) no = i + 1; });
+    var W = 32;
+    var tengah = function (s) { s = String(s || ''); if (s.length >= W) return s; return ' '.repeat(Math.floor((W - s.length) / 2)) + s; };
+    var kanan = function (kiri, kan) { kiri = String(kiri); kan = String(kan); return kiri + ' '.repeat(Math.max(1, W - kiri.length - kan.length)) + kan; };
+    var rpN = function (n) { return 'Rp' + Number(n || 0).toLocaleString('id-ID'); };
+    var angka = function (n) { return Number(n || 0).toLocaleString('id-ID'); };
+    var lines = [tengah(p.NamaToko || 'Zho POS')];
+    if (p.SloganToko) lines.push(tengah(p.SloganToko));
+    if (p.AlamatToko) lines.push(tengah(p.AlamatToko));
+    if (p.TeleponToko) lines.push(tengah('Telp: ' + p.TeleponToko));
+    lines.push('', tgl + (no ? '  #' + no : ''), 'Pelanggan: ' + trx.Pelanggan, '--------------------------------');
+    DATA.detail.filter(function (x) { return x.TransaksiID === trx.ID; }).forEach(function (x) {
+      lines.push(x.NamaProduk);
+      var kiri = '  ' + x.Qty + ' x ' + angka(x.Harga);
+      lines.push(kiri + ' '.repeat(Math.max(1, W - kiri.length - rpN(x.Subtotal).length)) + rpN(x.Subtotal));
     });
-    lines.push('------------------------------', 'Total: Rp' + Number(trx.Total || 0).toLocaleString('id-ID'),
-      'Bayar: Rp' + Number(trx.Bayar || 0).toLocaleString('id-ID'),
-      'Kembali: Rp' + Math.max(0, Number(trx.Bayar || 0) - Number(trx.Total || 0)).toLocaleString('id-ID'),
-      'Status: ' + trx.StatusBayar, 'Terima kasih sudah berbelanja!');
+    lines.push('--------------------------------');
+    if (Number(trx.Diskon || 0) > 0) lines.push(kanan('Diskon', '-' + rpN(trx.Diskon)));
+    if (Number(trx.Ongkir || 0) > 0) lines.push(kanan('Ongkir', rpN(trx.Ongkir)));
+    lines.push(kanan('Total', rpN(trx.Total)),
+      kanan(trx.Metode || 'Tunai', rpN(trx.Bayar)),
+      kanan('Kembali', rpN(Math.max(0, Number(trx.Bayar || 0) - Number(trx.Total || 0)))),
+      '', tengah('Terima kasih sudah berbelanja!'));
     return { teks: lines.join('\n') };
   }
 

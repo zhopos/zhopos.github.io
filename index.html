@@ -181,6 +181,17 @@ th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04
 .detail-tab.active{font-weight:700}
 .struk-preview{background:#000;padding:24px 12px;margin:0 -14px}
 .struk-box{font-family:monospace;white-space:pre-wrap;background:#fff;padding:16px;border:1px dashed #94a3b8;border-radius:12px;margin:0 auto;max-width:420px}
+/* --- Struk ala Griyo (layar + cetak) --- */
+.struk{font-family:Arial,Helvetica,sans-serif;color:#111;max-width:340px;margin:0 auto}
+.struk-nama{text-align:center;font-size:26px;font-weight:700}
+.struk-info{text-align:center;font-size:15px;color:#333}
+.struk-bar{display:flex;justify-content:space-between;font-size:15px;margin-top:10px}
+.struk-plg{font-size:15px;margin-top:2px}
+.struk-hr{border:0;border-top:1px dashed #666;margin:10px 0}
+.struk-item{display:flex;justify-content:space-between;gap:10px;padding:6px 0;font-size:16px}
+.struk-qty{font-size:14px;color:#333;margin-top:2px}
+.struk-tot{display:flex;justify-content:space-between;font-size:16px;padding:2px 0}
+.struk-thanks{text-align:center;font-size:16px;margin-top:14px}
 .lebih-item{display:flex;align-items:center;gap:14px;padding:14px 20px;font-size:16px;cursor:pointer;border:0;background:none;width:100%;text-align:left;color:#202124}
 .lebih-item.merah{color:#c5221f}
 .lebih-ikon{font-size:20px;width:28px;text-align:center;color:#137333}
@@ -552,9 +563,17 @@ body.dark .menu-item{background:#1e293b}
 </section>
 
 <section id="pengaturan">
-<div class="card"><h3>Pengaturan Toko — bisa diubah kapan pun</h3>
-<label>Nama Toko <input id="sNama"></label><label>Alamat <input id="sAlamat"></label><label>Telepon <input id="sTelp"></label>
+<div class="card"><h3>Profil Toko</h3>
+<p style="color:#64748b;font-size:14px;margin-top:0">Yang tampil di struk: logo, nama, alamat, telepon, dan slogan. Kosongkan alamat/telepon bila tidak ingin tampil di struk.</p>
 <div style="margin:8px 0"><label>Logo Toko — tampil otomatis di struk</label><input id="logoFile" type="file" accept="image/*" onchange="pilihLogo(this)"><div style="margin-top:6px"><img id="logoPreview" alt="Logo toko" style="max-width:120px;max-height:120px;display:none;border:1px solid var(--line);border-radius:8px;padding:4px;background:#fff"></div><button class="secondary" id="logoHapusBtn" style="display:none;margin-top:6px" onclick="hapusLogo()">Hapus Logo</button></div>
+<label>Nama Toko <input id="sNama" oninput="pratinjauProfil()"></label>
+<label>Slogan — tampil di bawah nama toko di struk (opsional) <input id="sSlogan" placeholder="Contoh: Toko Kelontong & ATK" oninput="pratinjauProfil()"></label>
+<label>Alamat <input id="sAlamat" oninput="pratinjauProfil()"></label>
+<label>Telepon <input id="sTelp" oninput="pratinjauProfil()"></label>
+<h4 style="margin:14px 0 6px">Pratinjau Struk</h4>
+<div id="profilPreview" style="background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:14px"></div>
+<button class="primary" onclick="simpanPengaturan()" style="margin-top:12px">Simpan Profil Toko</button></div>
+<div class="card"><h3>Pengaturan Operasional</h3>
 <label>Target Omzet Harian (Rp) <input id="sTarget" type="number"></label>
 <label>Cabang Aktif <select id="sCabangAktif"></select></label>
 <label>Nomor WhatsApp Pemilik (format 628xx tanpa +) <input id="sWa" placeholder="62812xxxx"></label>
