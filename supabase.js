@@ -28,8 +28,12 @@
   }
   function nowISO() {
     var x = new Date();
+    // Sertakan offset zona waktu lokal (+07:00 untuk WIB) supaya Postgres
+    // tidak mengira waktu lokal sebagai UTC (sebelumnya jam tampil +7 jam).
+    var off = -x.getTimezoneOffset(), sign = off >= 0 ? '+' : '-';
+    var oh = String(Math.floor(Math.abs(off) / 60)).padStart(2, '0'), om = String(Math.abs(off) % 60).padStart(2, '0');
     return todayStr(x) + ' ' + String(x.getHours()).padStart(2, '0') + ':' +
-      String(x.getMinutes()).padStart(2, '0') + ':' + String(x.getSeconds()).padStart(2, '0');
+      String(x.getMinutes()).padStart(2, '0') + ':' + String(x.getSeconds()).padStart(2, '0') + sign + oh + ':' + om;
   }
   function uid(prefix) { return prefix + '-' + Date.now().toString(36).toUpperCase() + Math.floor(Math.random() * 1296).toString(36).toUpperCase(); }
   function kodeAcak() {
