@@ -1108,12 +1108,57 @@ function editProduk(id) {
   document.getElementById('pHargaGanti').checked = flagYa(p.HargaBisaDiganti);
   document.getElementById('pTermasukStok').checked = flagYa(p.TermasukStok);
   document.getElementById('pTampilKatalog').checked = flagYa(p.TampilkanDiKatalog);
-  document.getElementById('pHargaLain').value = p.HargaLainJSON || ''; document.getElementById('pHargaJumlah').value = p.HargaJumlahJSON || ''; document.getElementById('pVarian').value = p.VarianJSON || '';
+  renderEditorHarga('pHargaLain', p.HargaLainJSON || ''); renderEditorHarga('pHargaJumlah', p.HargaJumlahJSON || ''); renderEditorHarga('pVarian', p.VarianJSON || '');
   show('produk', document.querySelector('nav button.menu[data-sec="produk"]')); window.scrollTo(0, 0);
 }
-function resetProduk() { ['pId', 'pNama', 'pKategori', 'pGrup', 'pSKU', 'pJual', 'pModal', 'pStok', 'pGambar', 'pKet', 'pHargaLain', 'pHargaJumlah', 'pVarian'].forEach(function (i) { document.getElementById(i).value = ''; }); document.getElementById('pSatuan').value = 'pcs'; document.getElementById('pStokMin').value = '5'; document.getElementById('pHargaGanti').checked = true; document.getElementById('pTermasukStok').checked = true; document.getElementById('pTampilKatalog').checked = true; }
+function resetProduk() { ['pId', 'pNama', 'pKategori', 'pGrup', 'pSKU', 'pJual', 'pModal', 'pStok', 'pGambar', 'pKet'].forEach(function (i) { document.getElementById(i).value = ''; }); document.getElementById('pSatuan').value = 'pcs'; document.getElementById('pStokMin').value = '5'; document.getElementById('pHargaGanti').checked = true; document.getElementById('pTermasukStok').checked = true; document.getElementById('pTampilKatalog').checked = true; renderEditorHarga('pHargaLain', '[]'); renderEditorHarga('pHargaJumlah', '[]'); renderEditorHarga('pVarian', '[]'); }
+/* Editor baris Harga Lain / Harga Jumlah / Varian — ganti ketik JSON mentah.
+   Disimpan tetap sebagai JSON string seperti dulu, jadi kasir & database tidak berubah. */
+var LABEL_TAMBAH = { pHargaLain: '+ Tambah Harga Lain', pHargaJumlah: '+ Tambah Tingkat Harga', pVarian: '+ Tambah Varian' };
+function kolomEditor(id) { var w = document.getElementById(id); return (w && w.dataset.kolom) ? w.dataset.kolom.split(',') : []; }
+function renderEditorHarga(id, jsonStr) {
+  var wadah = document.getElementById(id); if (!wadah) return;
+  var kolom = kolomEditor(id);
+  var rows = [];
+  try { rows = JSON.parse(jsonStr || '[]'); } catch (e) { rows = []; }
+  if (!Array.isArray(rows)) rows = [];
+  wadah.innerHTML = rows.map(function (r, i) {
+    return '<div class="hr-row">' + kolom.map(function (k) {
+      var v = r[k] == null ? '' : r[k];
+      var tipe = (k === 'label') ? 'text' : 'number';
+      var ph = k === 'label' ? 'Nama' : (k === 'harga' ? 'Harga (Rp)' : (k === 'minQty' ? 'Min. qty' : 'Isi'));
+      return '<input type="' + tipe + '" data-k="' + k + '" value="' + esc(String(v)) + '" placeholder="' + ph + '">';
+    }).join('') + '<button type="button" class="secondary hr-x" onclick="hapusBarisHarga(\'' + id + '\',' + i + ')">✕</button></div>';
+  }).join('') + '<button type="button" class="secondary" onclick="tambahBarisHarga(\'' + id + '\')">' + (LABEL_TAMBAH[id] || '+ Tambah') + '</button>';
+}
+function kumpulEditorHarga(id) {
+  var wadah = document.getElementById(id); if (!wadah) return '[]';
+  var rows = [];
+  wadah.querySelectorAll('.hr-row').forEach(function (row) {
+    var o = {}; var kosong = true;
+    row.querySelectorAll('input').forEach(function (inp) {
+      var k = inp.getAttribute('data-k'); var v = inp.value;
+      if (v !== '' && v != null) kosong = false;
+      o[k] = (k === 'label') ? v : (v === '' ? 0 : Number(v));
+    });
+    if (!kosong) rows.push(o);
+  });
+  return JSON.stringify(rows);
+}
+function tambahBarisHarga(id) {
+  var rows = [];
+  try { rows = JSON.parse(kumpulEditorHarga(id)); } catch (e) { rows = []; }
+  rows.push({});
+  renderEditorHarga(id, JSON.stringify(rows));
+}
+function hapusBarisHarga(id, i) {
+  var rows = [];
+  try { rows = JSON.parse(kumpulEditorHarga(id)); } catch (e) { rows = []; }
+  rows.splice(i, 1);
+  renderEditorHarga(id, JSON.stringify(rows));
+}
 async function simpanProduk() {
-  var payload = { ID: document.getElementById('pId').value || '', Nama: document.getElementById('pNama').value, Kategori: document.getElementById('pKategori').value, Grup: document.getElementById('pGrup').value, SKU: document.getElementById('pSKU').value, HargaJual: document.getElementById('pJual').value, HargaModal: document.getElementById('pModal').value, Stok: document.getElementById('pStok').value, StokMinimum: document.getElementById('pStokMin').value, Satuan: document.getElementById('pSatuan').value, GambarURL: document.getElementById('pGambar').value, Keterangan: document.getElementById('pKet').value, HargaBisaDiganti: document.getElementById('pHargaGanti').checked, TermasukStok: document.getElementById('pTermasukStok').checked, TampilkanDiKatalog: document.getElementById('pTampilKatalog').checked, HargaLainJSON: document.getElementById('pHargaLain').value, HargaJumlahJSON: document.getElementById('pHargaJumlah').value, VarianJSON: document.getElementById('pVarian').value, CabangID: cabangAktifId() };
+  var payload = { ID: document.getElementById('pId').value || '', Nama: document.getElementById('pNama').value, Kategori: document.getElementById('pKategori').value, Grup: document.getElementById('pGrup').value, SKU: document.getElementById('pSKU').value, HargaJual: document.getElementById('pJual').value, HargaModal: document.getElementById('pModal').value, Stok: document.getElementById('pStok').value, StokMinimum: document.getElementById('pStokMin').value, Satuan: document.getElementById('pSatuan').value, GambarURL: document.getElementById('pGambar').value, Keterangan: document.getElementById('pKet').value, HargaBisaDiganti: document.getElementById('pHargaGanti').checked, TermasukStok: document.getElementById('pTermasukStok').checked, TampilkanDiKatalog: document.getElementById('pTampilKatalog').checked, HargaLainJSON: kumpulEditorHarga('pHargaLain'), HargaJumlahJSON: kumpulEditorHarga('pHargaJumlah'), VarianJSON: kumpulEditorHarga('pVarian'), CabangID: cabangAktifId() };
   if (!payload.Nama || !payload.HargaJual) return alert('Nama dan harga jual wajib diisi.');
   try { JSON.parse(payload.HargaLainJSON || '[]'); JSON.parse(payload.HargaJumlahJSON || '[]'); JSON.parse(payload.VarianJSON || '[]'); } catch (e) { return alert('JSON Harga Lain / Harga Jumlah / Varian tidak valid.'); }
   await DB.upsertProduk(payload); resetProduk(); await loadData();
