@@ -559,7 +559,7 @@ function renderTrx() {
     if (dari && tg < dari) return false;
     if (sampai && tg > sampai) return false;
     return true;
-  }).slice(0, 100);
+  }).sort(function (a, b) { return String(b.Tanggal || '') < String(a.Tanggal || '') ? -1 : 1; }).slice(0, 100);
   var html = '<table><tr><th>ID / Tanggal</th><th>Pelanggan</th><th>Total</th><th>Bayar / Sisa</th><th>Status</th><th></th></tr>' + list.map(function (t) {
     var rugi = (t.Laba != null && Number(t.Laba) < 0) ? ' <span class="badge bad">Rugi</span>' : '';
     return '<tr><td>' + esc(t.ID) + '<br><small>' + new Date(t.Tanggal).toLocaleString('id-ID') + '</small>' + (t.KodeAlternatif ? '<br><small>Kode: ' + esc(t.KodeAlternatif) + '</small>' : '') + '</td><td>' + esc(t.Pelanggan) + '</td><td>' + rp(t.Total) + rugi + '</td><td>' + rp(t.Bayar) + ' / ' + rp(t.Sisa) + '</td><td><span class="badge ' + (t.StatusBayar === 'Lunas' ? '' : 'warn') + '">' + esc(t.StatusBayar) + '</span> • ' + esc(t.StatusPesanan || '') + '</td><td><button class="secondary" onclick="lunasi(\'' + esc(t.ID) + '\')">+ Bayar</button> <button class="secondary" onclick="strukUlang(\'' + esc(t.ID) + '\')">Struk</button> <select onchange="ubahStatus(\'' + esc(t.ID) + '\',this.value)"><option value="">Ubah status…</option><option>Antri</option><option>Proses</option><option>Selesai</option><option>Diambil</option></select> <button class="danger" onclick="batalkanTransaksi(\'' + esc(t.ID) + '\')">Batalkan</button></td></tr>';
