@@ -128,6 +128,7 @@ body.dark .pill{background:#0f172a;color:#e2e8f0}
   <div style="display:flex;align-items:center;gap:4px"><button class="burger" onclick="toggleDrawer()" aria-label="Menu">☰</button><div><b id="namaTokoHead">Zho POS</b><br><small id="modeLabel">Memuat data…</small> <small id="userLabel"></small></div></div>
   <div style="display:flex;align-items:center;gap:6px"><span class="premium">Premium</span><span class="modebadge" id="modeBadge">Mode Contoh</span><button class="hbtn" onclick="go('laporan')" aria-label="Notifikasi">🔔</button><button class="hbtn" onclick="logout()">Keluar</button><button class="hbtn" onclick="loadData()">↻</button></div>
 </header>
+<div id="errBar" style="display:none;position:fixed;top:57px;left:0;right:0;z-index:30;background:#fee2e2;color:#991b1b;border-bottom:1px solid #fca5a5;padding:10px 14px;font-size:14px;cursor:pointer" onclick="this.style.display='none'" title="Ketuk untuk menutup"></div>
 <div id="drawerBackdrop" onclick="closeDrawer()"></div>
 <nav id="nav">
   <div class="drawer-head"><div class="zmark">Z</div><div><b>Zho POS</b><small>Premium</small></div><button class="hbtn" style="margin-left:auto" onclick="closeDrawer()">✕</button></div>

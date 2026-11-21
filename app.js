@@ -48,6 +48,16 @@ function setModeLabel() {
 function withTimeout(promise, ms, msg) {
   return Promise.race([promise, new Promise(function (_, reject) { setTimeout(function () { reject(new Error(msg)); }, ms); })]);
 }
+function tampilError(msg) {
+  var el = document.getElementById('errBar');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+function sembunyiError() {
+  var el = document.getElementById('errBar');
+  if (el) el.style.display = 'none';
+}
 async function loadData() {
   try {
     var d = await withTimeout(DB.loadAll(), 20000, 'Supabase tidak menjawab dalam 20 detik. Periksa koneksi internet, lalu muat ulang halaman.');
@@ -58,6 +68,7 @@ async function loadData() {
     document.getElementById('heroToko').textContent = p.NamaToko || 'Zho POS';
     document.body.classList.toggle('dark', p.ModeGelap === 'YA');
     setModeLabel();
+    sembunyiError();
     isiPengaturanForm();
     var saved = null; try { saved = JSON.parse(sessionStorage.getItem('pos_user') || 'null'); } catch (e) { }
     if ((DATA.pengguna || []).length && !saved) {
@@ -71,7 +82,7 @@ async function loadData() {
     document.getElementById('loginBox').style.display = 'none';
     document.querySelectorAll('main section').forEach(function (s) { s.style.display = ''; });
     renderAll(); applyRole(); hideLoading();
-  } catch (e) { hideLoading(); alert('Gagal memuat data: ' + e.message); }
+  } catch (e) { hideLoading(); tampilError('Gagal memuat data: ' + e.message); alert('Gagal memuat data: ' + e.message); }
 }
 async function doLogin() {
   var nama = document.getElementById('loginNama').value, pin = document.getElementById('loginPin').value;
@@ -458,7 +469,8 @@ async function simpanTransaksi() {
   var pl = (DATA.pelanggan || []).find(function (p) { return p.Nama === namaPelanggan; });
   var payload = { pelanggan: namaPelanggan, kasir: currentUser ? currentUser.nama : 'Kasir', cabangId: cabangAktifId(), meja: document.getElementById('kasirMeja').value || '', items: cart, diskon: h.diskonTotal, diskonPersen: document.getElementById('kasirDiskonJenis').value === 'persen' ? Number(document.getElementById('kasirDiskon').value || 0) : 0, ongkir: h.ongkir, bayar: Number(document.getElementById('kasirBayar').value || 0), metode: document.getElementById('kasirMetode').value, statusPesanan: document.getElementById('kasirStatus').value, catatan: '', catatanStruk: document.getElementById('kasirCatatanStruk').value, catatanInternal: document.getElementById('kasirCatatanInternal').value, poinDipakai: poinDipakai, promoId: promoTerpakai.length ? (promoTerpakai[0].id || promoTerpakai[0].ID || '') : '', kodeAlternatif: '' };
   try {
-    var res = await DB.saveTransaksi(payload);
+    sembunyiError();
+    var res = await withTimeout(DB.saveTransaksi(payload), 15000, 'Supabase tidak menjawab saat menyimpan (15 detik). Periksa koneksi internet, lalu coba lagi.');
     lastStruk = buatStruk(res, payload, h, pl);
     var el = document.getElementById('struk'); el.style.display = 'block'; el.textContent = lastStruk;
     document.getElementById('strukPrint').textContent = lastStruk;
@@ -467,7 +479,7 @@ async function simpanTransaksi() {
     await loadData();
     show('kasir', document.querySelector('nav button.menu[data-sec="kasir"]'));
     alert('Transaksi tersimpan. ID: ' + (res.id || '') + (res.rugi ? ' — RUGI (total di bawah HPP)' : ''));
-  } catch (e) { alert('Gagal menyimpan: ' + e.message); }
+  } catch (e) { var m = 'Gagal menyimpan: ' + (e && e.message ? e.message : e); tampilError(m); alert(m); }
 }
 function buatStruk(res, payload, h, pl) {
   var p = DATA.pengaturan || {};
