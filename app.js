@@ -1238,9 +1238,9 @@ async function simpanProduk() {
   if (!payload.Nama || !payload.HargaJual) return alert('Nama dan harga jual wajib diisi.');
   try { JSON.parse(payload.HargaLainJSON || '[]'); JSON.parse(payload.HargaJumlahJSON || '[]'); JSON.parse(payload.VarianJSON || '[]'); } catch (e) { return alert('JSON Harga Lain / Harga Jumlah / Varian tidak valid.'); }
   try { await DB.upsertProduk(payload); } catch (e) { tampilError('Gagal menyimpan produk: ' + (e.message || e)); return; }
-  resetProduk(); await loadData(); tampilInfo('Produk tersimpan.');
+  await loadData(); resetProduk(); tampilInfo('Produk tersimpan.');
 }
-async function hapusProduk(id, el) { if (!duaKetuk(el)) return; await DB.hapusProduk(id); tutupForm('produk'); await loadData(); tampilInfo('Produk dihapus.'); }
+async function hapusProduk(id, el) { if (!duaKetuk(el)) return; await DB.hapusProduk(id); await loadData(); tutupForm('produk'); tampilInfo('Produk dihapus.'); }
 async function exportProduk() {
   try { var res = await DB.exportProdukCSV(); unduhFile('produk.csv', res.csv || '', 'text/csv'); } catch (e) { alert(e.message); }
 }
@@ -1318,18 +1318,18 @@ function renderPembelian() {
   }).join('') + '</table>';
   document.getElementById('pemasokTable').innerHTML = '<table><tr><th>Nama</th><th>Telepon</th><th>Hutang</th></tr>' + (DATA.pemasok || []).map(function (p) { return '<tr><td>' + esc(p.Nama) + '</td><td>' + esc(p.Telepon || '') + '</td><td>' + rp(p.Hutang || 0) + '</td></tr>'; }).join('') + '</table>';
 }
-async function simpanPemasok() { var nama = document.getElementById('pmNama').value; if (!nama) return alert('Nama wajib diisi.'); await DB.upsertPemasok({ Nama: nama, Telepon: document.getElementById('pmTelp').value, Alamat: document.getElementById('pmAlamat').value }); ['pmNama', 'pmTelp', 'pmAlamat'].forEach(function (i) { document.getElementById(i).value = ''; }); tutupForm('pembelian'); await loadData(); tampilInfo('Pemasok tersimpan.'); }
+async function simpanPemasok() { var nama = document.getElementById('pmNama').value; if (!nama) return alert('Nama wajib diisi.'); await DB.upsertPemasok({ Nama: nama, Telepon: document.getElementById('pmTelp').value, Alamat: document.getElementById('pmAlamat').value }); ['pmNama', 'pmTelp', 'pmAlamat'].forEach(function (i) { document.getElementById(i).value = ''; }); await loadData(); tutupForm('pembelian'); tampilInfo('Pemasok tersimpan.'); }
 
 /* ---------- PENGELUARAN & KAS ---------- */
 async function simpanPengeluaran() {
   var nominal = Number(document.getElementById('pgNominal').value || 0); if (!nominal) return alert('Nominal wajib diisi.');
   await DB.simpanPengeluaran({ kategori: document.getElementById('pgKategori').value || 'Lainnya', keterangan: document.getElementById('pgKet').value, nominal: nominal, efekLaba: document.getElementById('pgEfek').value, cabangId: cabangAktifId() });
-  document.getElementById('pgKet').value = ''; document.getElementById('pgNominal').value = ''; tutupForm('pengeluaran'); await loadData(); tampilInfo('Pengeluaran tersimpan.');
+  document.getElementById('pgKet').value = ''; document.getElementById('pgNominal').value = ''; await loadData(); tutupForm('pengeluaran'); tampilInfo('Pengeluaran tersimpan.');
 }
 async function simpanUangKas() {
   var nominal = Number(document.getElementById('ukNominal').value || 0); if (!nominal) return alert('Nominal wajib diisi.');
   await DB.simpanUangKas({ jenis: document.getElementById('ukJenis').value, keterangan: document.getElementById('ukKet').value, nominal: nominal, cabangId: cabangAktifId() });
-  document.getElementById('ukKet').value = ''; document.getElementById('ukNominal').value = ''; tutupForm('aruskas'); await loadData(); tampilInfo('Kas tersimpan.');
+  document.getElementById('ukKet').value = ''; document.getElementById('ukNominal').value = ''; await loadData(); tutupForm('aruskas'); tampilInfo('Kas tersimpan.');
 }
 function renderKeuangan() {
   document.getElementById('kasTable').innerHTML = '<table><tr><th>Tanggal</th><th>Keterangan</th><th>Masuk</th><th>Keluar</th><th>Saldo</th></tr>' + (DATA.kas || []).slice(-50).reverse().map(function (k) { return '<tr><td>' + new Date(k.Tanggal).toLocaleString('id-ID') + '</td><td>' + esc(k.Keterangan) + '</td><td>' + rp(k.Masuk) + '</td><td>' + rp(k.Keluar) + '</td><td>' + rp(k.Saldo) + '</td></tr>'; }).join('') + '</table>';
@@ -1353,7 +1353,7 @@ function renderUtang() {
 async function cicilUtang() {
   var id = document.getElementById('cicilUtangId').value; var nominal = Number(document.getElementById('cicilNominal').value || 0);
   if (!id || !nominal) return alert('Pilih utang dan isi nominal cicilan.');
-  try { await DB.cicilUtang({ utangId: id, nominal: nominal, keterangan: document.getElementById('cicilKet').value }); document.getElementById('cicilNominal').value = ''; document.getElementById('cicilKet').value = ''; tutupForm('utang'); await loadData(); tampilInfo('Cicilan tersimpan.'); } catch (e) { alert(e.message); }
+  try { await DB.cicilUtang({ utangId: id, nominal: nominal, keterangan: document.getElementById('cicilKet').value }); document.getElementById('cicilNominal').value = ''; document.getElementById('cicilKet').value = ''; await loadData(); tutupForm('utang'); tampilInfo('Cicilan tersimpan.'); } catch (e) { alert(e.message); }
 }
 
 /* ---------- PELANGGAN & PIUTANG ---------- */
@@ -1385,7 +1385,7 @@ async function muatPengingatPiutang() {
 async function simpanPelanggan() {
   var nama = document.getElementById('plNama').value; if (!nama) return alert('Nama wajib diisi.');
   await DB.upsertPelanggan({ ID: document.getElementById('plId').value || '', Nama: nama, Telepon: document.getElementById('plTelp').value, Alamat: document.getElementById('plAlamat').value, TanggalLahir: document.getElementById('plLahir').value });
-  resetPelanggan(); await loadData(); tampilInfo('Pelanggan tersimpan.');
+  await loadData(); resetPelanggan(); tampilInfo('Pelanggan tersimpan.');
 }
 async function lunasiSemua(nama, el) { if (!duaKetuk(el)) return; var res = await DB.lunasiSemua({ pelanggan: nama }); tampilInfo('Dilunasi ' + (res.jumlah || 0) + ' transaksi, total ' + rp(res.total || 0)); await loadData(); }
 async function koreksiPoin() {
@@ -1426,7 +1426,7 @@ function renderMeja() {
 async function simpanMeja() {
   var nama = document.getElementById('mjNama').value; if (!nama) return alert('Nama meja wajib diisi.');
   await DB.upsertMeja({ Nama: nama, CabangID: cabangAktifId() });
-  document.getElementById('mjNama').value = ''; tutupForm('meja'); await loadData(); tampilInfo('Meja ditambah.');
+  document.getElementById('mjNama').value = ''; await loadData(); tutupForm('meja'); tampilInfo('Meja ditambah.');
 }
 async function hapusMeja(id, el) { if (!duaKetuk(el)) return; await DB.hapusMeja({ id: id }); await loadData(); tampilInfo('Meja dihapus.'); }
 async function muatDapur() {
@@ -1485,7 +1485,7 @@ function resetKatalog() { ['ktgId', 'ktgNama', 'ktgFooter'].forEach(function (i)
 async function simpanKatalog() {
   var nama = document.getElementById('ktgNama').value; if (!nama) return alert('Masukkan nama katalog');
   await DB.upsertKatalog({ ID: document.getElementById('ktgId').value || '', Nama: nama, TampilkanGambar: document.getElementById('ktgGambar').checked, TampilkanHarga: document.getElementById('ktgHarga').checked, TampilkanStok: document.getElementById('ktgStok').checked, SembunyikanStokKosong: document.getElementById('ktgSembunyiKosong').checked, TampilkanKeterangan: document.getElementById('ktgKet').checked, Footer: document.getElementById('ktgFooter').value, Aktif: true, CabangID: cabangAktifId() });
-  resetKatalog(); await loadData(); tampilInfo('Katalog tersimpan.');
+  await loadData(); resetKatalog(); tampilInfo('Katalog tersimpan.');
 }
 
 /* ---------- PROMO & MEMBER ---------- */
@@ -1506,7 +1506,7 @@ async function simpanPromo() {
   var syarat = document.getElementById('prmSyarat').value;
   try { if (syarat) JSON.parse(syarat); } catch (e) { return alert('Syarat JSON tidak valid.'); }
   await DB.upsertPromo({ ID: document.getElementById('prmId').value || '', Nama: nama, Jenis: document.getElementById('prmJenis').value, Nilai: document.getElementById('prmNilai').value, SyaratJSON: syarat, Mulai: document.getElementById('prmMulai').value, Selesai: document.getElementById('prmSelesai').value, JamMulai: document.getElementById('prmJamMulai').value, JamSelesai: document.getElementById('prmJamSelesai').value, Hari: document.getElementById('prmHari').value, Aktif: true, CabangID: document.getElementById('prmCabang').value || cabangAktifId() });
-  resetPromo(); await loadData(); tampilInfo('Promo tersimpan.');
+  await loadData(); resetPromo(); tampilInfo('Promo tersimpan.');
 }
 async function hapusPromo(id, el) { if (!duaKetuk(el)) return; await DB.hapusPromo({ id: id }); await loadData(); tampilInfo('Promo dihapus.'); }
 async function catatTier() {
@@ -1529,17 +1529,17 @@ function renderMaster() {
   document.getElementById('teksTable').innerHTML = '<table><tr><th>Nama</th><th>Keterangan</th><th>Jenis</th><th></th></tr>' + (DATA.daftarTeks || []).map(function (t) { return '<tr><td>' + esc(t.Nama) + '</td><td>' + esc(t.Keterangan || '') + '</td><td>' + esc(t.Jenis) + '</td><td><button class="danger" onclick="hapusTeks(\'' + esc(t.ID) + '\', this)">Hapus</button></td></tr>'; }).join('') + '</table>';
   document.getElementById('pegawaiTable').innerHTML = '<table><tr><th>Nama</th><th>Jabatan</th><th>Target</th><th>Komisi</th><th></th></tr>' + (DATA.pegawai || []).map(function (p) { return '<tr><td>' + esc(p.Nama) + '</td><td>' + esc(p.Jabatan || '') + '</td><td>' + rp(p.Target || 0) + '</td><td>' + (p.KomisiPersen || 0) + '%</td><td><button class="danger" onclick="hapusPegawai(\'' + esc(p.ID) + '\', this)">Hapus</button></td></tr>'; }).join('') + '</table>';
 }
-async function simpanGrup() { var n = document.getElementById('gNama').value; if (!n) return alert('Nama grup wajib diisi.'); await DB.upsertGrup({ id: document.getElementById('gId').value || '', nama: n }); document.getElementById('gNama').value = ''; tutupForm('master'); await loadData(); tampilInfo('Grup tersimpan.'); }
+async function simpanGrup() { var n = document.getElementById('gNama').value; if (!n) return alert('Nama grup wajib diisi.'); await DB.upsertGrup({ id: document.getElementById('gId').value || '', nama: n }); document.getElementById('gNama').value = ''; await loadData(); tutupForm('master'); tampilInfo('Grup tersimpan.'); }
 async function hapusGrup(id, el) { if (!duaKetuk(el)) return; await DB.hapusGrup({ id: id }); await loadData(); tampilInfo('Grup dihapus.'); }
-async function simpanSatuan() { var n = document.getElementById('stNama').value; if (!n) return alert('Nama satuan wajib diisi.'); await DB.upsertSatuan({ id: document.getElementById('stId').value || '', nama: n, singkatan: document.getElementById('stSingkat').value, desimal: document.getElementById('stDesimal').value }); document.getElementById('stNama').value = ''; document.getElementById('stSingkat').value = ''; tutupForm('master'); await loadData(); tampilInfo('Satuan tersimpan.'); }
+async function simpanSatuan() { var n = document.getElementById('stNama').value; if (!n) return alert('Nama satuan wajib diisi.'); await DB.upsertSatuan({ id: document.getElementById('stId').value || '', nama: n, singkatan: document.getElementById('stSingkat').value, desimal: document.getElementById('stDesimal').value }); document.getElementById('stNama').value = ''; document.getElementById('stSingkat').value = ''; await loadData(); tutupForm('master'); tampilInfo('Satuan tersimpan.'); }
 async function hapusSatuan(id, el) { if (!duaKetuk(el)) return; await DB.hapusSatuan({ id: id }); await loadData(); tampilInfo('Satuan dihapus.'); }
-async function simpanJenisBayar() { var n = document.getElementById('jbNama').value; if (!n) return alert('Nama wajib diisi.'); await DB.upsertJenisBayar({ id: document.getElementById('jbId').value || '', nama: n }); document.getElementById('jbNama').value = ''; tutupForm('master'); await loadData(); tampilInfo('Jenis bayar tersimpan.'); }
+async function simpanJenisBayar() { var n = document.getElementById('jbNama').value; if (!n) return alert('Nama wajib diisi.'); await DB.upsertJenisBayar({ id: document.getElementById('jbId').value || '', nama: n }); document.getElementById('jbNama').value = ''; await loadData(); tutupForm('master'); tampilInfo('Jenis bayar tersimpan.'); }
 async function hapusJenisBayar(id, el) { if (!duaKetuk(el)) return; await DB.hapusJenisBayar({ id: id }); await loadData(); tampilInfo('Jenis bayar dihapus.'); }
-async function simpanItemPengeluaran() { var n = document.getElementById('ipNama').value; if (!n) return alert('Nama wajib diisi.'); await DB.upsertItemPengeluaran({ id: document.getElementById('ipId').value || '', nama: n }); document.getElementById('ipNama').value = ''; tutupForm('master'); await loadData(); tampilInfo('Item tersimpan.'); }
+async function simpanItemPengeluaran() { var n = document.getElementById('ipNama').value; if (!n) return alert('Nama wajib diisi.'); await DB.upsertItemPengeluaran({ id: document.getElementById('ipId').value || '', nama: n }); document.getElementById('ipNama').value = ''; await loadData(); tutupForm('master'); tampilInfo('Item tersimpan.'); }
 async function hapusItemPengeluaran(id, el) { if (!duaKetuk(el)) return; await DB.hapusItemPengeluaran({ id: id }); await loadData(); tampilInfo('Item dihapus.'); }
-async function simpanTeks() { var n = document.getElementById('txNama').value; if (!n) return alert('Nama wajib diisi.'); await DB.simpanTeks({ id: document.getElementById('txId').value || '', nama: n, keterangan: document.getElementById('txKet').value, jenis: document.getElementById('txJenis').value }); document.getElementById('txNama').value = ''; document.getElementById('txKet').value = ''; tutupForm('master'); await loadData(); tampilInfo('Teks tersimpan.'); }
+async function simpanTeks() { var n = document.getElementById('txNama').value; if (!n) return alert('Nama wajib diisi.'); await DB.simpanTeks({ id: document.getElementById('txId').value || '', nama: n, keterangan: document.getElementById('txKet').value, jenis: document.getElementById('txJenis').value }); document.getElementById('txNama').value = ''; document.getElementById('txKet').value = ''; await loadData(); tutupForm('master'); tampilInfo('Teks tersimpan.'); }
 async function hapusTeks(id, el) { if (!duaKetuk(el)) return; await DB.hapusTeks({ id: id }); await loadData(); tampilInfo('Teks dihapus.'); }
-async function simpanPegawai() { var n = document.getElementById('pgwNama').value; if (!n) return alert('Nama wajib diisi.'); await DB.upsertPegawai({ id: document.getElementById('pgwId').value || '', nama: n, telepon: document.getElementById('pgwTelp').value, jabatan: document.getElementById('pgwJabatan').value, target: document.getElementById('pgwTarget').value, komisiPersen: document.getElementById('pgwKomisi').value }); ['pgwNama', 'pgwTelp', 'pgwJabatan', 'pgwTarget', 'pgwKomisi'].forEach(function (i) { document.getElementById(i).value = ''; }); tutupForm('master'); await loadData(); tampilInfo('Pegawai tersimpan.'); }
+async function simpanPegawai() { var n = document.getElementById('pgwNama').value; if (!n) return alert('Nama wajib diisi.'); await DB.upsertPegawai({ id: document.getElementById('pgwId').value || '', nama: n, telepon: document.getElementById('pgwTelp').value, jabatan: document.getElementById('pgwJabatan').value, target: document.getElementById('pgwTarget').value, komisiPersen: document.getElementById('pgwKomisi').value }); ['pgwNama', 'pgwTelp', 'pgwJabatan', 'pgwTarget', 'pgwKomisi'].forEach(function (i) { document.getElementById(i).value = ''; }); await loadData(); tutupForm('master'); tampilInfo('Pegawai tersimpan.'); }
 async function hapusPegawai(id, el) { if (!duaKetuk(el)) return; await DB.hapusPegawai({ id: id }); await loadData(); tampilInfo('Pegawai dihapus.'); }
 
 /* ---------- BAHAN & RESEP ---------- */
@@ -1551,7 +1551,7 @@ function renderBahan() {
   var hpp = 0; list.forEach(function (r) { var b = (DATA.bahan || []).find(function (x) { return x.ID === r.BahanID; }); if (b) hpp += Number(b.HargaPerSatuan) * Number(r.QtyPakai); });
   document.getElementById('resepHpp').textContent = 'HPP dari resep: ' + rp(hpp);
 }
-async function simpanBahan() { var nama = document.getElementById('bNama').value; if (!nama) return alert('Nama bahan wajib diisi.'); await DB.upsertBahan({ Nama: nama, Satuan: document.getElementById('bSatuan').value, Stok: document.getElementById('bStok').value, HargaPerSatuan: document.getElementById('bHarga').value, StokMinimum: document.getElementById('bMin').value }); ['bNama', 'bSatuan', 'bStok', 'bHarga'].forEach(function (i) { document.getElementById(i).value = ''; }); tutupForm('master'); await loadData(); tampilInfo('Bahan tersimpan.'); }
+async function simpanBahan() { var nama = document.getElementById('bNama').value; if (!nama) return alert('Nama bahan wajib diisi.'); await DB.upsertBahan({ Nama: nama, Satuan: document.getElementById('bSatuan').value, Stok: document.getElementById('bStok').value, HargaPerSatuan: document.getElementById('bHarga').value, StokMinimum: document.getElementById('bMin').value }); ['bNama', 'bSatuan', 'bStok', 'bHarga'].forEach(function (i) { document.getElementById(i).value = ''; }); await loadData(); tutupForm('master'); tampilInfo('Bahan tersimpan.'); }
 async function hapusBahan(id, el) { if (!duaKetuk(el)) return; await DB.hapusBahan({ id: id }); await loadData(); tampilInfo('Bahan dihapus.'); }
 function tambahResepRow() {
   var bid = document.getElementById('resepBahan').value; var b = (DATA.bahan || []).find(function (x) { return x.ID === bid; }); if (!b) return alert('Pilih bahan dulu.');
@@ -1675,7 +1675,7 @@ async function simpanPengguna() {
   var nama = document.getElementById('uNama').value, pin = document.getElementById('uPin').value;
   if (!nama || !pin) return alert('Nama dan PIN wajib diisi.');
   await DB.upsertPengguna({ ID: document.getElementById('uId').value || '', Nama: nama, PIN: pin, Peran: document.getElementById('uPeran').value, CabangID: document.getElementById('uCabang').value, AksesTransaksi: document.getElementById('uAkses').value, IzinJSON: JSON.stringify(bacaIzin()) });
-  resetPengguna(); await loadData(); tampilInfo('Pengguna tersimpan.');
+  await loadData(); resetPengguna(); tampilInfo('Pengguna tersimpan.');
 }
 async function hapusPengguna(id, el) { if (!duaKetuk(el)) return; await DB.hapusPengguna({ id: id }); await loadData(); tampilInfo('Pengguna dihapus.'); }
 
@@ -1753,7 +1753,7 @@ async function simpanCabang() {
   var nama = document.getElementById('cbNama').value; if (!nama) return alert('Nama cabang wajib diisi.');
   await DB.upsertCabang({ ID: document.getElementById('cbId').value || '', Nama: nama, Alamat: document.getElementById('cbAlamat').value, Telepon: document.getElementById('cbTelp').value });
   ['cbNama', 'cbAlamat', 'cbTelp'].forEach(function (i) { document.getElementById(i).value = ''; });
-  tutupForm('pengaturan'); await loadData(); tampilInfo('Cabang tersimpan.');
+  await loadData(); tutupForm('pengaturan'); tampilInfo('Cabang tersimpan.');
 }
 async function hapusCabang(id, el) { if (!duaKetuk(el)) return; await DB.hapusCabang({ id: id }); await loadData(); tampilInfo('Cabang dihapus.'); }
 async function setCabangAktif(id) { await DB.setCabangAktif({ id: id }); await loadData(); tampilInfo('Cabang aktif diganti.'); }
