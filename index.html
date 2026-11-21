@@ -309,7 +309,7 @@ body.dark .menu-item{background:#1e293b}
   <button class="menu" data-sec="utang" onclick="show('utang',this)"><span class="mi">🤝</span> Utang</button>
   <div class="navgroup">Lainnya</div>
   <button class="menu" data-sec="pelanggan" onclick="show('pelanggan',this)"><span class="mi">👥</span> Pelanggan &amp; Piutang</button>
-  <button class="menu" data-sec="meja" onclick="show('meja',this)"><span class="mi">🍽️</span> Meja &amp; Dapur</button>
+  <button class="menu" id="menuMeja" data-sec="meja" onclick="show('meja',this)"><span class="mi">🍽️</span> Meja &amp; Dapur</button>
   <button class="menu" data-sec="promo" onclick="show('promo',this)"><span class="mi">🎁</span> Promo &amp; Member</button>
   <button class="menu" data-sec="pengguna" onclick="show('pengguna',this)"><span class="mi">👤</span> Pengguna &amp; Peran</button>
   <button class="menu" data-sec="pengaturan" onclick="show('pengaturan',this)"><span class="mi">⚙️</span> Pengaturan</button>
@@ -354,7 +354,7 @@ body.dark .menu-item{background:#1e293b}
   <div class="card" id="keranjangCard"><h3>Keranjang</h3>
     <label>Pelanggan <select id="kasirPelanggan" onchange="pelangganDipilih()"></select></label>
     <div id="kasirPelangganInfo" style="font-size:13px;color:#64748b"></div>
-    <label>Meja (bila mode meja aktif) <select id="kasirMeja"><option value="">— Tanpa meja —</option></select></label>
+    <label id="kasirMejaWrap">Meja (bila mode meja aktif) <select id="kasirMeja"><option value="">— Tanpa meja —</option></select></label>
     <label>Status Pesanan <select id="kasirStatus"><option>Antri</option><option>Proses</option><option selected>Selesai</option><option>Diambil</option></select></label>
     <label>Metode Bayar <select id="kasirMetode"></select></label>
     <div id="cart"></div>

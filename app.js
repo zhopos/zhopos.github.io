@@ -177,9 +177,17 @@ function isiPengaturanForm() {
   set('sPoinStruk', p.TampilkanPoinStruk || 'YA'); set('sWatermark', p.WatermarkStruk || 'TIDAK'); set('sKertas', p.StrukUkuranKertas || '58');
   set('sMeja', p.ModeMejaAktif || 'TIDAK'); set('sPromo', p.PromoAktif || 'YA'); set('sMultiCabang', p.MultiCabangAktif || 'YA');
   logoDataUrl = p.LogoToko || ''; logo2DataUrl = p.Logo2 || ''; watermarkDataUrl = p.Watermark || ''; tampilLogoPreview();
+  terapkanModeMeja();
   var cb = document.getElementById('sCabangAktif');
   cb.innerHTML = (DATA.cabang || []).map(function (c) { return '<option value="' + esc(c.ID) + '"' + (String(c.ID) === String(p.CabangAktif) ? ' selected' : '') + '>' + esc(c.Nama) + '</option>'; }).join('');
   pratinjauProfil();
+}
+/* Mode Meja: menu Meja & Dapur + pilihan meja di kasir hanya tampil bila ModeMejaAktif = YA (restoran). Toko kelontong (TIDAK) tidak melihatnya; restoran tinggal mengaktifkan di Pengaturan. */
+function terapkanModeMeja() {
+  var aktif = (DATA.pengaturan || {}).ModeMejaAktif === 'YA';
+  var m = document.getElementById('menuMeja'); if (m) m.style.display = aktif ? '' : 'none';
+  var k = document.getElementById('kasirMejaWrap'); if (k) k.style.display = aktif ? '' : 'none';
+  if (!aktif) { var s = document.getElementById('meja'); if (s && s.classList.contains('active')) show('dashboard', document.querySelector('nav button.menu[data-sec="dashboard"]')); }
 }
 /* Pratinjau struk langsung dari isi Profil Toko — contoh transaksi, bukan data asli. */
 function pratinjauProfil() {
