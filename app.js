@@ -152,6 +152,7 @@ function logout() {
 }
 function applyRole() {
   document.querySelectorAll('nav button.menu').forEach(function (b) { b.style.display = ''; });
+  terapkanModeMeja();
   if (!currentUser || currentUser.peran === 'Admin') return;
   var allowed = ['dashboard', 'kasir', 'pelanggan'];
   document.querySelectorAll('nav button.menu').forEach(function (b) {
@@ -164,7 +165,6 @@ function applyRole() {
     if (sec && allowed.indexOf(sec) < 0) b.style.display = 'none';
   });
   if (!izinAktif('diskon')) { var d = document.getElementById('kasirDiskon'); if (d) d.disabled = true; }
-  terapkanModeMeja();
 }
 function isiPengaturanForm() {
   var p = DATA.pengaturan || {};
