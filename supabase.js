@@ -403,8 +403,12 @@
         if (b && Number(b.Stok || 0) < Number(r.QtyPakai || 0) * butuh) throw new Error('Stok bahan tidak mencukupi: ' + b.Nama);
       });
     }
-    // 3. Kurangi stok (FEFO: batch paling cepat kedaluwarsa dulu) + bahan
+    // 3. Siapkan pengurangan stok (FEFO: batch paling cepat kedaluwarsa dulu) + bahan.
+    //    HANYA dihitung di sini — diterapkan setelah transaksi tersimpan (langkah 4b),
+    //    supaya bila simpan transaksi gagal, stok TIDAK ikut berkurang.
     var labaTotal = 0;
+    var stokChanges = [];
+    var bahanChanges = [];
     items.forEach(function (it) {
       var prod = DATA.produk.find(function (x) { return String(x.ID) === String(it.id); });
       if (!prod) return;
@@ -420,21 +424,20 @@
         var sisaButuh = butuh;
         var batches = (DATA.stokBatch || []).filter(function (b) { return String(b.ProdukID) === String(prod.ID) && String(b.CabangID) === String(cabangId) && Number(b.Qty) > 0; })
           .sort(function (a, b) { return String(a.Kedaluwarsa || '9999') < String(b.Kedaluwarsa || '9999') ? -1 : 1; });
+        var batchChanges = [];
         batches.forEach(function (b) {
           if (sisaButuh <= 0) return;
           var ambil = Math.min(Number(b.Qty), sisaButuh);
-          b.Qty = Number(b.Qty) - ambil; sisaButuh -= ambil;
-          persist('stok_batch', b);
+          batchChanges.push({ row: b, ambil: ambil });
+          sisaButuh -= ambil;
         });
         var baru = stokOf(DATA, prod) - butuh;
-        setStok(DATA, prod, baru);
-        persist('produk', prod);
         var sc = (DATA.stokCabang || []).find(function (x) { return String(x.ProdukID) === String(prod.ID) && String(x.CabangID) === String(cabangId); });
-        if (sc) persist('stok_cabang', sc);
+        stokChanges.push({ prod: prod, baru: baru, batchChanges: batchChanges, sc: sc });
       }
       (DATA.resep || []).filter(function (r) { return String(r.ProdukID) === String(prod.ID); }).forEach(function (r) {
         var b = DATA.bahan.find(function (x) { return x.ID === r.BahanID; });
-        if (b) { b.Stok = Number(b.Stok || 0) - Number(r.QtyPakai || 0) * butuh; persist('bahan_baku', b); }
+        if (b) bahanChanges.push({ row: b, qty: Number(r.QtyPakai || 0) * butuh });
       });
       var modal = Number(it.modal != null ? it.modal : (prod ? prod.HargaModal || 0 : 0));
       it._laba = (Number(it.Harga || 0) - modal) * Number(it.Qty || 0) - Number(it.diskonItem || 0) * Number(it.Qty || 0);
@@ -454,8 +457,17 @@
       CatatanInternal: payload.catatanInternal || '', Laba: labaTotal,
       PromoID: promo.promoTerpakai.length ? promo.promoTerpakai[0].id : (payload.promoId || null)
     };
-    DATA.transaksi.unshift(trx);
+    // Transaksi disimpan DULU; bila ini gagal (throw), tidak ada stok/bahan yang berubah.
     await persist('transaksi', trx);
+    DATA.transaksi.unshift(trx);
+    // 4b. Terapkan pengurangan stok + bahan (transaksi sudah tersimpan).
+    stokChanges.forEach(function (c) {
+      c.batchChanges.forEach(function (bc) { bc.row.Qty = Number(bc.row.Qty) - bc.ambil; persist('stok_batch', bc.row); });
+      setStok(DATA, c.prod, c.baru);
+      persist('produk', c.prod);
+      if (c.sc) persist('stok_cabang', c.sc);
+    });
+    bahanChanges.forEach(function (bc) { bc.row.Stok = Number(bc.row.Stok || 0) - bc.qty; persist('bahan_baku', bc.row); });
     items.forEach(function (it) {
       var prod = DATA.produk.find(function (x) { return String(x.ID) === String(it.id); });
       var det = {
