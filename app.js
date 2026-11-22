@@ -657,6 +657,11 @@ function updateKembalian() {
   var el = document.getElementById('bayarKembalianVal');
   if (el) el.textContent = rp(Math.max(0, tunai - h.total));
   else document.getElementById('bayarKembalian').textContent = 'Kembalian: ' + rp(Math.max(0, tunai - h.total));
+  // Tampilkan sisa bila bayar kurang dari total (dulu halaman pembayaran
+  // tidak menunjukkan status Kurang sebelum disimpan).
+  var sisa = Math.max(0, h.total - tunai);
+  var sEl = document.getElementById('bayarSisa');
+  if (sEl) { sEl.style.display = sisa > 0 ? '' : 'none'; var sv = document.getElementById('bayarSisaVal'); if (sv) sv.textContent = rp(sisa); }
 }
 var sedangMenyimpan = false;
 async function simpanTransaksi() {
@@ -788,8 +793,12 @@ function buatStruk(res, payload, h, pl) {
   if (h.pajak) rincian.push({ label: 'Pajak', nilai: rp(h.pajak) });
   if (h.ongkir) rincian.push({ label: 'Ongkir', nilai: rp(h.ongkir) });
   var sisa = res.sisa != null ? res.sisa : Math.max(0, h.total - payload.bayar);
+  // Nomor struk harus sama dengan nomor di Daftar Transaksi (hitungNomorTrx
+  // mengurutkan kronologis) — dulu length+1, padahal transaksi baru sudah
+  // masuk DATA, jadi struk selalu kelebihan 1 (#7 padahal daftar #6).
+  if (!trxNomor[res.id]) hitungNomorTrx();
   lastStrukData = {
-    id: res.id || '', kode: res.kodeAlternatif || '', nomor: (DATA.transaksi || []).length + 1,
+    id: res.id || '', kode: res.kodeAlternatif || '', nomor: trxNomor[res.id] || '',
     toko: p.NamaToko || 'ZPOS', slogan: p.SloganToko || '', alamat: p.AlamatToko || '', kota: p.KotaToko || '', telepon: p.TeleponToko || '', footer: p.FooterStruk || 'Terima kasih',
     logo: p.LogoToko || logoDataUrl || '', logo2: p.Logo2 || logo2DataUrl || '', watermark: p.Watermark || watermarkDataUrl || '', tanggal: new Date(), pelanggan: payload.pelanggan, kasir: payload.kasir || '',
     metode: payload.metode || 'Tunai',
@@ -1037,9 +1046,13 @@ async function lunasi(id) { var n = prompt('Nominal pembayaran (Rp):', ''); if (
 async function ubahStatus(id, status) { if (!status) return; await DB.ubahStatusPesanan({ id: id, status: status }); await loadData(); }
 async function batalkanTransaksi(id) {
   var t = (DATA.transaksi || []).find(function (x) { return x.ID === id; });
-  if (t && Number(t.Bayar) > 0 && Number(t.Sisa) === 0) return alert('Transaksi sudah Lunas — pakai Retur untuk mengembalikan item, bukan Batalkan.');
-  var alasan = prompt('Alasan pembatalan:', ''); if (alasan === null) return;
-  try { await DB.batalkanTransaksi({ id: id, alasan: alasan }); await loadData(); } catch (e) { alert(e.message); }
+  if (!t) return;
+  if (Number(t.Bayar) > 0 && Number(t.Sisa) === 0) return tampilError('Transaksi sudah Lunas — pakai Retur untuk mengembalikan item, bukan Batalkan.');
+  // Jangan pakai prompt() untuk alasan: di browser penguji prompt ditelan
+  // diam-diam (kembali null) sehingga tombol Batalkan tampak tidak berfungsi.
+  // Pakai modal konfirmasi dalam aplikasi, seperti semua aksi hapus lainnya.
+  if (!await konfirmasi('Batalkan transaksi ini?', 'Stok dikembalikan, piutang dan kas disesuaikan. Transaksi dan detailnya dihapus.', 'Ya, Batalkan')) return;
+  try { await DB.batalkanTransaksi({ id: id, alasan: '' }); await loadData(); tampilInfo('Transaksi dibatalkan. Stok dikembalikan.'); } catch (e) { tampilError('Gagal membatalkan: ' + (e.message || e)); }
 }
 function strukUlang(id) {
   var t = (DATA.transaksi || []).find(function (x) { return x.ID === id; });

@@ -453,6 +453,7 @@ body.dark .menu-item{background:#1e293b}
     <label style="margin-top:12px">Uang Tunai (Rp)</label>
     <div class="tunai-row"><input id="bayarTunai" type="number" value="" oninput="bayarTunaiInput()" placeholder="0"><button class="secondary" onclick="document.getElementById('bayarTunai').value='';bayarTunaiInput()" title="Hapus">✕</button></div>
     <div id="bayarKembalian" class="kembali-row"><span>Kembalian</span><span id="bayarKembalianVal">Rp0</span></div>
+    <div id="bayarSisa" class="kembali-row" style="display:none"><span>Sisa (belum dibayar)</span><span id="bayarSisaVal">Rp0</span></div>
     <button class="primary" id="btnSelesai" style="width:100%;font-size:18px;padding:14px" onclick="simpanTransaksi()">✓ Selesai</button>
     <p style="color:#64748b;font-size:13px;text-align:center">Transaksi tersimpan dan struk ditampilkan setelah selesai.</p>
   </div>
