@@ -750,7 +750,16 @@
     var row = { ID: uid('RTR'), Tanggal: nowISO(), TransaksiID: trx.ID, Produk: payload.produk || '', Qty: qty, Nominal: nominal, Alasan: payload.alasan || '', CabangID: trx.CabangID || cabangAktifId(DATA) };
     DATA.retur.unshift(row); await persist('retur', row);
     var prod = DATA.produk.find(function (x) { return x.ID === payload.produkId || x.Nama === payload.produk; });
-    if (prod) { prod.Stok = Number(prod.Stok || 0) + qty; await persist('produk', prod); }
+    // stokQty (opsional): jumlah yang kembali ke stok bisa berbeda dari qty
+    // retur bila item dijual per varian (mis. 1 lsn = 12 pcs) — pakai pengali
+    // varian seperti batalkanTransaksi, dan kembalikan ke cabang trx itu.
+    var qtyStok = Number(payload.stokQty != null ? payload.stokQty : qty);
+    if (prod) {
+      var scRetur = (DATA.stokCabang || []).find(function (x) { return String(x.ProdukID) === String(prod.ID) && String(x.CabangID) === String(trx.CabangID || cabangAktifId(DATA)); });
+      setStok(DATA, prod, stokOf(DATA, prod) + qtyStok);
+      await persist('produk', prod);
+      if (scRetur) await persist('stok_cabang', scRetur);
+    }
     trx.Total = Math.max(0, Number(trx.Total || 0) - nominal);
     trx.Sisa = Math.max(0, Number(trx.Sisa || 0) - nominal);
     if (trx.Sisa === 0 && Number(trx.Bayar || 0) > 0) trx.StatusBayar = 'Lunas';
@@ -779,6 +788,89 @@
     if (pl) { pl.Piutang = Math.max(0, Number(pl.Piutang || 0) - nominal); await persist('pelanggan', pl); }
     refreshRingkasan(); return { ok: true, sisa: trx.Sisa, statusBayar: trx.StatusBayar };
   }
+  /* Tambah 1 item ke transaksi lama (alur Griyo): item masuk ke detail,
+     stok + bahan berkurang, Total/Sisa naik, trx jadi Belum Lunas sampai
+     sisa dibayar. Dipakai dari Detail Transaksi (tombol ＋ Tambah Item). */
+  async function tambahItemTrx(payload) {
+    if (!DATA) await loadAll();
+    var trx = DATA.transaksi.find(function (x) { return x.ID === payload.id; });
+    if (!trx) throw new Error('Transaksi tidak ditemukan.');
+    var prod = DATA.produk.find(function (x) { return x.ID === payload.produkId; });
+    if (!prod) throw new Error('Produk tidak ditemukan.');
+    var qty = Math.max(1, Number(payload.qty || 1));
+    var harga = Number(payload.harga || 0);
+    var satuan = payload.satuan || 'pcs';
+    var isi = 1;
+    if (satuan) { var vr = parseJSON(prod.VarianJSON || '[]', []); var v = vr.find(function (x) { return x.label === satuan; }); if (v) isi = Number(v.isi || 1); }
+    var butuh = qty * isi;
+    var cabangId = trx.CabangID || cabangAktifId(DATA);
+    if (lacakStok(prod) && stokOf(DATA, prod) < butuh) throw new Error('Stok produk tidak mencukupi: ' + prod.Nama);
+    (DATA.resep || []).filter(function (r) { return String(r.ProdukID) === String(prod.ID); }).forEach(function (r) {
+      var b = DATA.bahan.find(function (x) { return x.ID === r.BahanID; });
+      if (b && Number(b.Stok || 0) < Number(r.QtyPakai || 0) * butuh) throw new Error('Stok bahan tidak mencukupi: ' + b.Nama);
+    });
+    var subtotal = harga * qty;
+    var namaProduk = prod.Nama + (payload.note ? ' (' + String(payload.note).trim() + ')' : '');
+    // PK detail (transaksi_id, produk_id): produk yang sudah ada di trx ini
+    // digabung qty-nya, bukan insert baris kedua.
+    var ex = (DATA.detail || []).find(function (d) { return String(d.TransaksiID) === String(trx.ID) && String(d.ProdukID) === String(prod.ID); });
+    if (ex) {
+      ex.Qty = Number(ex.Qty || 0) + qty;
+      ex.Subtotal = Number(ex.Subtotal || 0) + subtotal;
+      ex.Laba = Number(ex.Laba || 0) + (harga - Number(prod.HargaModal || 0)) * qty;
+      if (MODE === 'supabase' && client) {
+        var upd = await client.from('transaksi_detail').update({ qty: ex.Qty, subtotal: ex.Subtotal, laba: ex.Laba }).eq('transaksi_id', trx.ID).eq('produk_id', prod.ID);
+        if (upd.error) throw new Error(upd.error.message);
+      }
+    } else {
+      var det = {
+        TransaksiID: trx.ID, ProdukID: prod.ID, NamaProduk: namaProduk,
+        Qty: qty, Harga: harga, Subtotal: subtotal,
+        Modal: Number(prod.HargaModal || 0), DiskonItem: 0,
+        Laba: (harga - Number(prod.HargaModal || 0)) * qty,
+        SatuanDipakai: satuan
+      };
+      DATA.detail.unshift(det);
+      await persist('transaksi_detail', det);
+    }
+    // Kurangi stok (FEFO batch seperti saveTransaksi) + bahan.
+    if (lacakStok(prod)) {
+      var sisaButuh = butuh;
+      var batches = (DATA.stokBatch || []).filter(function (b) { return String(b.ProdukID) === String(prod.ID) && String(b.CabangID) === String(cabangId) && Number(b.Qty) > 0; })
+        .sort(function (a, b) { return String(a.Kedaluwarsa || '9999') < String(b.Kedaluwarsa || '9999') ? -1 : 1; });
+      for (var bi = 0; bi < batches.length; bi++) {
+        if (sisaButuh <= 0) break;
+        var ambil = Math.min(Number(batches[bi].Qty), sisaButuh);
+        batches[bi].Qty = Number(batches[bi].Qty) - ambil;
+        await persist('stok_batch', batches[bi]);
+        sisaButuh -= ambil;
+      }
+      var sc = (DATA.stokCabang || []).find(function (x) { return String(x.ProdukID) === String(prod.ID) && String(x.CabangID) === String(cabangId); });
+      setStok(DATA, prod, stokOf(DATA, prod) - butuh);
+      await persist('produk', prod);
+      if (sc) await persist('stok_cabang', sc);
+    }
+    var bahanUbah = [];
+    (DATA.resep || []).filter(function (r) { return String(r.ProdukID) === String(prod.ID); }).forEach(function (r) {
+      var b2 = DATA.bahan.find(function (x) { return x.ID === r.BahanID; });
+      if (b2) { b2.Stok = Number(b2.Stok || 0) - Number(r.QtyPakai || 0) * butuh; bahanUbah.push(b2); }
+    });
+    for (var ri = 0; ri < bahanUbah.length; ri++) await persist('bahan_baku', bahanUbah[ri]);
+    trx.Total = Number(trx.Total || 0) + subtotal;
+    trx.Sisa = Math.max(0, Number(trx.Total || 0) - Number(trx.Bayar || 0));
+    trx.StatusBayar = trx.Sisa === 0 ? 'Lunas' : (Number(trx.Bayar || 0) > 0 ? 'Kurang' : 'Belum Dibayar');
+    trx.Laba = Number(trx.Laba || 0) + (harga - Number(prod.HargaModal || 0)) * qty;
+    await persist('transaksi', trx);
+    var pl = DATA.pelanggan.find(function (x) { return x.Nama === trx.Pelanggan; });
+    if (pl) {
+      pl.TotalBeli = Number(pl.TotalBeli || 0) + subtotal;
+      pl.Piutang = Number(pl.Piutang || 0) + subtotal;
+      await persist('pelanggan', pl);
+    }
+    addLog(DATA, trx.Kasir, 'Tambah Item', trx.ID + ' — ' + prod.Nama + ' x' + qty);
+    refreshRingkasan();
+    return { ok: true, total: trx.Total, sisa: trx.Sisa, statusBayar: trx.StatusBayar };
+  }
   async function lunasiSemua(payload) {
     if (!DATA) await loadAll();
     var nama = payload.pelanggan || payload.nama;
@@ -802,7 +894,6 @@
     if (!DATA) await loadAll();
     var trx = DATA.transaksi.find(function (x) { return x.ID === payload.id; });
     if (!trx) throw new Error('Transaksi tidak ditemukan.');
-    if (Number(trx.Bayar || 0) > 0 && Number(trx.Sisa || 0) === 0) throw new Error('Transaksi sudah Lunas — pakai Retur untuk mengembalikan item.');
     var dets = DATA.detail.filter(function (d) { return d.TransaksiID === trx.ID; });
     // Kembalikan stok (pakai pengali varian: 1 lsn = isi pcs) + bahan baku.
     // Stok dikembalikan ke cabang transaksi itu, bukan cabang aktif.
@@ -1348,7 +1439,7 @@
     simpanOpname: simpanOpname, simpanPengaturan: simpanPengaturan,
     upsertPengguna: upsertPengguna, hapusPengguna: hapusPengguna,
     upsertCabang: upsertCabang, hapusCabang: hapusCabang, setCabangAktif: setCabangAktif,
-    tambahPembayaran: tambahPembayaran, ubahStatusPesanan: ubahStatusPesanan,
+    tambahPembayaran: tambahPembayaran, tambahItemTrx: tambahItemTrx, ubahStatusPesanan: ubahStatusPesanan,
     ubahTransaksi: ubahTransaksi,
     batalkanTransaksi: batalkanTransaksi, koreksiPoin: koreksiPoin,
     simpanTeks: simpanTeks, upsertTeks: simpanTeks, hapusTeks: hapusTeks,
