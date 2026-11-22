@@ -422,10 +422,13 @@ function renderProdukKasir() {
     .map(function (p) {
       var diKeranjang = 0; cart.forEach(function (x) { if (x.id === p.ID) diKeranjang += x.Qty; });
       var stok = stokProduk(p);
-      var kanan = diKeranjang > 0
+      var habis = lacakStok(p) && stok <= 0 && diKeranjang === 0;
+      var kanan = habis
+        ? '<span style="color:#94a3b8;font-size:13px;font-weight:600">Habis</span>'
+        : diKeranjang > 0
         ? '<span class="qty-ctl"><button onclick="event.stopPropagation();ubahQtyKasir(\'' + esc(p.ID) + '\',-1)">−</button><b class="qty-badge">' + diKeranjang + '</b><button onclick="event.stopPropagation();ubahQtyKasir(\'' + esc(p.ID) + '\',1)">+</button></span>'
         : '<button class="qty-add" onclick="event.stopPropagation();addToCart(\'' + esc(p.ID) + '\')">+</button>';
-      return '<div class="prod-row" onclick="addToCart(\'' + esc(p.ID) + '\')"><span style="display:flex;gap:10px;align-items:center"><span class="prod-thumb">' + emojiProduk(p.Nama) + '</span><span><b>' + esc(p.Nama) + '</b><br><small class="price">' + rp(p.HargaJual) + '</small><br><small class="' + (stok <= 0 ? 'red' : '') + '">Stok: ' + stok + '</small></span></span>' + kanan + '</div>';
+      return '<div class="prod-row"' + (habis ? '' : ' onclick="addToCart(\'' + esc(p.ID) + '\')"') + '><span style="display:flex;gap:10px;align-items:center"><span class="prod-thumb">' + emojiProduk(p.Nama) + '</span><span><b>' + esc(p.Nama) + '</b><br><small class="price">' + rp(p.HargaJual) + '</small><br><small class="' + (stok <= 0 ? 'red' : '') + '">Stok: ' + stok + '</small></span></span>' + kanan + '</div>';
     }).join('') || 'Produk tidak ditemukan.';
 }
 function ubahQtyKasir(id, delta) {
