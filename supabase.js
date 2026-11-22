@@ -274,6 +274,13 @@
     var res = await client.from(table).delete().eq('id', id);
     if (res.error) throw new Error(res.error.message);
   }
+  // Hapus semua baris dengan kolom = nilai (mis. detail satu transaksi,
+  // resep satu produk). No-op di Mode Contoh, seperti removeRow.
+  async function hapusBarisWhere(table, kolom, nilai) {
+    if (MODE !== 'supabase' || !client) return;
+    var res = await client.from(table).delete().eq(kolom, nilai);
+    if (res.error) throw new Error(res.error.message);
+  }
   async function persistPengaturan() {
     if (MODE !== 'supabase' || !client) return;
     var rows = Object.keys(DATA.pengaturan).map(function (k) {
@@ -477,13 +484,17 @@
     await persist('transaksi', trx);
     DATA.transaksi.unshift(trx);
     // 4b. Terapkan pengurangan stok + bahan (transaksi sudah tersimpan).
+    // Semua persist DITUNGGU: kalau ada yang gagal, galatnya naik ke layar
+    // (dulu fire-and-forget — transaksi tersimpan tapi stok/detail bisa
+    // menyimpang diam-diam tanpa ada yang tahu).
+    var janji4b = [];
     stokChanges.forEach(function (c) {
-      c.batchChanges.forEach(function (bc) { bc.row.Qty = Number(bc.row.Qty) - bc.ambil; persist('stok_batch', bc.row); });
+      c.batchChanges.forEach(function (bc) { bc.row.Qty = Number(bc.row.Qty) - bc.ambil; janji4b.push(persist('stok_batch', bc.row)); });
       setStok(DATA, c.prod, c.baru);
-      persist('produk', c.prod);
-      if (c.sc) persist('stok_cabang', c.sc);
+      janji4b.push(persist('produk', c.prod));
+      if (c.sc) janji4b.push(persist('stok_cabang', c.sc));
     });
-    bahanChanges.forEach(function (bc) { bc.row.Stok = Number(bc.row.Stok || 0) - bc.qty; persist('bahan_baku', bc.row); });
+    bahanChanges.forEach(function (bc) { bc.row.Stok = Number(bc.row.Stok || 0) - bc.qty; janji4b.push(persist('bahan_baku', bc.row)); });
     items.forEach(function (it) {
       var prod = DATA.produk.find(function (x) { return String(x.ID) === String(it.id); });
       var det = {
@@ -495,8 +506,9 @@
         SatuanDipakai: it.satuanDipakai || ''
       };
       DATA.detail.unshift(det);
-      persist('transaksi_detail', det);
+      janji4b.push(persist('transaksi_detail', det));
     });
+    try { await Promise.all(janji4b); } catch (e) { throw new Error('Transaksi tersimpan, tapi stok/detail gagal diperbarui (' + (e.message || e) + '). Periksa stok sebelum menjual lagi.'); }
     // 5. Pelanggan: TotalBeli / Piutang / Poin / Tier / TerakhirBeli
     var poinDidapat = 0;
     var pl = (DATA.pelanggan || []).find(function (x) { return x.Nama === trx.Pelanggan; });
@@ -507,14 +519,14 @@
       if (poinDipakai > 0) {
         pl.Poin = Math.max(0, Number(pl.Poin || 0) - poinDipakai);
         DATA.riwayatPoin.unshift({ ID: uid('PNT'), Tanggal: nowISO(), PelangganID: pl.ID, Pelanggan: pl.Nama, Jenis: 'Tukar', Jumlah: -poinDipakai, Sisa: pl.Poin, Keterangan: 'Tukar poin di ' + id, TransaksiID: id });
-        persist('riwayat_poin', DATA.riwayatPoin[0]);
+        await persist('riwayat_poin', DATA.riwayatPoin[0]);
       }
       if (p.PoinAktif !== 'TIDAK' && pl.Nama !== 'Umum' && statusBayar === 'Lunas' && poinDipakai === 0) {
         poinDidapat = Math.floor(total / Number(p.PoinPerRupiah || 1000));
         if (poinDidapat > 0) {
           pl.Poin = Number(pl.Poin || 0) + poinDidapat;
           DATA.riwayatPoin.unshift({ ID: uid('PNT'), Tanggal: nowISO(), PelangganID: pl.ID, Pelanggan: pl.Nama, Jenis: 'Dapat', Jumlah: poinDidapat, Sisa: pl.Poin, Keterangan: 'Poin dari ' + id, TransaksiID: id });
-          persist('riwayat_poin', DATA.riwayatPoin[0]);
+          await persist('riwayat_poin', DATA.riwayatPoin[0]);
         }
       }
       // tier otomatis dari TotalBeli
@@ -574,11 +586,14 @@
   /* ---------- produk / pelanggan / pemasok ---------- */
   async function upsertProduk(payload) {
     if (!DATA) await loadAll();
+    // Edit produk JANGAN menghidupkan lagi produk yang dinonaktifkan
+    // (dulu Aktif selalu true — produk pernah terjual muncul lagi di kasir).
+    var exProd = payload.ID ? (DATA.produk || []).find(function (x) { return String(x.ID) === String(payload.ID); }) : null;
     var row = {
       ID: payload.ID || '', Nama: payload.Nama, Kategori: payload.Kategori || '', Grup: payload.Grup || '',
       SKUBarcode: payload.SKU || '', HargaJual: Number(payload.HargaJual || 0), HargaModal: Number(payload.HargaModal || 0),
       Stok: Number(payload.Stok == null || payload.Stok === '' ? 0 : payload.Stok),
-      Satuan: payload.Satuan || 'pcs', Aktif: true, StokMinimum: Number(payload.StokMinimum || 5),
+      Satuan: payload.Satuan || 'pcs', Aktif: exProd ? exProd.Aktif : true, StokMinimum: Number(payload.StokMinimum || 5),
       GambarURL: payload.GambarURL || '', Keterangan: payload.Keterangan || '',
       HargaBisaDiganti: boolFlag(payload.HargaBisaDiganti, true), TermasukStok: boolFlag(payload.TermasukStok, true),
       HargaLainJSON: payload.HargaLainJSON || '', HargaJumlahJSON: payload.HargaJumlahJSON || '',
@@ -788,13 +803,46 @@
     var trx = DATA.transaksi.find(function (x) { return x.ID === payload.id; });
     if (!trx) throw new Error('Transaksi tidak ditemukan.');
     if (Number(trx.Bayar || 0) > 0 && Number(trx.Sisa || 0) === 0) throw new Error('Transaksi sudah Lunas — pakai Retur untuk mengembalikan item.');
-    // kembalikan stok
-    DATA.detail.filter(function (d) { return d.TransaksiID === trx.ID; }).forEach(function (d) {
+    var dets = DATA.detail.filter(function (d) { return d.TransaksiID === trx.ID; });
+    // Kembalikan stok (pakai pengali varian: 1 lsn = isi pcs) + bahan baku.
+    // Stok dikembalikan ke cabang transaksi itu, bukan cabang aktif.
+    var bahanKembali = {};
+    for (var di = 0; di < dets.length; di++) {
+      var d = dets[di];
       var prod = DATA.produk.find(function (x) { return x.ID === d.ProdukID; });
-      if (prod) { prod.Stok = Number(prod.Stok || 0) + Number(d.Qty || 0); persist('produk', prod); }
-    });
+      if (!prod) continue;
+      var isi = 1;
+      if (d.SatuanDipakai) { var vr = parseJSON(prod.VarianJSON || '[]', []); var v = vr.find(function (x) { return x.label === d.SatuanDipakai; }); if (v) isi = Number(v.isi || 1); }
+      var kembali = Number(d.Qty || 0) * isi;
+      if (lacakStok(prod)) {
+        var sc = (DATA.stokCabang || []).find(function (x) { return String(x.ProdukID) === String(prod.ID) && String(x.CabangID) === String(trx.CabangID || cabangAktifId(DATA)); });
+        if (sc) { sc.Stok = Number(sc.Stok || 0) + kembali; await persist('stok_cabang', sc); }
+        else { prod.Stok = Number(prod.Stok || 0) + kembali; await persist('produk', prod); }
+      }
+      (DATA.resep || []).filter(function (r) { return String(r.ProdukID) === String(prod.ID); }).forEach(function (r) {
+        var b = DATA.bahan.find(function (x) { return x.ID === r.BahanID; });
+        if (b) { b.Stok = Number(b.Stok || 0) + Number(r.QtyPakai || 0) * kembali; bahanKembali[b.ID] = b; }
+      });
+    }
+    var daftarBahan = Object.keys(bahanKembali);
+    for (var bi = 0; bi < daftarBahan.length; bi++) await persist('bahan_baku', bahanKembali[daftarBahan[bi]]);
     var pl = DATA.pelanggan.find(function (x) { return x.Nama === trx.Pelanggan; });
-    if (pl) { pl.Piutang = Math.max(0, Number(pl.Piutang || 0) - Number(trx.Sisa || 0)); pl.TotalBeli = Math.max(0, Number(pl.TotalBeli || 0) - Number(trx.Total || 0)); await persist('pelanggan', pl); }
+    if (pl) {
+      pl.Piutang = Math.max(0, Number(pl.Piutang || 0) - Number(trx.Sisa || 0));
+      pl.TotalBeli = Math.max(0, Number(pl.TotalBeli || 0) - Number(trx.Total || 0));
+      // Balik poin: yang didapat ditarik, yang dipakai dikembalikan.
+      if (Number(trx.PoinDidapat || 0) > 0) {
+        pl.Poin = Math.max(0, Number(pl.Poin || 0) - Number(trx.PoinDidapat));
+        DATA.riwayatPoin.unshift({ ID: uid('PNT'), Tanggal: nowISO(), PelangganID: pl.ID, Pelanggan: pl.Nama, Jenis: 'Batal', Jumlah: -Number(trx.PoinDidapat), Sisa: pl.Poin, Keterangan: 'Poin dibatalkan dari ' + trx.ID, TransaksiID: trx.ID });
+        await persist('riwayat_poin', DATA.riwayatPoin[0]);
+      }
+      if (Number(trx.PoinDipakai || 0) > 0) {
+        pl.Poin = Number(pl.Poin || 0) + Number(trx.PoinDipakai);
+        DATA.riwayatPoin.unshift({ ID: uid('PNT'), Tanggal: nowISO(), PelangganID: pl.ID, Pelanggan: pl.Nama, Jenis: 'Kembali', Jumlah: Number(trx.PoinDipakai), Sisa: pl.Poin, Keterangan: 'Poin kembali dari ' + trx.ID, TransaksiID: trx.ID });
+        await persist('riwayat_poin', DATA.riwayatPoin[0]);
+      }
+      await persist('pelanggan', pl);
+    }
     if (Number(trx.Bayar || 0) > 0) {
       var saldo = (DATA.kas || []).reduce(function (a, k) { return a + Number(k.Masuk || 0) - Number(k.Keluar || 0); }, 0) - Number(trx.Bayar);
       var kasRow = { ID: uid('KAS'), Tanggal: nowISO(), Jenis: 'Keluar', Keterangan: 'Batal transaksi ' + trx.ID + ' (uang kembali)', Masuk: 0, Keluar: Number(trx.Bayar), Saldo: saldo, CabangID: trx.CabangID || cabangAktifId(DATA) };
@@ -802,6 +850,9 @@
     }
     DATA.transaksi = DATA.transaksi.filter(function (x) { return x.ID !== trx.ID; });
     DATA.detail = DATA.detail.filter(function (x) { return x.TransaksiID !== trx.ID; });
+    // Hapus juga baris detail di DB (dulu hanya header yang dihapus —
+    // detail jadi yatim dan menggelembungkan "Produk Terlaris").
+    await hapusBarisWhere('transaksi_detail', 'transaksi_id', trx.ID);
     await removeRow('transaksi', trx.ID);
     addLog(DATA, '', 'Batal Transaksi', trx.ID + ' — ' + (payload.alasan || ''));
     refreshRingkasan(); return { ok: true };
@@ -915,7 +966,8 @@
   }
   async function upsertCabang(payload) {
     if (!DATA) await loadAll();
-    var row = { ID: payload.ID || '', Nama: payload.Nama, Alamat: payload.Alamat || '', Telepon: payload.Telepon || '', Aktif: true };
+    var exCbg = payload.ID ? (DATA.cabang || []).find(function (x) { return String(x.ID) === String(payload.ID); }) : null;
+    var row = { ID: payload.ID || '', Nama: payload.Nama, Alamat: payload.Alamat || '', Telepon: payload.Telepon || '', Aktif: exCbg ? exCbg.Aktif : true };
     return upsertInto('cabang', 'cabang', row, 'CBG');
   }
   async function hapusCabang(payload) { if (!DATA) await loadAll(); hapusDari('cabang', 'cabang', payload.id); return { ok: true }; }
@@ -927,7 +979,8 @@
   }
   async function upsertPengguna(payload) {
     if (!DATA) await loadAll();
-    var row = { ID: payload.ID || '', Nama: payload.Nama, PIN: String(payload.PIN || ''), Peran: payload.Peran || 'Kasir', Aktif: true, IzinJSON: payload.IzinJSON || '{}', AksesTransaksi: payload.AksesTransaksi || 'Tidak dibatasi', CabangID: payload.CabangID || '' };
+    var exPgn = payload.ID ? (DATA.pengguna || []).find(function (x) { return String(x.ID) === String(payload.ID); }) : null;
+    var row = { ID: payload.ID || '', Nama: payload.Nama, PIN: String(payload.PIN || ''), Peran: payload.Peran || 'Kasir', Aktif: exPgn ? exPgn.Aktif : true, IzinJSON: payload.IzinJSON || '{}', AksesTransaksi: payload.AksesTransaksi || 'Tidak dibatasi', CabangID: payload.CabangID || '' };
     return upsertInto('pengguna', 'pengguna', row, 'USR');
   }
   async function hapusPengguna(payload) { if (!DATA) await loadAll(); hapusDari('pengguna', 'pengguna', payload.id); return { ok: true }; }
@@ -968,7 +1021,9 @@
   async function hapusSatuan(payload) { if (!DATA) await loadAll(); hapusDari('satuan', 'satuan', payload.id); return { ok: true }; }
   async function upsertJenisBayar(payload) {
     if (!DATA) await loadAll();
-    return upsertInto('jenisBayar', 'jenis_pembayaran', { ID: payload.id || payload.ID || '', Nama: payload.nama, Aktif: true }, 'JB');
+    var idJB = payload.id || payload.ID || '';
+    var exJB = idJB ? (DATA.jenisBayar || []).find(function (x) { return String(x.ID) === String(idJB); }) : null;
+    return upsertInto('jenisBayar', 'jenis_pembayaran', { ID: idJB, Nama: payload.nama, Aktif: exJB ? exJB.Aktif : true }, 'JB');
   }
   async function hapusJenisBayar(payload) { if (!DATA) await loadAll(); hapusDari('jenisBayar', 'jenis_pembayaran', payload.id); return { ok: true }; }
   async function upsertItemPengeluaran(payload) {
@@ -978,7 +1033,9 @@
   async function hapusItemPengeluaran(payload) { if (!DATA) await loadAll(); hapusDari('itemPengeluaran', 'item_pengeluaran', payload.id); return { ok: true }; }
   async function upsertPegawai(payload) {
     if (!DATA) await loadAll();
-    var row = { ID: payload.id || payload.ID || '', Nama: payload.nama, Telepon: payload.telepon || '', Jabatan: payload.jabatan || '', Target: Number(payload.target || 0), KomisiPersen: Number(payload.komisiPersen || 0), Aktif: true };
+    var idPgw = payload.id || payload.ID || '';
+    var exPgw = idPgw ? (DATA.pegawai || []).find(function (x) { return String(x.ID) === String(idPgw); }) : null;
+    var row = { ID: idPgw, Nama: payload.nama, Telepon: payload.telepon || '', Jabatan: payload.jabatan || '', Target: Number(payload.target || 0), KomisiPersen: Number(payload.komisiPersen || 0), Aktif: exPgw ? exPgw.Aktif : true };
     return upsertInto('pegawai', 'pegawai', row, 'PGW');
   }
   async function hapusPegawai(payload) { if (!DATA) await loadAll(); hapusDari('pegawai', 'pegawai', payload.id); return { ok: true }; }
@@ -1008,11 +1065,15 @@
     if (!DATA) await loadAll();
     var pid = payload.produkId;
     DATA.resep = DATA.resep.filter(function (r) { return String(r.ProdukID) !== String(pid); });
-    (payload.items || []).forEach(function (it) {
+    // Hapus dulu bahan lama di DB (dulu hanya difilter lokal — bahan yang
+    // dihapus muncul lagi setelah muat ulang), lalu insert baru (dituggu).
+    await hapusBarisWhere('resep', 'produk_id', pid);
+    for (var ri = 0; ri < (payload.items || []).length; ri++) {
+      var it = payload.items[ri];
       var b = DATA.bahan.find(function (x) { return x.ID === it.bahanId; });
       var row = { ProdukID: pid, BahanID: it.bahanId, NamaBahan: it.namaBahan || (b ? b.Nama : ''), QtyPakai: Number(it.qty || 0) };
-      DATA.resep.push(row); persist('resep', row);
-    });
+      DATA.resep.push(row); await persist('resep', row);
+    }
     var hpp = hitungHPPSync(pid);
     var prod = DATA.produk.find(function (x) { return x.ID === pid; });
     if (prod) { prod.HargaModal = hpp; await persist('produk', prod); }

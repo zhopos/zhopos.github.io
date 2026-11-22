@@ -319,6 +319,7 @@ create table if not exists pembelian_detail (
   nama_produk text not null default '',
   qty bigint not null default 0,
   harga_beli bigint not null default 0,
+  harga_jual bigint not null default 0,
   subtotal bigint not null default 0,
   kedaluwarsa date,
   primary key (pembelian_id, produk_id)
@@ -823,5 +824,11 @@ on conflict (id) do nothing;
 insert into transaksi_detail (transaksi_id, produk_id, nama_produk, qty, harga, subtotal, modal, laba, satuan_dipakai)
 values ('TRX-8250237222', 'PRD-TESKOPI', 'TES Kopi', 1, 10000, 10000, 0, 10000, 'pcs')
 on conflict (transaksi_id, produk_id) do nothing;
+
+-- Hak akses peran anon (perbaikan 42501): RLS saja tidak cukup — peran anon
+-- butuh GRANT atas tabel, kalau tidak REST mengembalikan "permission denied".
+-- Tanpa blok ini, setup toko baru dari file ini akan gagal di langkah pertama.
+grant select, insert, update, delete on all tables in schema public to anon, authenticated;
+alter default privileges in schema public grant select, insert, update, delete on tables to anon, authenticated;
 
 -- End of schema. Re-run safe.

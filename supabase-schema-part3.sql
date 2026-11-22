@@ -112,4 +112,10 @@ insert into transaksi_detail (transaksi_id, produk_id, nama_produk, qty, harga, 
 values ('TRX-8250237222', 'PRD-TESKOPI', 'TES Kopi', 1, 10000, 10000, 0, 10000, 'pcs')
 on conflict (transaksi_id, produk_id) do nothing;
 
+-- Hak akses peran anon (perbaikan 42501): RLS saja tidak cukup — peran anon
+-- butuh GRANT atas tabel, kalau tidak REST mengembalikan "permission denied".
+-- Tanpa blok ini, setup toko baru dari file ini akan gagal di langkah pertama.
+grant select, insert, update, delete on all tables in schema public to anon, authenticated;
+alter default privileges in schema public grant select, insert, update, delete on tables to anon, authenticated;
+
 -- End of schema. Re-run safe.

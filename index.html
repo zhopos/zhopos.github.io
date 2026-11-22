@@ -43,7 +43,7 @@ header small{opacity:.92;font-size:11px}
 /* --- Halaman daftar / detail (form tersembunyi sampai dibuka) --- */
 .form-view{display:none}
 /* Daftar produk ala Griyo */
-.countbar{background:#2563eb;color:#fff;border-radius:10px;padding:9px 12px;display:flex;justify-content:space-between;font-size:14px;margin-bottom:10px}
+.countbar{background:var(--teal);color:#fff;border-radius:10px;padding:9px 12px;display:flex;justify-content:space-between;font-size:14px;margin-bottom:10px}
 .plist{border-top:1px solid var(--line)}
 .prow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:13px 2px;border-bottom:1px solid var(--line);cursor:pointer}
 .prow:active{background:#f8fafc}
@@ -73,11 +73,11 @@ header small{opacity:.92;font-size:11px}
 .konfirm-tombol button{flex:1;padding:12px}
 /* --- Popup notif (toast modern) --- */
 #errBar{display:none;position:fixed;top:60px;left:0;right:0;z-index:80;pointer-events:none;padding:0 12px}
-.toast{pointer-events:auto;display:flex;gap:10px;align-items:flex-start;max-width:480px;margin:0 auto 8px;background:#fff;border:1px solid var(--line);border-left:5px solid #0ea5e9;border-radius:14px;box-shadow:0 10px 28px rgba(15,23,42,.18);padding:12px;animation:toastMasuk .25s ease}
+.toast{pointer-events:auto;display:flex;gap:10px;align-items:flex-start;max-width:480px;margin:0 auto 8px;background:#fff;border:1px solid var(--line);border-left:5px solid var(--teal);border-radius:14px;box-shadow:0 10px 28px rgba(15,23,42,.18);padding:12px;animation:toastMasuk .25s ease}
 .toast.sukses{border-left-color:#16a34a}
 .toast.error{border-left-color:#dc2626}
 .toast.keluar{opacity:0;transform:translateY(-6px);transition:all .3s ease}
-.t-ic{width:30px;height:30px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;background:#0ea5e9}
+.t-ic{width:30px;height:30px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;background:var(--teal)}
 .toast.sukses .t-ic{background:#16a34a}
 .toast.error .t-ic{background:#dc2626}
 .t-body{flex:1;min-width:0}
@@ -236,7 +236,8 @@ th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04
 .nav-arrow{width:52px;height:52px;border-radius:12px;border:1px solid #dadce0;background:#fff;font-size:26px;color:#137333;cursor:pointer}
 .nav-arrow:disabled{opacity:.35;cursor:default}
 .detail-tabs{position:sticky;bottom:0;display:flex;background:#fff;border-top:1px solid #dadce0;margin:12px -14px -14px}
-.detail-tab{flex:1;border:0;background:none;padding:10px 4px 12px;font-size:14px;color:#0b5394;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
+.detail-tab{flex:1;border:0;background:none;padding:10px 4px 12px;font-size:14px;color:var(--teal);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
+.langkah-ind{display:flex;gap:6px;margin:0 0 10px}.langkah-ind span{flex:1;text-align:center;font-size:13px;font-weight:600;color:#94a3b8;padding:7px 4px;border-bottom:2px solid var(--line)}.langkah-ind span.on{color:var(--teal);border-bottom-color:var(--teal)}
 .detail-tab span{font-size:20px}
 .detail-tab.active{font-weight:700}
 .struk-preview{background:#000;padding:24px 12px;margin:0 -14px}
@@ -404,6 +405,7 @@ body.dark .menu-item{background:#1e293b}
 </section>
 
 <section id="kasir">
+  <div class="langkah-ind"><span data-l="1" class="on">1 Produk</span><span data-l="2">2 Keranjang</span><span data-l="3">3 Bayar</span></div>
   <div id="kasirLangkah1">
   <div class="card" style="margin-bottom:10px"><div class="kasir-head"><button class="burger" onclick="toggleDrawer()">☰</button><h3>Transaksi Baru</h3><button class="secondary" onclick="go('pengaturan')">⚙</button></div>
     <div class="pillrow" style="margin-top:12px"><button class="pill active" id="pillReguler" onclick="setModeKasir('reguler')">🛒 Reguler</button><button class="pill" id="pillCepat" onclick="setModeKasir('cepat')">⚡ Cepat</button></div>
@@ -435,7 +437,7 @@ body.dark .menu-item{background:#1e293b}
     <div id="poinBox" style="font-size:13px;margin:6px 0"></div>
     <div id="cartTotal" style="font-weight:700;margin:10px 0"></div>
     <div class="flex noprint"><button class="primary" id="btnSimpanTrx" onclick="goCheckout()" style="flex:1;padding:14px;font-size:17px">KE PEMBAYARAN ›</button></div>
-    <div class="flex noprint"><button class="secondary" onclick="tukarPoin()">Tukar Poin</button><button class="secondary" onclick="simpanCepatDariKasir()">Simpan Transaksi Cepat</button><button class="secondary" onclick="parkirTransaksi()">Parkir (Tertunda)</button><button class="secondary" onclick="kosongkanCart()">Kosongkan</button></div>
+    <div class="flex noprint"><button class="secondary" onclick="tukarPoin()">Tukar Poin</button><button class="secondary" onclick="simpanCepatDariKasir()">Simpan sbg Template</button><button class="secondary" onclick="parkirTransaksi()">Parkir (Tertunda)</button><button class="secondary" onclick="tanyaKosongkanCart()">Kosongkan</button></div>
     <div id="struk" style="margin-top:12px;display:none"></div>
     <div class="flex noprint" style="margin-top:10px"><button class="secondary" onclick="go('pengaturan')">⚙ Pengaturan Struk</button><button class="secondary" onclick="window.print()">🖨 Cetak Struk</button><button class="secondary" onclick="kirimWAGambar()">💬 Kirim Struk via WhatsApp (Gambar)</button></div>
   </div>
@@ -444,13 +446,14 @@ body.dark .menu-item{background:#1e293b}
 
 <section id="bayar">
   <div class="card"><div style="display:flex;align-items:center;gap:8px"><button class="secondary" onclick="kembaliKeKeranjang()">← Kembali</button><h3 style="margin:0">Pembayaran</h3></div>
+    <div class="langkah-ind" style="margin-top:10px"><span data-l="1">1 Produk</span><span data-l="2">2 Keranjang</span><span data-l="3" class="on">3 Bayar</span></div>
     <div class="pay-total"><div class="lbl">Total Belanja</div><div class="amt" id="bayarTotal">Rp0</div></div>
     <div id="bayarRincian" style="font-size:15px"></div>
     <h4>Metode Pembayaran</h4><div class="paygrid" id="bayarMetodeGrid"></div>
     <label style="margin-top:12px">Uang Tunai (Rp)</label>
     <div class="tunai-row"><input id="bayarTunai" type="number" value="" oninput="bayarTunaiInput()" placeholder="0"><button class="secondary" onclick="document.getElementById('bayarTunai').value='';bayarTunaiInput()" title="Hapus">✕</button></div>
     <div id="bayarKembalian" class="kembali-row"><span>Kembalian</span><span id="bayarKembalianVal">Rp0</span></div>
-    <button class="primary" style="width:100%;font-size:18px;padding:14px" onclick="simpanTransaksi()">✓ Selesai</button>
+    <button class="primary" id="btnSelesai" style="width:100%;font-size:18px;padding:14px" onclick="simpanTransaksi()">✓ Selesai</button>
     <p style="color:#64748b;font-size:13px;text-align:center">Transaksi tersimpan dan struk ditampilkan setelah selesai.</p>
   </div>
 </section>
@@ -496,7 +499,7 @@ body.dark .menu-item{background:#1e293b}
 <h4 style="margin:14px 0 4px;text-align:center">Gambar Produk</h4>
 <div class="gambar-box" id="pGambarBox">🎁</div>
 <img id="pGambarPreview" alt="Gambar produk" style="display:none;width:150px;height:150px;object-fit:cover;border-radius:12px;border:1.5px solid #cbd5e1;margin:6px auto">
-<div style="display:flex;gap:8px;justify-content:center"><label style="padding:9px 14px;border-radius:10px;cursor:pointer;background:#2563eb;color:#fff;font-size:14px">🔄 Pilih Gambar<input id="pGambarFile" type="file" accept="image/*" style="display:none" onchange="pilihGambarProduk(this)"></label><button class="danger" id="pGambarHapusBtn" style="display:none" onclick="hapusGambarProduk()">✕ Hapus</button></div>
+<div style="display:flex;gap:8px;justify-content:center"><label style="padding:9px 14px;border-radius:10px;cursor:pointer;background:var(--teal);color:#fff;font-size:14px">🔄 Pilih Gambar<input id="pGambarFile" type="file" accept="image/*" style="display:none" onchange="pilihGambarProduk(this)"></label><button class="danger" id="pGambarHapusBtn" style="display:none" onclick="hapusGambarProduk()">✕ Hapus</button></div>
 <div class="frow"><span class="fic">💬</span><div class="fcol"><label>Keterangan untuk katalog</label><input id="pKet" placeholder="Keterangan"></div></div>
 <div class="frow"><span class="fic">🏷️</span><div class="fcol"><label>Kategori</label><input id="pKategori" placeholder="Kategori (Minuman / Makanan / Jasa)"></div></div>
 <div class="frow"><span class="fic">🗂️</span><div class="fcol"><label>Grup produk</label><input id="pGrup" placeholder="Grup produk"></div></div>
