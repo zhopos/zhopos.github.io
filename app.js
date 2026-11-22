@@ -1105,7 +1105,16 @@ function renderTrx() {
   document.getElementById('trxTable').innerHTML = html;
   document.getElementById('laporanTable').innerHTML = html;
 }
-async function lunasi(id) { var n = prompt('Nominal pembayaran (Rp):', ''); if (!n) return; await DB.tambahPembayaran({ id: id, nominal: Number(n) }); await loadData(); }
+async function lunasi(id, nominal) {
+  var trx = (DATA.transaksi || []).find(function (x) { return x.ID === id; });
+  if (!trx) return;
+  var sisa = Number(trx.Sisa || 0);
+  var n = nominal != null ? Number(nominal) : sisa;
+  if (!(n > 0)) return;
+  if (n > sisa) n = sisa;
+  if (!await konfirmasi('Bayar sisa ' + rp(n) + '?', 'Pembayaran dicatat sebagai pelunasan ' + (trx.Pelanggan || 'transaksi') + ' (' + (trx.KodeAlternatif || trx.ID) + ').', 'Ya, Bayar', 'primary')) return;
+  try { await DB.tambahPembayaran({ id: id, nominal: n }); await loadData(); tampilInfo('Pembayaran ' + rp(n) + ' tercatat.'); } catch (e) { tampilError('Gagal mencatat pembayaran: ' + (e.message || e)); }
+}
 async function ubahStatus(id, status) { if (!status) return; await DB.ubahStatusPesanan({ id: id, status: status }); await loadData(); }
 async function batalkanTransaksi(id) {
   var t = (DATA.transaksi || []).find(function (x) { return x.ID === id; });

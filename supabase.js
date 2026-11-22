@@ -760,10 +760,20 @@
       await persist('produk', prod);
       if (scRetur) await persist('stok_cabang', scRetur);
     }
+    var sisaLama = Number(trx.Sisa || 0);
     trx.Total = Math.max(0, Number(trx.Total || 0) - nominal);
-    trx.Sisa = Math.max(0, Number(trx.Sisa || 0) - nominal);
+    trx.Sisa = Math.max(0, sisaLama - nominal);
     if (trx.Sisa === 0 && Number(trx.Bayar || 0) > 0) trx.StatusBayar = 'Lunas';
     await persist('transaksi', trx);
+    // Pelanggan: retur mengurangi TotalBeli sebesar nominal, dan piutang
+    // sebesar berkurangnya sisa (simetris dengan tambahItemTrx yang
+    // menambah keduanya). Tanpa ini piutang nyangkut seperti Rp2.000 di #7.
+    var pl = DATA.pelanggan.find(function (x) { return x.Nama === trx.Pelanggan; });
+    if (pl) {
+      pl.TotalBeli = Math.max(0, Number(pl.TotalBeli || 0) - nominal);
+      pl.Piutang = Math.max(0, Number(pl.Piutang || 0) - (sisaLama - trx.Sisa));
+      await persist('pelanggan', pl);
+    }
     if (nominal > 0) {
       var saldo = (DATA.kas || []).reduce(function (a, k) { return a + Number(k.Masuk || 0) - Number(k.Keluar || 0); }, 0) - nominal;
       var kasRow = { ID: uid('KAS'), Tanggal: nowISO(), Jenis: 'Keluar', Keterangan: 'Retur ' + trx.ID + ' — ' + row.Produk, Masuk: 0, Keluar: nominal, Saldo: saldo, CabangID: row.CabangID };
