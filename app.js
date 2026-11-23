@@ -3,6 +3,7 @@ var DATA = { produk: [], transaksi: [], detail: [], pelanggan: [], pemasok: [], 
 var cart = []; var lastStruk = ''; var lastStrukData = null; var lastWaTelp = ''; var resepDraft = []; var beliItems = []; var currentUser = null; var promoTerpakai = []; var promoDiskon = 0; var poinDipakai = 0; var laporBosTeks = ''; var laporBosWa = '';
 var rp = function (n) { return 'Rp ' + (Math.round(n || 0)).toLocaleString('id-ID'); };
 var esc = function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
+var escJS = function (s) { return String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
 /* ---------- Format uang di input (pemisah ribuan otomatis, v4-21) ----------
    Semua isian uang memakai type="text" + inputmode="decimal" agar titik
    pemisah ribuan bisa tampil saat mengetik (12.000, 1.250.000). Yang
@@ -459,7 +460,7 @@ function renderAll() {
   vsEl.textContent = (pct >= 0 ? '+' : '') + pct + '% vs kemarin';
   vsEl.classList.toggle('down', pct < 0);
   document.getElementById('heroUser').textContent = currentUser ? ('Halo, ' + currentUser.nama + ' (' + currentUser.peran + ') — kasir siap melayani hari ini.') : 'Kasir siap melayani hari ini.';
-  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • ' + currentUser.peran + ' • v4-27') : 'Kasir • v4-27';
+  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • ' + currentUser.peran + ' • v4-28') : 'Kasir • v4-28';
   var bb = document.getElementById('bellBadge');
   if (bb) { var sm = Number(r.stokMenipis || 0); bb.style.display = sm > 0 ? 'flex' : 'none'; bb.textContent = sm > 99 ? '99+' : String(sm); }
   isiNotifPanel();
@@ -572,7 +573,7 @@ function emojiProduk(nama) {
 }
 function renderProdukKasir() {
   var q = (document.getElementById('cariProduk').value || '').toLowerCase();
-  document.getElementById('produkKasir').innerHTML = (DATA.produk || []).filter(function (p) { return produkAktif(p) && (!q || p.Nama.toLowerCase().indexOf(q) >= 0 || String(p.SKU || p['SKU/Barcode'] || '').toLowerCase().indexOf(q) >= 0); })
+  document.getElementById('produkKasir').innerHTML = (DATA.produk || []).filter(function (p) { return produkAktif(p) && (!q || (p.Nama || '').toLowerCase().indexOf(q) >= 0 || String(p.SKU || p['SKU/Barcode'] || '').toLowerCase().indexOf(q) >= 0); })
     .map(function (p) {
       var diKeranjang = 0; cart.forEach(function (x) { if (x.id === p.ID) diKeranjang += x.Qty; });
       var stok = stokProduk(p);
@@ -791,7 +792,7 @@ function renderBayar() {
   if (!jb.length) jb = [{ Nama: 'Tunai' }];
   document.getElementById('bayarMetodeGrid').innerHTML = jb.map(function (j) {
     var sel = j.Nama === metode;
-    return '<div class="payopt' + (sel ? ' sel' : '') + '" onclick="pilihMetodeBayar(\'' + esc(j.Nama) + '\')"><span class="payopt-ic">' + iconBayar(j.Nama) + '</span>' + (sel ? '✓ ' : '') + esc(j.Nama) + '</div>';
+    return '<div class="payopt' + (sel ? ' sel' : '') + '" onclick="pilihMetodeBayar(\'' + escJS(j.Nama) + '\')"><span class="payopt-ic">' + iconBayar(j.Nama) + '</span>' + (sel ? '✓ ' : '') + esc(j.Nama) + '</div>';
   }).join('');
   var bt = document.getElementById('bayarTunai');
   if (!bayarManual) setUang(bt, h.total);
@@ -1842,7 +1843,7 @@ function renderPickerPemasok() {
   var q = (document.getElementById('cariPemasok').value || '').toLowerCase();
   var list = (DATA.pemasok || []).filter(function (p) { return !q || String(p.Nama || '').toLowerCase().indexOf(q) >= 0; });
   document.getElementById('daftarPemasok').innerHTML = list.map(function (p) {
-    return '<div class="prow" onclick="pilihPemasok(\'' + esc(p.Nama) + '\')"><div class="pinfo"><b>' + esc(p.Nama) + '</b><span>' + esc(p.Telepon || '') + '</span></div><span style="font-size:20px;color:#94a3b8">›</span></div>';
+    return '<div class="prow" onclick="pilihPemasok(\'' + escJS(p.Nama) + '\')"><div class="pinfo"><b>' + esc(p.Nama) + '</b><span>' + esc(p.Telepon || '') + '</span></div><span style="font-size:20px;color:#94a3b8">›</span></div>';
   }).join('') || '<p style="color:#64748b">Tidak ada pemasok yang cocok.</p>';
 }
 function pilihPemasok(nama) {
@@ -2033,7 +2034,7 @@ function renderPelanggan() {
   var hanyaPiutang = document.getElementById('plFilterPiutang').checked;
   var list = (DATA.pelanggan || []).filter(function (p) { return !hanyaPiutang || Number(p.Piutang || 0) > 0; });
   document.getElementById('pelangganTable').innerHTML = list.map(function (p) {
-    return '<div class="cart-item"><span><b>' + esc(p.Nama) + '</b><br><small>' + esc(p.Telepon || '') + ' • ' + esc(tierOtomatis(p)) + ' • Poin ' + (p.Poin || 0) + ' • Piutang ' + rp(p.Piutang || 0) + '<br>Terakhir beli: ' + esc(p.TerakhirBeli || '—') + '</small></span><span><button class="secondary" onclick="editPelanggan(\'' + esc(p.ID) + '\')">Edit</button> <button class="secondary" onclick="lunasiSemua(\'' + esc(p.Nama) + '\', this)">Lunasi Semua</button></span></div>';
+    return '<div class="cart-item"><span><b>' + esc(p.Nama) + '</b><br><small>' + esc(p.Telepon || '') + ' • ' + esc(tierOtomatis(p)) + ' • Poin ' + (p.Poin || 0) + ' • Piutang ' + rp(p.Piutang || 0) + '<br>Terakhir beli: ' + esc(p.TerakhirBeli || '—') + '</small></span><span><button class="secondary" onclick="editPelanggan(\'' + esc(p.ID) + '\')">Edit</button> <button class="secondary" onclick="lunasiSemua(\'' + escJS(p.Nama) + '\', this)">Lunasi Semua</button></span></div>';
   }).join('') || 'Belum ada pelanggan.';
 }
 function editPelanggan(id) {
