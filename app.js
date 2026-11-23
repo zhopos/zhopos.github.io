@@ -459,7 +459,7 @@ function renderAll() {
   vsEl.textContent = (pct >= 0 ? '+' : '') + pct + '% vs kemarin';
   vsEl.classList.toggle('down', pct < 0);
   document.getElementById('heroUser').textContent = currentUser ? ('Halo, ' + currentUser.nama + ' (' + currentUser.peran + ') — kasir siap melayani hari ini.') : 'Kasir siap melayani hari ini.';
-  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • ' + currentUser.peran + ' • v4-26') : 'Kasir • v4-26';
+  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • ' + currentUser.peran + ' • v4-27') : 'Kasir • v4-27';
   var bb = document.getElementById('bellBadge');
   if (bb) { var sm = Number(r.stokMenipis || 0); bb.style.display = sm > 0 ? 'flex' : 'none'; bb.textContent = sm > 99 ? '99+' : String(sm); }
   isiNotifPanel();
@@ -2212,7 +2212,7 @@ function renderUlangTahun() {
 /* ---------- MASTER ---------- */
 function renderMaster() {
   document.getElementById('grupTable').innerHTML = (DATA.grup || []).map(function (g) { return '<div class="cart-item"><span>' + esc(g.Nama) + '</span><span><button class="danger" onclick="hapusGrup(\'' + esc(g.ID) + '\', this)">Hapus</button></span></div>'; }).join('') || 'Belum ada grup.';
-  document.getElementById('satuanTable').innerHTML = '<table><tr><th>Nama</th><th>Singkatan</th><th>Desimal</th><th></th></tr>' + (DATA.satuan || []).map(function (s) { return '<tr><td>' + esc(s.Nama) + '</td><td>' + esc(s.Singkatan || '') + '</td><td>' + esc(s.Desimal || 'TIDAK') + '</td><td><button class="danger" onclick="hapusSatuan(\'' + esc(s.ID) + '\', this)">Hapus</button></td></tr>'; }).join('') + '</table>';
+  document.getElementById('satuanTable').innerHTML = '<table><tr><th>Nama</th><th>Singkatan</th><th>Desimal</th><th></th></tr>' + (DATA.satuan || []).map(function (s) { return '<tr><td>' + esc(s.Nama) + '</td><td>' + esc(s.Singkatan || '') + '</td><td>' + (s.Desimal === true || s.Desimal === 'YA' ? 'YA' : 'TIDAK') + '</td><td><button class="danger" onclick="hapusSatuan(\'' + esc(s.ID) + '\', this)">Hapus</button></td></tr>'; }).join('') + '</table>';
   document.getElementById('jenisBayarTable').innerHTML = (DATA.jenisBayar || []).map(function (j) { return '<div class="cart-item"><span>' + esc(j.Nama) + '</span><span><button class="danger" onclick="hapusJenisBayar(\'' + esc(j.ID) + '\', this)">Hapus</button></span></div>'; }).join('') || 'Belum ada jenis pembayaran.';
   document.getElementById('itemPengeluaranTable').innerHTML = (DATA.itemPengeluaran || []).map(function (j) { return '<div class="cart-item"><span>' + esc(j.Nama) + '</span><span><button class="danger" onclick="hapusItemPengeluaran(\'' + esc(j.ID) + '\', this)">Hapus</button></span></div>'; }).join('') || 'Belum ada item pengeluaran.';
   document.getElementById('teksTable').innerHTML = '<table><tr><th>Nama</th><th>Keterangan</th><th>Jenis</th><th></th></tr>' + (DATA.daftarTeks || []).map(function (t) { return '<tr><td>' + esc(t.Nama) + '</td><td>' + esc(t.Keterangan || '') + '</td><td>' + esc(t.Jenis) + '</td><td><button class="danger" onclick="hapusTeks(\'' + esc(t.ID) + '\', this)">Hapus</button></td></tr>'; }).join('') + '</table>';
