@@ -211,6 +211,24 @@ function tampilInfo(msg) { tampilNotif('sukses', 'Berhasil', msg); }
 function sembunyiError() { var w = document.getElementById('errBar'); if (w) { w.innerHTML = ''; w.style.display = 'none'; } }
 async function loadData() {
   try {
+    // Mode Supabase: autentikasi DULU sebelum memuat data. Sebagai anon, RLS
+    // menutup semua tabel (loadAll mengembalikan data kosong), jadi memuat data
+    // sebelum login hanya menghasilkan layar kosong.
+    if (DB.configured) {
+      var sesi = null;
+      try { sesi = await DB.getSessionUser(); } catch (e) { sesi = null; }
+      if (!sesi) {
+        try { sessionStorage.removeItem('pos_user'); } catch (e) {}
+        document.getElementById('loginBox').style.display = 'block';
+        document.body.classList.add('belum-login');
+        document.querySelectorAll('main section').forEach(function (s) { s.style.display = 'none'; });
+        hideLoading();
+        return;
+      }
+      currentUser = sesi;
+      try { sessionStorage.setItem('pos_user', JSON.stringify(sesi)); } catch (e) {}
+      document.getElementById('userLabel').textContent = '• ' + sesi.nama + ' (' + sesi.peran + ')';
+    }
     var d = await withTimeout(DB.loadAll(), 20000, 'Server tidak menjawab dalam 20 detik. Periksa koneksi internet, lalu muat ulang halaman.');
     DATA = Object.assign(DATA, d || {});
     var p = DATA.pengaturan || {};
@@ -223,14 +241,16 @@ async function loadData() {
     sembunyiError();
     isiPengaturanForm();
     var saved = null; try { saved = JSON.parse(sessionStorage.getItem('pos_user') || 'null'); } catch (e) { }
-    if ((DATA.pengguna || []).length && !saved) {
+    // Login dilewati bila belum ada pengguna sama sekali — HANYA Mode Contoh.
+    // Di Mode Supabase login selalu wajib (pengguna tidak bisa dibaca tanpa login).
+    if (!DB.configured && (DATA.pengguna || []).length && !saved) {
       document.getElementById('loginBox').style.display = 'block';
       document.body.classList.add('belum-login');
       document.querySelectorAll('main section').forEach(function (s) { s.style.display = 'none'; });
       hideLoading();
       return;
     }
-    currentUser = saved;
+    currentUser = saved || currentUser;
     if (currentUser) document.getElementById('userLabel').textContent = '• ' + currentUser.nama + ' (' + currentUser.peran + ')';
     document.getElementById('loginBox').style.display = 'none';
     document.body.classList.remove('belum-login');
@@ -244,9 +264,9 @@ async function muatUlangManual() {
   if (ok) tampilInfo('Data diperbarui • ' + (lastSyncAt ? lastSyncAt.toLocaleTimeString('id-ID') : ''));
 }
 async function doLogin() {
-  var nama = document.getElementById('loginNama').value, pin = document.getElementById('loginPin').value;
+  var email = document.getElementById('loginEmail').value, kataSandi = document.getElementById('loginKataSandi').value;
   try {
-    var res = await DB.login(nama, pin);
+    var res = await DB.login(email, kataSandi);
     if (!res.ok) return alert(res.error || 'Login gagal');
     sessionStorage.setItem('pos_user', JSON.stringify(res));
     currentUser = res;
@@ -254,16 +274,20 @@ async function doLogin() {
     document.getElementById('loginBox').style.display = 'none';
     document.body.classList.remove('belum-login');
     document.querySelectorAll('main section').forEach(function (s) { s.style.display = ''; });
-    renderAll(); applyRole(); hideLoading();
+    // Data belum dimuat (boot berhenti di login) — muat sekarang dengan sesi Auth.
+    await loadData();
   } catch (e) { alert('Login gagal: ' + e.message); }
 }
-function logout() {
+async function logout() {
+  try { await DB.logout(); } catch (e) {}
   sessionStorage.removeItem('pos_user'); currentUser = null;
   cart = []; promoDiskon = 0; promoTerpakai = []; poinDipakai = 0; bayarManual = false;
   document.getElementById('userLabel').textContent = '';
-  document.getElementById('loginNama').value = ''; document.getElementById('loginPin').value = '';
+  document.getElementById('loginEmail').value = ''; document.getElementById('loginKataSandi').value = '';
   var kb = document.getElementById('kasirBayar'); if (kb) kb.value = '';
-  if ((DATA.pengguna || []).length) {
+  // Mode Supabase: login selalu wajib setelah keluar. Mode Contoh: login
+  // dilewati bila belum ada pengguna sama sekali.
+  if (DB.configured || (DATA.pengguna || []).length) {
     document.getElementById('loginBox').style.display = 'block';
     document.body.classList.add('belum-login');
     document.querySelectorAll('main section').forEach(function (s) { s.style.display = 'none'; });
@@ -2052,15 +2076,17 @@ async function tampilKatalogPublik(id) {
   var kp = document.getElementById('katalogPublik'); if (kp) kp.style.display = 'block';
   var body = document.getElementById('katalogPublikBody');
   try {
-    await DB.loadAll();
-    var k = (DATA.katalog || []).find(function (x) { return String(x.ID) === String(id); });
+    // Tanpa login: hanya RPC katalog_publik (katalog + produk + nama/telepon toko).
+    // loadAll() TIDAK dipakai di sini — sebagai anon, RLS menutup semua tabel.
+    var res = await DB.loadKatalogPublik(id);
+    var k = res.katalog;
     if (!k) { body.innerHTML = '<p style="color:#64748b">Katalog tidak ditemukan.</p>'; return; }
-    var p = DATA.pengaturan || {};
-    var prods = (DATA.produk || []).filter(function (x) { return produkAktif(x) && flagYa(x.TampilkanDiKatalog); });
-    if (k.SembunyikanStokKosong === 'YA') prods = prods.filter(function (x) { return stokProduk(x) > 0; });
+    var p = res.toko || {};
+    var prods = (res.produk || []).slice();
+    if (flagYa(k.SembunyikanStokKosong)) prods = prods.filter(function (x) { return Number(x.Stok || 0) > 0; });
     var wa = String(p.TeleponToko || '').replace(/\D/g, '');
     body.innerHTML = '<h3>' + esc(p.NamaToko || 'ZPOS') + '</h3><h4>' + esc(k.Nama) + '</h4>' + prods.map(function (x) {
-      return '<div class="cart-item"><span>' + (k.TampilkanGambar === 'YA' ? emojiProduk(x.Nama) + ' ' : '') + esc(x.Nama) + (k.TampilkanKeterangan === 'YA' && x.Keterangan ? '<br><small>' + esc(x.Keterangan) + '</small>' : '') + (k.TampilkanStok === 'YA' ? '<br><small>Stok: ' + stokProduk(x) + '</small>' : '') + '</span><span>' + (k.TampilkanHarga === 'YA' ? rp(x.HargaJual) : '') + ' <button class="secondary" onclick="window.open(\'https://wa.me/' + wa + '?text=' + encodeURIComponent('Halo, saya mau pesan ' + x.Nama) + '\',\'_blank\')">💬 Pesan</button></span></div>';
+      return '<div class="cart-item"><span>' + (flagYa(k.TampilkanGambar) ? emojiProduk(x.Nama) + ' ' : '') + esc(x.Nama) + (flagYa(k.TampilkanKeterangan) && x.Keterangan ? '<br><small>' + esc(x.Keterangan) + '</small>' : '') + (flagYa(k.TampilkanStok) ? '<br><small>Stok: ' + Number(x.Stok || 0) + '</small>' : '') + '</span><span>' + (flagYa(k.TampilkanHarga) ? rp(x.HargaJual) : '') + ' <button class="secondary" onclick="window.open(\'https://wa.me/' + wa + '?text=' + encodeURIComponent('Halo, saya mau pesan ' + x.Nama) + '\',\'_blank\')">💬 Pesan</button></span></div>';
     }).join('') + (k.Footer ? '<p style="color:#64748b;font-size:13px">' + esc(k.Footer) + '</p>' : '');
   } catch (e) { body.innerHTML = '<p style="color:#64748b">Gagal memuat katalog: ' + esc(e.message || e) + '</p>'; }
 }
@@ -2256,16 +2282,16 @@ function bacaIzin() {
 }
 function editPengguna(id) {
   var u = (DATA.pengguna || []).find(function (x) { return x.ID === id; }); if (!u) return;
-  document.getElementById('uId').value = u.ID; document.getElementById('uNama').value = u.Nama; document.getElementById('uPin').value = u.PIN || '';
+  document.getElementById('uId').value = u.ID; document.getElementById('uNama').value = u.Nama; document.getElementById('uEmail').value = u.Email || '';
   document.getElementById('uPeran').value = u.Peran; document.getElementById('uCabang').value = u.CabangID || ''; document.getElementById('uAkses').value = u.AksesTransaksi || 'Tidak dibatasi';
   try { var iz = JSON.parse(u.IzinJSON || '{}'); IZIN_KEYS.forEach(function (k) { var el = document.getElementById('iz_' + k[0]); if (el) el.checked = iz[k[0]] !== false; }); } catch (e) { }
   bukaForm('pengguna');
 }
-function resetPengguna() { ['uId', 'uNama', 'uPin'].forEach(function (i) { document.getElementById(i).value = ''; }); document.getElementById('uPeran').value = 'Kasir'; tutupForm('pengguna'); }
+function resetPengguna() { ['uId', 'uNama', 'uEmail'].forEach(function (i) { document.getElementById(i).value = ''; }); document.getElementById('uPeran').value = 'Kasir'; tutupForm('pengguna'); }
 async function simpanPengguna() {
-  var nama = document.getElementById('uNama').value, pin = document.getElementById('uPin').value;
-  if (!nama || !pin) return alert('Nama dan PIN wajib diisi.');
-  await DB.upsertPengguna({ ID: document.getElementById('uId').value || '', Nama: nama, PIN: pin, Peran: document.getElementById('uPeran').value, CabangID: document.getElementById('uCabang').value, AksesTransaksi: document.getElementById('uAkses').value, IzinJSON: JSON.stringify(bacaIzin()) });
+  var nama = document.getElementById('uNama').value, email = document.getElementById('uEmail').value;
+  if (!nama || !email || email.indexOf('@') < 0) return alert('Nama dan email yang valid wajib diisi.');
+  await DB.upsertPengguna({ ID: document.getElementById('uId').value || '', Nama: nama, Email: email, Peran: document.getElementById('uPeran').value, CabangID: document.getElementById('uCabang').value, AksesTransaksi: document.getElementById('uAkses').value, IzinJSON: JSON.stringify(bacaIzin()) });
   await loadData(); resetPengguna(); tampilInfo('Pengguna tersimpan.');
 }
 async function hapusPengguna(id, el) { if (!await konfirmasi('Hapus pengguna?', 'Pengguna ini tidak bisa lagi login ke aplikasi.')) return; try { await DB.hapusPengguna({ id: id }); await loadData(); tampilInfo('Pengguna dihapus.'); } catch (e) { tampilError('Gagal menghapus pengguna: ' + (e.message || e)); } }

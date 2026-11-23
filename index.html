@@ -34,6 +34,8 @@ header small{opacity:.92;font-size:12px}
 .brand-name{line-height:1.15;white-space:nowrap}
 .burger{background:rgba(255,255,255,.18);color:#fff;border:0;font-size:20px;line-height:1;padding:8px 11px;border-radius:10px;cursor:pointer}
 .hbtn{background:rgba(255,255,255,.18);color:#fff;border:0;font-size:15px;padding:8px 10px;border-radius:10px;cursor:pointer;position:relative}
+.hbtn svg{width:22px;height:22px;display:block}
+.burger svg{width:22px;height:22px;display:block}
 .modebadge{background:rgba(255,255,255,.22);font-size:12px;padding:3px 8px;border-radius:999px;white-space:nowrap}
 .bell-badge{position:absolute;top:-4px;right:-4px;min-width:17px;height:17px;border-radius:999px;background:#ef4444;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px}
 
@@ -106,12 +108,13 @@ nav#nav.open{transform:none}
 .zmark{width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800}
 .drawer-store{margin:12px 14px;padding:12px;border:1px solid var(--line);border-radius:14px;background:#f8fafc;font-size:14px;display:flex;gap:10px;align-items:center}
 .drawer-store .store-ic{width:42px;height:42px;border-radius:12px;background:#ccfbf1;color:var(--teal);display:flex;align-items:center;justify-content:center;font-size:22px;flex:none}
+.drawer-store .store-ic svg{width:22px;height:22px;display:block}
 .drawer-store b{display:block;font-size:15px}
 .drawer-store small{color:var(--muted);display:block}
 .navgroup{padding:12px 16px 4px;font-size:12px;font-weight:700;letter-spacing:.06em;color:#64748b;text-transform:uppercase}
 button.menu + .navgroup{border-top:1px solid var(--line);margin-top:8px}
 nav#nav button.menu{white-space:nowrap;border:1px solid transparent;background:transparent;padding:11px 14px;border-radius:10px;cursor:pointer;text-align:left;font-size:15px;width:calc(100% - 16px);margin:1px 8px;display:flex;align-items:center;gap:10px;color:var(--ink)}
-nav#nav button.menu .mi{font-size:17px;flex:none}
+nav#nav button.menu svg{width:20px;height:20px;display:block;flex:none}
 nav#nav button.menu[data-sec]::after{content:'›';margin-left:auto;color:#94a3b8;font-size:18px}
 nav#nav button.menu.active{background:var(--teal);color:#fff;border-color:var(--teal)}
 nav#nav button.menu.active::after{color:#fff}
@@ -160,6 +163,7 @@ th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04
 .sale-vs{font-size:13px;color:var(--green);font-weight:600}
 .sale-vs.down{color:var(--red)}
 .sale-ic{width:46px;height:46px;border-radius:14px;background:var(--teal-soft);color:var(--teal);display:flex;align-items:center;justify-content:center;font-size:22px;flex:none}
+.sale-ic svg{width:22px;height:22px;display:block}
 
 /* --- Tile statistik --- */
 .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
@@ -186,9 +190,15 @@ th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04
 .kasir-head .burger{background:#eef2f6;color:var(--ink)}
 .pillrow{display:flex;gap:8px;margin:12px 0 10px}
 .pill{flex:1;padding:11px;border-radius:999px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;font-weight:600;text-align:center;font-size:14px;color:var(--ink)}
+.pill svg{width:16px;height:16px;vertical-align:-3px}
+.secondary svg{width:16px;height:16px;vertical-align:-2px}
+.danger svg{width:16px;height:16px;vertical-align:-2px}
+.primary svg{width:17px;height:17px;vertical-align:-3px}
+.btn-file svg{width:16px;height:16px;vertical-align:-2px}
 .pill.active{background:var(--teal);color:#fff;border-color:var(--teal)}
 .searchbar{display:flex;gap:8px;align-items:center;background:#fff;border:1px solid #cbd5e1;border-radius:12px;padding:0 6px 0 12px}
 .searchbar .sic{font-size:16px;color:var(--muted);flex:none}
+.searchbar .sic svg{width:18px;height:18px;display:block}
 .searchbar input{border:0;margin:0;padding:11px 0;flex:1;min-width:0}
 .searchbar input:focus{outline:none}
 .searchbar button{flex:none}
@@ -205,6 +215,7 @@ th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04
 .qty-badge{background:var(--teal);color:#fff;min-width:40px;height:40px;line-height:40px;text-align:center;border-radius:10px;font-size:17px}
 .cart-bar{position:sticky;bottom:72px;justify-content:space-between;align-items:center;background:linear-gradient(135deg,#0f766e,#0d9488);color:#fff;padding:14px 16px;font-size:16px;cursor:pointer;z-index:20;border-radius:16px;margin-top:10px;box-shadow:0 6px 18px rgba(15,118,110,.35)}
 .cart-ic{position:relative;font-size:20px}
+.cart-ic svg{width:20px;height:20px;display:block}
 .cart-badge{position:absolute;top:-9px;right:-11px;min-width:18px;height:18px;border-radius:999px;background:#ef4444;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px}
 .cart-item{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid #f1f5f9;font-size:14px}
 .cart-item:last-child{border-bottom:0}
@@ -293,7 +304,7 @@ th{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04
 /* --- Bottom nav --- */
 #bottomNav{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);display:flex;z-index:30;padding-bottom:env(safe-area-inset-bottom)}
 #bottomNav button{flex:1;background:none;border:0;padding:8px 0 7px;cursor:pointer;font-size:12px;color:var(--muted)}
-#bottomNav button .bn-ic{font-size:21px;display:block;line-height:1.25}
+#bottomNav button svg{width:22px;height:22px;display:block;margin:0 auto 2px}
 #bottomNav button.active{color:var(--teal);font-weight:700}
 body.belum-login header,body.belum-login nav#nav,body.belum-login #bottomNav,body.belum-login #drawerBackdrop{display:none!important}
 
@@ -341,8 +352,8 @@ body.dark .menu-item{background:#1e293b}
 </head>
 <body>
 <header>
-  <div class="brand"><button class="burger" onclick="toggleDrawer()" aria-label="Menu">☰</button><span class="brand-z"><img src="icon-192.png" alt="ZPOS" style="width:100%;height:100%;border-radius:10px;display:block"></span><span class="brand-name"><b id="namaTokoHead">ZPOS</b><br><small id="modeLabel">Memuat data…</small> <small id="userLabel"></small></span></div>
-  <div style="display:flex;align-items:center;gap:6px"><span class="modebadge" id="modeBadge">Mode Contoh</span><button class="hbtn" onclick="toggleNotifPanel()" aria-label="Notifikasi">🔔<span id="bellBadge" class="bell-badge" style="display:none">0</span></button></div>
+  <div class="brand"><button class="burger" onclick="toggleDrawer()" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button><span class="brand-z"><img src="icon-192.png" alt="ZPOS" style="width:100%;height:100%;border-radius:10px;display:block"></span><span class="brand-name"><b id="namaTokoHead">ZPOS</b><br><small id="modeLabel">Memuat data…</small> <small id="userLabel"></small></span></div>
+  <div style="display:flex;align-items:center;gap:6px"><span class="modebadge" id="modeBadge">Mode Contoh</span><button class="hbtn" onclick="toggleNotifPanel()" aria-label="Notifikasi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span id="bellBadge" class="bell-badge" style="display:none">0</span></button></div>
 </header>
 <div id="errBar"></div>
 <div id="notifBackdrop" style="display:none;position:fixed;inset:0;z-index:70" onclick="toggleNotifPanel()"></div>
@@ -351,45 +362,45 @@ body.dark .menu-item{background:#1e293b}
 <div id="konfirmBox" style="display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:91;width:min(360px,calc(100vw - 40px))"><div class="konfirm-card"><div id="konfirmJudul" class="konfirm-judul"></div><div id="konfirmPesan" class="konfirm-pesan"></div><div class="konfirm-tombol"><button class="secondary" onclick="jawabKonfirm(false)">Batal</button><button id="konfirmYa" class="danger" onclick="jawabKonfirm(true)">Ya, Hapus</button></div></div></div>
 <div id="drawerBackdrop" onclick="closeDrawer()"></div>
 <nav id="nav">
-  <div class="drawer-head"><div class="zmark"><img src="icon-192.png" alt="ZPOS" style="width:100%;height:100%;border-radius:14px;display:block"></div><div><b>ZPOS</b></div><button class="hbtn" style="margin-left:auto" onclick="closeDrawer()">✕</button></div>
+  <div class="drawer-head"><div class="zmark"><img src="icon-192.png" alt="ZPOS" style="width:100%;height:100%;border-radius:14px;display:block"></div><div><b>ZPOS</b></div><button class="hbtn" style="margin-left:auto" onclick="closeDrawer()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
   <div class="navgroup">Utama</div>
-  <button class="menu active" data-sec="dashboard" onclick="show('dashboard',this)"><span class="mi">🏠</span> Dashboard</button>
+  <button class="menu active" data-sec="dashboard" onclick="show('dashboard',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg> Dashboard</button>
   <div class="navgroup">Transaksi</div>
-  <button class="menu" data-sec="kasir" onclick="show('kasir',this)"><span class="mi">🛒</span> Transaksi Baru</button>
-  <button class="menu" data-sec="cepat" onclick="show('cepat',this)"><span class="mi">⚡</span> Transaksi Cepat</button>
-  <button class="menu" data-sec="daftar" onclick="show('daftar',this)"><span class="mi">🧾</span> Daftar Transaksi</button>
+  <button class="menu" data-sec="kasir" onclick="show('kasir',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg> Transaksi Baru</button>
+  <button class="menu" data-sec="cepat" onclick="show('cepat',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg> Transaksi Cepat</button>
+  <button class="menu" data-sec="daftar" onclick="show('daftar',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h12v20l-2-1.3-2 1.3-2-1.3-2 1.3-2-1.3L6 22z"/><path d="M9 7h6M9 11h6M9 15h4"/></svg> Daftar Transaksi</button>
   <div class="navgroup">Master Data</div>
-  <button class="menu" data-sec="produk" onclick="show('produk',this)"><span class="mi">📦</span> Produk</button>
-  <button class="menu" data-sec="stok" onclick="show('stok',this)"><span class="mi">📊</span> Stok</button>
-  <button class="menu" data-sec="master" onclick="show('master',this)"><span class="mi">🗂️</span> Master</button>
-  <button class="menu" data-sec="katalog" onclick="show('katalog',this)"><span class="mi">📖</span> Katalog</button>
+  <button class="menu" data-sec="produk" onclick="show('produk',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.27 6.96L12 12.01l8.73-5.05"/><path d="M12 22.08V12"/></svg> Produk</button>
+  <button class="menu" data-sec="stok" onclick="show('stok',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg> Stok</button>
+  <button class="menu" data-sec="master" onclick="show('master',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg> Master</button>
+  <button class="menu" data-sec="katalog" onclick="show('katalog',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg> Katalog</button>
   <div class="navgroup">Laporan</div>
-  <button class="menu" data-sec="laporan" onclick="show('laporan',this)"><span class="mi">📈</span> Laporan</button>
-  <button class="menu" data-sec="laporbos" onclick="show('laporbos',this)"><span class="mi">📣</span> Lapor Bos</button>
+  <button class="menu" data-sec="laporan" onclick="show('laporan',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/></svg> Laporan</button>
+  <button class="menu" data-sec="laporbos" onclick="show('laporbos',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg> Lapor Bos</button>
   <div class="navgroup">Keuangan</div>
-  <button class="menu" data-sec="pembelian" onclick="show('pembelian',this)"><span class="mi">🛍️</span> Pembelian</button>
-  <button class="menu" data-sec="pengeluaran" onclick="show('pengeluaran',this)"><span class="mi">💸</span> Pengeluaran</button>
-  <button class="menu" data-sec="aruskas" onclick="show('aruskas',this)"><span class="mi">💰</span> Arus Kas</button>
-  <button class="menu" data-sec="utang" onclick="show('utang',this)"><span class="mi">🤝</span> Utang</button>
+  <button class="menu" data-sec="pembelian" onclick="show('pembelian',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg> Pembelian</button>
+  <button class="menu" data-sec="pengeluaran" onclick="show('pengeluaran',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 9.5v4M10.2 11.8L12 13.5l1.8-1.7"/></svg> Pengeluaran</button>
+  <button class="menu" data-sec="aruskas" onclick="show('aruskas',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/></svg> Arus Kas</button>
+  <button class="menu" data-sec="utang" onclick="show('utang',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg> Utang</button>
   <div class="navgroup">Lainnya</div>
-  <button class="menu" data-sec="pelanggan" onclick="show('pelanggan',this)"><span class="mi">👥</span> Pelanggan &amp; Piutang</button>
-  <button class="menu" id="menuMeja" data-sec="meja" onclick="show('meja',this)"><span class="mi">🍽️</span> Meja &amp; Dapur</button>
-  <button class="menu" data-sec="promo" onclick="show('promo',this)"><span class="mi">🎁</span> Promo &amp; Member</button>
-  <button class="menu" data-sec="pengguna" onclick="show('pengguna',this)"><span class="mi">👤</span> Pengguna &amp; Peran</button>
-  <button class="menu" data-sec="pengaturan" onclick="show('pengaturan',this)"><span class="mi">⚙️</span> Pengaturan</button>
-  <button class="menu" onclick="alert('ZPOS v4.0\nBantuan: lihat PANDUAN di folder proyek atau hubungi pemilik toko.')"><span class="mi">❓</span> Bantuan</button>
-  <button class="menu" onclick="alert('ZPOS v4.0\nSistem Informasi & Kasir Toko.\nDibangun untuk Bos — Mahdi.')"><span class="mi">ℹ️</span> Tentang</button>
-  <div class="drawer-foot"><div id="drawerSync">Mode Contoh</div><div class="foot-btns"><button class="secondary" onclick="muatUlangManual()">↻ Muat Ulang</button><button class="secondary" onclick="logout()">Keluar</button></div></div>
-  <div class="drawer-store" onclick="bukaProfilToko()"><span class="store-ic">🏪</span><span><b id="namaTokoDrawer">ZPOS</b><small id="drawerStoreRole">Kasir • v4.0</small></span><span style="margin-left:auto;color:#94a3b8;font-size:18px">›</span></div>
+  <button class="menu" data-sec="pelanggan" onclick="show('pelanggan',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Pelanggan &amp; Piutang</button>
+  <button class="menu" id="menuMeja" data-sec="meja" onclick="show('meja',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg> Meja &amp; Dapur</button>
+  <button class="menu" data-sec="promo" onclick="show('promo',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12v10H4V12"/><path d="M2 7h20v5H2z"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg> Promo &amp; Member</button>
+  <button class="menu" data-sec="pengguna" onclick="show('pengguna',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Pengguna &amp; Peran</button>
+  <button class="menu" data-sec="pengaturan" onclick="show('pengaturan',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Pengaturan</button>
+  <button class="menu" onclick="alert('ZPOS v4.0\nBantuan: lihat PANDUAN di folder proyek atau hubungi pemilik toko.')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg> Bantuan</button>
+  <button class="menu" onclick="alert('ZPOS v4.0\nSistem Informasi & Kasir Toko.\nDibangun untuk Bos — Mahdi.')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg> Tentang</button>
+  <div class="drawer-foot"><div id="drawerSync">Mode Contoh</div><div class="foot-btns"><button class="secondary" onclick="muatUlangManual()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Muat Ulang</button><button class="secondary" onclick="logout()">Keluar</button></div></div>
+  <div class="drawer-store" onclick="bukaProfilToko()"><span class="store-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5 4.5 4h15L21 9.5"/><path d="M5 9.5V20h14V9.5"/><path d="M9.5 20v-5h5v5"/></svg></span><span><b id="namaTokoDrawer">ZPOS</b><small id="drawerStoreRole">Kasir • v4.0</small></span><span style="margin-left:auto;color:#94a3b8;font-size:18px">›</span></div>
 </nav>
 <main>
-<div id="loading" style="position:fixed;inset:0;background:#fff;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px"><div style="font-size:42px">🛒</div><b style="font-size:18px">ZPOS</b><span style="color:#64748b;font-size:14px">Memuat data…</span></div>
-<div id="loginBox" class="card login-wrap" style="display:none"><div class="login-logo"><img src="icon-192.png" alt="ZPOS" style="width:100%;height:100%;border-radius:20px;display:block"></div><h3>Masuk — Pengguna</h3><p>Aplikasi ini memakai daftar Pengguna. Kalau daftar Pengguna masih kosong, login dilewati.</p><div class="flex"><input id="loginNama" placeholder="Nama pengguna"><input id="loginPin" type="password" placeholder="PIN"></div><button class="primary" onclick="doLogin()">Masuk</button></div>
+<div id="loading" style="position:fixed;inset:0;background:#fff;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px"><div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:42px;height:42px;display:block"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></div><b style="font-size:18px">ZPOS</b><span style="color:#64748b;font-size:14px">Memuat data…</span></div>
+<div id="loginBox" class="card login-wrap" style="display:none"><div class="login-logo"><img src="icon-192.png" alt="ZPOS" style="width:100%;height:100%;border-radius:20px;display:block"></div><h3>Masuk — ZPOS</h3><p>Masuk dengan akun toko (email + kata sandi). Akun dibuat di dashboard Supabase oleh pemilik toko.</p><div class="flex"><input id="loginEmail" type="email" placeholder="Email" autocomplete="username"><input id="loginKataSandi" type="password" placeholder="Kata sandi" autocomplete="current-password"></div><button class="primary" onclick="doLogin()">Masuk</button></div>
 
 <section id="dashboard" class="active">
   <div class="hero"><p class="hero-hi">Selamat Datang 👋</p><h2 id="heroToko">ZPOS</h2><p class="hero-sub" id="heroUser">Kasir siap melayani hari ini.</p>
   </div>
-  <div class="card sale-card"><div><span class="sale-label">Penjualan Hari Ini</span><div class="sale-big" id="heroOmzet">Rp0</div><div class="sale-vs" id="heroOmzetVs">—</div></div><div class="sale-ic">📊</div></div>
+  <div class="card sale-card"><div><span class="sale-label">Penjualan Hari Ini</span><div class="sale-big" id="heroOmzet">Rp0</div><div class="sale-vs" id="heroOmzetVs">—</div></div><div class="sale-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg></div></div>
   <div class="tiles" id="statTiles"></div>
   <div class="card"><h3>Menu</h3><div id="menuKelompok"></div></div>
   <div class="card"><h3>Grafik Penjualan 7 Hari Terakhir</h3><div class="chart-wrap"><div class="chart-y" id="chartY"></div><div id="chart7" style="flex:1;min-width:0"></div></div><div id="analitikBox" style="font-size:13px;color:#64748b;margin-top:8px"></div></div>
@@ -404,9 +415,9 @@ body.dark .menu-item{background:#1e293b}
 
 <section id="kasir">
   <div id="kasirLangkah1">
-  <div class="card" style="margin-bottom:10px"><div class="kasir-head"><h3>Transaksi Baru</h3><button class="secondary" onclick="go('pengaturan')">⚙</button></div>
-    <div class="pillrow" style="margin-top:12px"><button class="pill active" id="pillReguler" onclick="setModeKasir('reguler')">🛒 Reguler</button><button class="pill" id="pillCepat" onclick="setModeKasir('cepat')">⚡ Cepat</button></div>
-    <div class="searchbar"><span class="sic">🔍</span><input id="cariProduk" placeholder="Cari produk / scan barcode (nama / kode / barcode)" oninput="renderProdukKasir()" onkeydown="if(event.key==='Enter'){scanBarcode()}"><button class="secondary" onclick="document.getElementById('cariProduk').focus()" title="Scan barcode">📷</button></div>
+  <div class="card" style="margin-bottom:10px"><div class="kasir-head"><h3>Transaksi Baru</h3><button class="secondary" onclick="go('pengaturan')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button></div>
+    <div class="pillrow" style="margin-top:12px"><button class="pill active" id="pillReguler" onclick="setModeKasir('reguler')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg> Reguler</button><button class="pill" id="pillCepat" onclick="setModeKasir('cepat')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg> Cepat</button></div>
+    <div class="searchbar"><span class="sic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></span><input id="cariProduk" placeholder="Cari produk / scan barcode (nama / kode / barcode)" oninput="renderProdukKasir()" onkeydown="if(event.key==='Enter'){scanBarcode()}"><button class="secondary" onclick="document.getElementById('cariProduk').focus()" title="Scan barcode"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button></div>
   </div>
   <div id="kasirReguler">
     <div class="card"><div class="prod-list" id="produkKasir" style="margin-top:4px"></div></div>
@@ -414,7 +425,7 @@ body.dark .menu-item{background:#1e293b}
   <div id="kasirCepat" style="display:none">
     <div class="card"><h3>Template Transaksi Cepat</h3><div id="cepatListKasir"></div></div>
   </div>
-  <div id="cartBar" class="cart-bar noprint" onclick="langkahKasir(2)" style="display:none"><span class="cart-ic">🛒<b id="cartBarCount" class="cart-badge">0</b></span><span id="cartBarTotal" style="font-weight:700">0 item | Rp0</span><span>›</span></div>
+  <div id="cartBar" class="cart-bar noprint" onclick="langkahKasir(2)" style="display:none"><span class="cart-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg><b id="cartBarCount" class="cart-badge">0</b></span><span id="cartBarTotal" style="font-weight:700">0 item | Rp0</span><span>›</span></div>
   </div>
   <div id="kasirLangkah2" style="display:none">
   <div class="card" id="keranjangCard"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><button class="secondary" onclick="langkahKasir(1)">← Kembali</button><h3 style="margin:0">Keranjang</h3></div>
@@ -437,7 +448,7 @@ body.dark .menu-item{background:#1e293b}
     <div class="flex noprint"><button class="primary" id="btnSimpanTrx" onclick="goCheckout()" style="flex:1;padding:14px;font-size:17px">KE PEMBAYARAN ›</button></div>
     <div class="flex noprint"><button class="secondary" onclick="tukarPoin()">Tukar Poin</button><button class="secondary" onclick="simpanCepatDariKasir()">Simpan sbg Template</button><button class="secondary" onclick="parkirTransaksi()">Parkir (Tertunda)</button><button class="secondary" onclick="tanyaKosongkanCart()">Kosongkan</button></div>
     <div id="struk" style="margin-top:12px;display:none"></div>
-    <div class="flex noprint" style="margin-top:10px"><button class="secondary" onclick="go('pengaturan')">⚙ Pengaturan Struk</button><button class="secondary" onclick="window.print()">🖨 Cetak Struk</button><button class="secondary" onclick="kirimWAGambar()">💬 Kirim Struk via WhatsApp (Gambar)</button></div>
+    <div class="flex noprint" style="margin-top:10px"><button class="secondary" onclick="go('pengaturan')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Pengaturan Struk</button><button class="secondary" onclick="window.print()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> Cetak Struk</button><button class="secondary" onclick="kirimWAGambar()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> Kirim Struk via WhatsApp (Gambar)</button></div>
   </div>
   </div>
 </section>
@@ -448,7 +459,7 @@ body.dark .menu-item{background:#1e293b}
     <div id="bayarRincian" style="font-size:15px"></div>
     <h4>Metode Pembayaran</h4><div class="paygrid" id="bayarMetodeGrid"></div>
     <label style="margin-top:12px">Uang Tunai (Rp)</label>
-    <div class="tunai-row"><input id="bayarTunai" type="text" inputmode="decimal" value="" oninput="formatUangInput(this);bayarTunaiInput()" placeholder="0"><button class="secondary" onclick="document.getElementById('bayarTunai').value='';bayarTunaiInput()" title="Hapus">✕</button></div>
+    <div class="tunai-row"><input id="bayarTunai" type="text" inputmode="decimal" value="" oninput="formatUangInput(this);bayarTunaiInput()" placeholder="0"><button class="secondary" onclick="document.getElementById('bayarTunai').value='';bayarTunaiInput()" title="Hapus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
     <div id="bayarKembalian" class="kembali-row"><span>Kembalian</span><span id="bayarKembalianVal">Rp0</span></div>
     <div id="bayarSisa" class="kembali-row" style="display:none"><span>Sisa (belum dibayar)</span><span id="bayarSisaVal">Rp0</span></div>
     <button class="primary" id="btnSelesai" style="width:100%;font-size:18px;padding:14px" onclick="simpanTransaksi()">✓ Selesai</button>
@@ -470,7 +481,7 @@ body.dark .menu-item{background:#1e293b}
 
 <div id="lebihBackdrop" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:60" onclick="tutupLebih()"></div>
 <div id="lebihSheet" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:61;background:#fff;border-radius:16px 16px 0 0;box-shadow:0 -4px 24px rgba(15,23,42,.2);padding:8px 0 20px;max-width:640px;margin:0 auto">
-  <div style="text-align:right;padding:0 8px"><button class="danger" style="border-radius:8px;padding:6px 12px" onclick="tutupLebih()">✕</button></div>
+  <div style="text-align:right;padding:0 8px"><button class="danger" style="border-radius:8px;padding:6px 12px" onclick="tutupLebih()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
   <div id="lebihItems"></div>
 </div>
 
@@ -491,7 +502,7 @@ body.dark .menu-item{background:#1e293b}
 <h4 style="margin:14px 0 4px;text-align:center">Gambar Produk</h4>
 <div class="gambar-box" id="pGambarBox">🎁</div>
 <img id="pGambarPreview" alt="Gambar produk" style="display:none;width:150px;height:150px;object-fit:cover;border-radius:12px;border:1.5px solid #cbd5e1;margin:6px auto">
-<div style="display:flex;gap:8px;justify-content:center"><label class="btn-file">🔄 Pilih Gambar<input id="pGambarFile" type="file" accept="image/*" style="display:none" onchange="pilihGambarProduk(this)"></label><button class="danger" id="pGambarHapusBtn" style="display:none" onclick="hapusGambarProduk()">✕ Hapus</button></div>
+<div style="display:flex;gap:8px;justify-content:center"><label class="btn-file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Pilih Gambar<input id="pGambarFile" type="file" accept="image/*" style="display:none" onchange="pilihGambarProduk(this)"></label><button class="danger" id="pGambarHapusBtn" style="display:none" onclick="hapusGambarProduk()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg> Hapus</button></div>
 <div class="frow"><span class="fic">💬</span><div class="fcol"><label>Keterangan untuk katalog</label><input id="pKet" placeholder="Keterangan"></div></div>
 <div class="frow"><span class="fic">🏷️</span><div class="fcol"><label>Kategori</label><input id="pKategori" placeholder="Kategori (Minuman / Makanan / Jasa)"></div></div>
 <div class="frow"><span class="fic">🗂️</span><div class="fcol"><label>Grup produk</label><input id="pGrup" placeholder="Grup produk"></div></div>
@@ -501,12 +512,12 @@ body.dark .menu-item{background:#1e293b}
 <div class="hr-block"><div class="hr-title">Harga Lain <span class="hr-hint">mis. harga grosir — pilih di kasir lewat tombol "Harga Lain"</span></div><div id="pHargaLain" class="hr-editor" data-kolom="label,harga"><button type="button" class="secondary" onclick="tambahBarisHarga('pHargaLain')">+ Tambah Harga Lain</button></div></div>
 <div class="hr-block"><div class="hr-title">Harga Jumlah (multi-tingkat) <span class="hr-hint">mis. beli ≥ 12 harganya berubah otomatis di kasir</span></div><div id="pHargaJumlah" class="hr-editor" data-kolom="minQty,harga"><button type="button" class="secondary" onclick="tambahBarisHarga('pHargaJumlah')">+ Tambah Tingkat Harga</button></div></div>
 <div class="hr-block"><div class="hr-title">Satuan Varian <span class="hr-hint">mis. "lsn" isi 12 — pilih di kasir lewat tombol "Varian"</span></div><div id="pVarian" class="hr-editor" data-kolom="label,isi,harga"><button type="button" class="secondary" onclick="tambahBarisHarga('pVarian')">+ Tambah Varian</button></div></div>
-<button class="primary" style="width:100%;padding:14px;margin-top:12px;font-size:16px" onclick="simpanProduk()">💾 SIMPAN</button>
+<button class="primary" style="width:100%;padding:14px;margin-top:12px;font-size:16px" onclick="simpanProduk()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg> SIMPAN</button>
 <button class="danger" id="produkHapusBtn" style="display:none;width:100%;padding:12px;margin-top:8px" onclick="hapusProduk(document.getElementById('pId').value, this)">Hapus Produk</button>
 </div>
 <div class="card list-view">
 <div class="countbar"><span id="produkCount">Produk: 0</span><span id="produkStokCount">Stok: 0 pcs</span></div>
-<div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">Produk</h3><button class="secondary" onclick="exportProduk()">⬇ Export (CSV)</button></div>
+<div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">Produk</h3><button class="secondary" onclick="exportProduk()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg> Export (CSV)</button></div>
 <div id="produkTable" style="margin-top:6px"></div>
 <button class="fab" onclick="resetProduk();bukaForm('produk')" aria-label="Tambah produk">+</button>
 </div>
@@ -520,7 +531,7 @@ body.dark .menu-item{background:#1e293b}
 <div class="flex"><input id="opFisik" type="number" placeholder="Stok fisik"><input id="opKet" placeholder="Keterangan"></div>
 <button class="primary" onclick="simpanOpname()">Simpan Opname</button><div id="opnameTable" style="margin-top:12px"></div></div>
 <div class="card"><h3>Saran Order Otomatis</h3><button class="secondary" onclick="muatSaranOrder()">Hitung Saran Order</button><div id="saranBox" style="margin-top:10px"></div></div>
-<div class="card"><h3>Cetak Label Barcode</h3><div id="labelList"></div><button class="secondary" onclick="gambarLabel()">Tampilkan Label</button> <button class="secondary" onclick="window.print()">🖨 Cetak Label</button><div id="labelBox" style="margin-top:12px"></div></div>
+<div class="card"><h3>Cetak Label Barcode</h3><div id="labelList"></div><button class="secondary" onclick="gambarLabel()">Tampilkan Label</button> <button class="secondary" onclick="window.print()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> Cetak Label</button><div id="labelBox" style="margin-top:12px"></div></div>
 </section>
 
 <section id="pembelian">
@@ -541,16 +552,16 @@ body.dark .menu-item{background:#1e293b}
 <div class="flex"><input id="beliDiskon" type="text" inputmode="decimal" value="0" placeholder="Diskon (Rp)" oninput="formatUangInput(this);hitungTotalBeli()"><input id="beliPajak" type="text" inputmode="decimal" value="0" placeholder="Pajak (Rp)" oninput="formatUangInput(this);hitungTotalBeli()"><input id="beliBiaya" type="text" inputmode="decimal" value="0" placeholder="Biaya lain (Rp)" oninput="formatUangInput(this);hitungTotalBeli()"></div>
 <label>Bayar (Rp, kosongkan = hutang) <input id="beliBayar" type="text" inputmode="decimal" value="0" oninput="formatUangInput(this)"></label>
 <input id="beliCatatan" placeholder="Keterangan pembelian">
-<button class="primary" onclick="simpanPembelian()" style="width:100%;padding:13px">💾 SIMPAN DRAFT</button></div>
-<div class="card form-view" id="formBeliItem"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="bukaForm('pembelian','formPembelian')">← Kembali</button><h3 style="margin:0">Tambah Item</h3><button class="danger" id="beliItemHapusBtn" style="display:none;margin-left:auto" onclick="hapusItemBeliForm()">🗑 Hapus</button></div>
+<button class="primary" onclick="simpanPembelian()" style="width:100%;padding:13px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg> SIMPAN DRAFT</button></div>
+<div class="card form-view" id="formBeliItem"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="bukaForm('pembelian','formPembelian')">← Kembali</button><h3 style="margin:0">Tambah Item</h3><button class="danger" id="beliItemHapusBtn" style="display:none;margin-left:auto" onclick="hapusItemBeliForm()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6M14 11v6"/></svg> Hapus</button></div>
 <input type="hidden" id="beliItemProdukId">
 <div class="frow" onclick="bukaPickerProduk(true)"><span class="fic">💡</span><div class="fcol"><label>Produk/Bahan Baku</label><div id="beliItemProdukLabel" style="font-size:16px">Pilih produk…</div></div><span style="font-size:20px;color:#94a3b8">›</span></div>
 <div class="frow"><span class="fic">📦</span><div class="fcol"><label>Jumlah</label><input id="beliItemQty" type="number" value="1" min="1" oninput="hitungItemBeli()"></div><div class="fcol"><label>Satuan</label><input id="beliItemSatuan" value="pcs" readonly></div></div>
 <div class="frow"><span class="fic">💵</span><div class="fcol"><label>Harga beli (total)</label><input id="beliItemTotal" type="text" inputmode="decimal" placeholder="0" oninput="formatUangInput(this);hitungItemBeli()"></div></div>
 <div class="frow2"><div class="fcol"><label>Harga beli per item</label><input id="beliItemPerItem" readonly></div><div class="fcol"><label>Harga jual per item</label><input id="beliItemJual" type="text" inputmode="decimal" oninput="formatUangInput(this);hitungItemBeli()"></div></div>
 <div class="frow"><span class="fic">💰</span><div class="fcol"><label>Laba</label><input id="beliItemLaba" readonly></div></div>
-<div class="frow"><span class="fic">📅</span><div class="fcol"><label>Kedaluwarsa</label><input id="beliItemKedaluwarsa" type="date"></div><button class="secondary" onclick="document.getElementById('beliItemKedaluwarsa').value=''">✕</button></div>
-<button class="primary" onclick="simpanItemBeli()" style="width:100%;padding:13px">💾 SIMPAN</button></div>
+<div class="frow"><span class="fic">📅</span><div class="fcol"><label>Kedaluwarsa</label><input id="beliItemKedaluwarsa" type="date"></div><button class="secondary" onclick="document.getElementById('beliItemKedaluwarsa').value=''"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+<button class="primary" onclick="simpanItemBeli()" style="width:100%;padding:13px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg> SIMPAN</button></div>
 <div class="card form-view" id="pickerPemasok"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="bukaForm('pembelian','formPembelian')">← Kembali</button><h3 style="margin:0">Pilih Pemasok</h3></div>
 <input id="cariPemasok" placeholder="🔍 Cari pemasok…" oninput="renderPickerPemasok()">
 <div id="daftarPemasok" style="margin-top:8px"></div>
@@ -572,7 +583,7 @@ body.dark .menu-item{background:#1e293b}
 
 <section id="aruskas">
 <div class="card form-view" id="formArusKas"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="tutupForm('aruskas')">← Kembali</button><h3 style="margin:0">Uang Masuk / Keluar Manual</h3></div><div class="flex"><select id="ukJenis"><option>Masuk</option><option>Keluar</option></select><input id="ukKet" placeholder="Keterangan"><input id="ukNominal" type="text" inputmode="decimal" placeholder="Nominal Rp" oninput="formatUangInput(this)"></div><button class="primary" onclick="simpanUangKas()">Simpan</button></div>
-<div class="card list-view"><h3>Ringkasan Kas &amp; Laba</h3><div id="kasSummary"></div><button class="secondary" onclick="exportKasCSV()">⬇ Export Arus Kas (CSV)</button></div>
+<div class="card list-view"><h3>Ringkasan Kas &amp; Laba</h3><div id="kasSummary"></div><button class="secondary" onclick="exportKasCSV()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg> Export Arus Kas (CSV)</button></div>
 <div class="card list-view"><h3>Arus Kas Terakhir</h3><div id="kasTable"></div><button class="fab" onclick="document.getElementById('ukKet').value='';document.getElementById('ukNominal').value='';bukaForm('aruskas')" aria-label="Catat kas">+</button></div>
 </section>
 
@@ -671,7 +682,7 @@ body.dark .menu-item{background:#1e293b}
 <div class="card"><h3>Laporan</h3>
 <div class="flex"><label>Dari <input id="lapDari" type="date"></label><label>Sampai <input id="lapSampai" type="date"></label><label>Cabang <select id="lapCabang"></select></label>
 <label>Jenis <select id="lapJenis"><option value="penjualan">Penjualan</option><option value="pengeluaran">Pengeluaran</option><option value="piutang">Piutang</option><option value="pembayaran">Pembayaran</option><option value="stok">Stok</option><option value="labarugi">Laba Rugi</option><option value="pajak">Pajak</option></select></label></div>
-<div class="flex"><button class="primary" onclick="muatLaporan()">Tampilkan Laporan</button><button class="secondary" onclick="exportLaporan()">⬇ Export Laporan (CSV bulanan)</button><button class="secondary" onclick="exportCSV()">⬇ Export Transaksi (CSV)</button><button class="secondary" onclick="backupJSON()">⬇ Backup Semua Data (JSON)</button></div>
+<div class="flex"><button class="primary" onclick="muatLaporan()">Tampilkan Laporan</button><button class="secondary" onclick="exportLaporan()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg> Export Laporan (CSV bulanan)</button><button class="secondary" onclick="exportCSV()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg> Export Transaksi (CSV)</button><button class="secondary" onclick="backupJSON()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg> Backup Semua Data (JSON)</button></div>
 <div id="laporanBox" style="margin-top:12px"></div>
 <div id="pieBox" style="margin-top:12px"></div>
 <div id="topKasirBox" style="margin-top:12px"></div></div>
@@ -684,12 +695,12 @@ body.dark .menu-item{background:#1e293b}
 <div class="flex"><label>Tanggal <input id="lbTanggal" type="date"></label><label>Cabang <select id="lbCabang"></select></label><label>Mode <select id="lbMode"><option value="rekap">Rekap</option><option value="detail">Detail</option></select></label></div>
 <button class="primary" onclick="pratinjauLaporBos()">Pratinjau Laporan</button>
 <pre id="lbPreview" style="white-space:pre-wrap;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-top:10px"></pre>
-<button class="secondary" id="lbWaBtn" onclick="kirimLaporBosWA()">💬 WHATSAPP</button> <button class="secondary" onclick="cetakLaporBos()">🖨 CETAK</button> <span id="lbWaLink"></span></div>
+<button class="secondary" id="lbWaBtn" onclick="kirimLaporBosWA()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> WHATSAPP</button> <button class="secondary" onclick="cetakLaporBos()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> CETAK</button> <span id="lbWaLink"></span></div>
 </section>
 
 <section id="pengguna">
-<div class="card form-view" id="formPengguna"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="tutupForm('pengguna')">← Kembali</button><h3 style="margin:0">Tambah / Edit Pengguna</h3></div><p style="color:#64748b;font-size:14px">Admin bisa semua menu. Kasir hanya Home, Transaksi Baru, dan Pelanggan &amp; Piutang (plus batas izin di bawah). Kalau belum ada pengguna sama sekali, login dilewati.</p>
-<input id="uId" type="hidden"><div class="flex"><input id="uNama" placeholder="Nama pengguna *"><input id="uPin" placeholder="PIN (angka) *"><select id="uPeran"><option>Kasir</option><option>Admin</option></select><select id="uCabang"><option value="">— Semua cabang —</option></select>
+<div class="card form-view" id="formPengguna"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><button class="secondary" onclick="tutupForm('pengguna')">← Kembali</button><h3 style="margin:0">Tambah / Edit Pengguna</h3></div><p style="color:#64748b;font-size:14px">Admin bisa semua menu. Kasir hanya Home, Transaksi Baru, dan Pelanggan &amp; Piutang (plus batas izin di bawah). Akun login (email + kata sandi) dibuat di dashboard Supabase; email di sini harus sama dengan email akun tersebut.</p>
+<input id="uId" type="hidden"><div class="flex"><input id="uNama" placeholder="Nama pengguna *"><input id="uEmail" type="email" placeholder="Email akun login *"><select id="uPeran"><option>Kasir</option><option>Admin</option></select><select id="uCabang"><option value="">— Semua cabang —</option></select>
 <select id="uAkses"><option>Tidak dibatasi</option><option>1 Jam</option><option>3 Jam</option><option>Hari ini</option><option>7 Hari</option><option>30 Hari</option></select></div>
 <h4>Izin Granular</h4><div id="izinBox" class="flex"></div>
 <button class="primary" onclick="simpanPengguna()">Simpan Pengguna</button> <button class="secondary" onclick="resetPengguna()">Batal</button></div>
@@ -700,9 +711,9 @@ body.dark .menu-item{background:#1e293b}
 <div class="card list-view" id="profilTokoCard"><h3>Profil Toko</h3>
 <h4 style="margin:14px 0 6px">Logo Struk</h4>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-<div><label>Logo 1 (atas struk)</label><div class="file-pick"><label class="btn-file">🖼️ Pilih Logo<input id="logoFile" type="file" accept="image/*" style="display:none" onchange="pilihLogo(this,'LogoToko')"></label><span class="file-nama" id="logoNama">Belum ada file</span></div><div style="margin-top:6px"><img id="logoPreview" alt="Logo 1" style="max-width:100px;max-height:100px;display:none;border:1px solid var(--line);border-radius:8px;padding:4px;background:#fff"></div><button class="secondary" id="logoHapusBtn" style="display:none;margin-top:6px" onclick="hapusLogo('LogoToko')">✕ Hapus</button></div>
-<div><label>Logo 2 (gambar struk &amp; WhatsApp)</label><div class="file-pick"><label class="btn-file">🖼️ Pilih Logo<input id="logo2File" type="file" accept="image/*" style="display:none" onchange="pilihLogo(this,'Logo2')"></label><span class="file-nama" id="logo2Nama">Belum ada file</span></div><div style="margin-top:6px"><img id="logo2Preview" alt="Logo 2" style="max-width:100px;max-height:100px;display:none;border:1px solid var(--line);border-radius:8px;padding:4px;background:#fff"></div><button class="secondary" id="logo2HapusBtn" style="display:none;margin-top:6px" onclick="hapusLogo('Logo2')">✕ Hapus</button></div>
-<div><label>Watermark (belakang struk)</label><div class="file-pick"><label class="btn-file">🖼️ Pilih Watermark<input id="wmFile" type="file" accept="image/*" style="display:none" onchange="pilihLogo(this,'Watermark')"></label><span class="file-nama" id="wmNama">Belum ada file</span></div><div style="margin-top:6px"><img id="wmPreview" alt="Watermark" style="max-width:100px;max-height:100px;display:none;border:1px solid var(--line);border-radius:8px;padding:4px;background:#fff"></div><button class="secondary" id="wmHapusBtn" style="display:none;margin-top:6px" onclick="hapusLogo('Watermark')">✕ Hapus</button></div>
+<div><label>Logo 1 (atas struk)</label><div class="file-pick"><label class="btn-file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg> Pilih Logo<input id="logoFile" type="file" accept="image/*" style="display:none" onchange="pilihLogo(this,'LogoToko')"></label><span class="file-nama" id="logoNama">Belum ada file</span></div><div style="margin-top:6px"><img id="logoPreview" alt="Logo 1" style="max-width:100px;max-height:100px;display:none;border:1px solid var(--line);border-radius:8px;padding:4px;background:#fff"></div><button class="secondary" id="logoHapusBtn" style="display:none;margin-top:6px" onclick="hapusLogo('LogoToko')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg> Hapus</button></div>
+<div><label>Logo 2 (gambar struk &amp; WhatsApp)</label><div class="file-pick"><label class="btn-file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg> Pilih Logo<input id="logo2File" type="file" accept="image/*" style="display:none" onchange="pilihLogo(this,'Logo2')"></label><span class="file-nama" id="logo2Nama">Belum ada file</span></div><div style="margin-top:6px"><img id="logo2Preview" alt="Logo 2" style="max-width:100px;max-height:100px;display:none;border:1px solid var(--line);border-radius:8px;padding:4px;background:#fff"></div><button class="secondary" id="logo2HapusBtn" style="display:none;margin-top:6px" onclick="hapusLogo('Logo2')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg> Hapus</button></div>
+<div><label>Watermark (belakang struk)</label><div class="file-pick"><label class="btn-file"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg> Pilih Watermark<input id="wmFile" type="file" accept="image/*" style="display:none" onchange="pilihLogo(this,'Watermark')"></label><span class="file-nama" id="wmNama">Belum ada file</span></div><div style="margin-top:6px"><img id="wmPreview" alt="Watermark" style="max-width:100px;max-height:100px;display:none;border:1px solid var(--line);border-radius:8px;padding:4px;background:#fff"></div><button class="secondary" id="wmHapusBtn" style="display:none;margin-top:6px" onclick="hapusLogo('Watermark')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg> Hapus</button></div>
 </div>
 <label>Nama Toko <input id="sNama" oninput="pratinjauProfil()"></label>
 <label>Slogan — tampil di bawah nama toko di struk (opsional) <input id="sSlogan" placeholder="Contoh: Toko Kelontong & ATK" oninput="pratinjauProfil()"></label>
@@ -748,11 +759,11 @@ body.dark .menu-item{background:#1e293b}
 <section id="katalogPublik" style="display:none"><div class="card"><div id="katalogPublikBody"><p style="color:#64748b">Memuat katalog…</p></div></div></section>
 </main>
 <nav id="bottomNav">
-  <button class="active" data-sec="dashboard" onclick="show('dashboard',this)"><span class="bn-ic">🏠</span>Beranda</button>
-  <button data-sec="kasir" onclick="show('kasir',this)"><span class="bn-ic">🛒</span>Transaksi</button>
-  <button data-sec="laporan" onclick="show('laporan',this)"><span class="bn-ic">📈</span>Laporan</button>
-  <button data-sec="master" onclick="show('master',this)"><span class="bn-ic">🗂️</span>Master</button>
-  <button data-sec="pengaturan" onclick="show('pengaturan',this)"><span class="bn-ic">⚙️</span>Pengaturan</button>
+  <button class="active" data-sec="dashboard" onclick="show('dashboard',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>Beranda</button>
+  <button data-sec="kasir" onclick="show('kasir',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>Transaksi</button>
+  <button data-sec="laporan" onclick="show('laporan',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/></svg>Laporan</button>
+  <button data-sec="master" onclick="show('master',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>Master</button>
+  <button data-sec="pengaturan" onclick="show('pengaturan',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Pengaturan</button>
 </nav>
 <script src="config.js"></script>
 <script src="supabase.js"></script>

@@ -45,7 +45,7 @@
   function parseJSON(s, fb) { try { return JSON.parse(s || ''); } catch (e) { return fb; } }
 
   /* ---------- pemetaan snake_case <-> PascalCase ---------- */
-  var SPECIAL = { id: 'ID', sku: 'SKU', json: 'JSON', wa: 'WA', url: 'URL', pin: 'PIN', hpp: 'HPP' };
+  var SPECIAL = { id: 'ID', sku: 'SKU', json: 'JSON', wa: 'WA', url: 'URL', hpp: 'HPP' };
   function snakeToPascal(s) {
     return s.split('_').map(function (p) {
       var low = p.toLowerCase();
@@ -54,7 +54,7 @@
     }).join('');
   }
   function pascalToSnake(s) {
-    // Tangani akronim: ID, SKU, JSON, WA, URL, PIN, HPP
+    // Tangani akronim: ID, SKU, JSON, WA, URL, HPP
     var out = s.replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2').replace(/([a-z0-9])([A-Z])/g, '$1_$2');
     return out.toLowerCase().replace(/_i_d$/, '_id');
   }
@@ -100,7 +100,7 @@
     pemasok: [], pembelian: [], pembelian_detail: [], pengeluaran: [],
     kas: [{ id: 'KAS-1', tanggal: TGL + ' ' + JAM, jenis: 'Masuk', keterangan: 'Penjualan TRX-8250237222', masuk: 10000, keluar: 0, saldo: 10000, cabang_id: 'CBG-UTAMA' }],
     bahan_baku: [], resep: [],
-    pengguna: [{ id: 'USR-ADMIN', nama: 'Admin', pin: '', peran: 'Admin', aktif: 'YA', izin_json: '{}', akses_transaksi: 'Tidak dibatasi', cabang_id: '' }],
+    pengguna: [{ id: 'USR-ADMIN', nama: 'Admin', email: 'admin@zpos.local', peran: 'Admin', aktif: 'YA', izin_json: '{}', akses_transaksi: 'Tidak dibatasi', cabang_id: '' }],
     retur: [], stok_cabang: [], stok_batch: [], riwayat_poin: [],
     tier_member: [
       { tier: 'Silver', min_total_beli: 500000, diskon_persen: 2, manfaat: 'Diskon 2%' },
@@ -240,10 +240,12 @@
     p.Stok = nilai; return p;
   }
   function addLog(d, pengguna, aksi, detail) {
-    var row = { ID: uid('LOG'), Tanggal: nowISO(), Pengguna: pengguna || '', Aksi: aksi, Detail: detail || '', CabangID: cabangAktifId(d) };
-    d.logs.unshift(row);
-    if (d.logs.length > 100) d.logs.length = 100;
-    persist('logs', row);
+    var row = { ID: uid('LOG'), Tanggal: nowISO(), Pengguna: pengguna || '', Aksi: aksi, Detail: detail || '', CabangID: d ? cabangAktifId(d) : '' };
+    // d boleh null (mis. saat login, sebelum loadAll): baris tetap ditulis ke DB,
+    // hanya antrean in-memory yang dilewati. Kegagalan tulis log tidak boleh
+    // menggagalkan aksi utama — ditelan diam-diam.
+    if (d && d.logs) { d.logs.unshift(row); if (d.logs.length > 100) d.logs.length = 100; }
+    try { var p = persist('logs', row); if (p && p.catch) p.catch(function () {}); } catch (e) {}
     return row;
   }
 
@@ -321,20 +323,104 @@
     DATA.ringkasan = computeRingkasan(DATA);
     return DATA;
   }
+  /* ---------- katalog publik (tanpa login) ----------
+     Katalog publik TIDAK memanggil loadAll() — sebagai anon, 34 tabel terkunci
+     RLS dan loadAll akan gagal. Data diambil lewat fungsi RPC SECURITY DEFINER
+     katalog_publik() yang hanya mengembalikan kolom aman (tanpa harga modal,
+     tanpa data toko selain nama + telepon). Di Mode Contoh, dibentuk dari data
+     lokal dengan bentuk yang sama (kunci PascalCase). */
+  async function loadKatalogPublik(id) {
+    if (MODE === 'contoh') {
+      if (!DATA) await loadAll();
+      var k = (DATA.katalog || []).find(function (x) { return String(x.ID) === String(id); }) || null;
+      var p = DATA.pengaturan || {};
+      var prods = (DATA.produk || []).filter(function (x) { return produkAktif(x) && flagYa(x.TampilkanDiKatalog); }).map(function (x) { var c = clone(x); c.Stok = stokOf(DATA, x); return c; });
+      return { katalog: k ? clone(k) : null, produk: prods, toko: { NamaToko: p.NamaToko || 'ZPOS', TeleponToko: p.TeleponToko || '' } };
+    }
+    if (!client || !client.rpc) throw new Error('Katalog tidak tersedia.');
+    var res = await client.rpc('katalog_publik', { p_id: String(id) });
+    if (res.error) throw new Error(res.error.message);
+    var d = res.data || {};
+    return { katalog: d.katalog || null, produk: d.produk || [], toko: d.toko || {} };
+  }
   function refreshRingkasan() { if (DATA) DATA.ringkasan = computeRingkasan(DATA); }
   function getData() { return DATA; }
 
-  /* ---------- login ---------- */
-  async function login(nama, pin) {
-    if (!DATA) await loadAll();
-    var list = DATA.pengguna || [];
-    if (!list.length) return { ok: true, nama: nama || 'Admin', peran: 'Admin', ID: '', IzinJSON: '{}' };
-    var u = list.find(function (x) { return String(x.Nama).toLowerCase() === String(nama || '').trim().toLowerCase(); });
-    if (!u) return { ok: false, error: 'Pengguna tidak ditemukan.' };
-    if (String(u.PIN || '') !== String(pin || '')) return { ok: false, error: 'PIN salah.' };
-    if (!boolFlag(u.Aktif, true)) return { ok: false, error: 'Pengguna tidak aktif.' };
-    addLog(DATA, u.Nama, 'Login', u.Nama + ' masuk');
-    return { ok: true, nama: u.Nama, peran: u.Peran, ID: u.ID, CabangID: u.CabangID || '', IzinJSON: u.IzinJSON || '{}', AksesTransaksi: u.AksesTransaksi || 'Tidak dibatasi' };
+  /* ---------- login (Supabase Auth) ----------
+     Mode Supabase: masuk memakai akun Supabase Auth (email + kata sandi).
+     PIN sudah tidak dipakai — kolom pin dihapus dari tabel pengguna, dan
+     login TIDAK PERNAH lagi mengunduh daftar pengguna + PIN ke browser.
+     Baris pengguna ditautkan ke akun Auth lewat auth_id; saat login pertama,
+     penautan dilakukan otomatis bila email baris cocok dengan email akun.
+     Mode Contoh: data lokal saja tanpa Supabase — cek PIN lokal seperti dulu.
+     Baris contoh tidak menyimpan PIN; PIN kosong berarti tidak berkunci. */
+  async function cariPenggunaAuth(authUser, tulisLog) {
+    var uid = authUser.id, em = String(authUser.email || '').trim().toLowerCase();
+    var row = null;
+    var q1 = await client.from('pengguna').select('*').eq('auth_id', uid).maybeSingle();
+    if (q1.error) return { ok: false, error: 'Gagal membaca data pengguna: ' + q1.error.message };
+    row = q1.data || null;
+    if (!row && em) {
+      var q2 = await client.from('pengguna').select('*').eq('email', em).maybeSingle();
+      if (q2.error) return { ok: false, error: 'Gagal membaca data pengguna: ' + q2.error.message };
+      row = q2.data || null;
+      if (row) {
+        // Tautan otomatis saat login pertama: isi auth_id baris yang email-nya cocok.
+        var up = await client.from('pengguna').update({ auth_id: uid }).eq('id', row.id);
+        if (up.error) return { ok: false, error: 'Akun belum tertaut ke pengguna toko. Minta Admin menautkan lewat SQL Editor.' };
+        row.auth_id = uid;
+      }
+    }
+    if (!row) return { ok: false, error: 'Akun belum terdaftar sebagai pengguna toko.' };
+    if (!boolFlag(row.aktif, true)) return { ok: false, error: 'Pengguna tidak aktif.' };
+    var u = toPascal(row);
+    if (tulisLog) { try { addLog(DATA, u.Nama, 'Login', u.Nama + ' masuk'); } catch (e) {} }
+    return { ok: true, nama: u.Nama, peran: u.Peran, ID: u.ID, CabangID: u.CabangID || '', IzinJSON: u.IzinJSON || '{}', AksesTransaksi: u.AksesTransaksi || 'Tidak dibatasi', email: em };
+  }
+  async function login(email, kataSandi) {
+    if (MODE === 'contoh') {
+      if (!DATA) await loadAll();
+      var list = DATA.pengguna || [];
+      if (!list.length) return { ok: true, nama: 'Admin', peran: 'Admin', ID: '', IzinJSON: '{}' };
+      var em = String(email || '').trim().toLowerCase();
+      var u = list.find(function (x) { return String(x.Email || '').toLowerCase() === em; }) || list[0];
+      var pinBenar = (u.Pin == null ? '' : String(u.Pin));
+      if (pinBenar !== String(kataSandi || '')) return { ok: false, error: 'PIN salah.' };
+      if (!boolFlag(u.Aktif, true)) return { ok: false, error: 'Pengguna tidak aktif.' };
+      try { addLog(DATA, u.Nama, 'Login', u.Nama + ' masuk (Mode Contoh)'); } catch (e) {}
+      return { ok: true, nama: u.Nama, peran: u.Peran, ID: u.ID, CabangID: u.CabangID || '', IzinJSON: u.IzinJSON || '{}', AksesTransaksi: u.AksesTransaksi || 'Tidak dibatasi' };
+    }
+    if (!client || !client.auth || !client.auth.signInWithPassword) return { ok: false, error: 'Login tidak tersedia (Auth tidak termuat). Muat ulang halaman.' };
+    var emLogin = String(email || '').trim().toLowerCase();
+    if (!emLogin || !kataSandi) return { ok: false, error: 'Isi email dan kata sandi.' };
+    var res;
+    try {
+      res = await client.auth.signInWithPassword({ email: emLogin, password: String(kataSandi) });
+    } catch (e) { return { ok: false, error: 'Login gagal: ' + (e.message || e) }; }
+    if ((res && res.error) || !res || !res.data || !res.data.user) return { ok: false, error: 'Email atau kata sandi salah.' };
+    var sesi = await cariPenggunaAuth(res.data.user, true);
+    if (!sesi.ok) { try { await client.auth.signOut(); } catch (e) {} return sesi; }
+    return sesi;
+  }
+  // Pulihkan sesi Auth yang tersimpan (mis. setelah muat ulang halaman).
+  // Dipakai boot sebelum loadAll — TIDAK menulis log login (bukan login baru).
+  async function getSessionUser() {
+    if (MODE === 'contoh') return null;
+    if (!client || !client.auth || !client.auth.getSession) return null;
+    var res;
+    try { res = await client.auth.getSession(); } catch (e) { return null; }
+    var sessUser = res && res.data && res.data.session && res.data.session.user;
+    if (!sessUser) return null;
+    try {
+      var sesi = await cariPenggunaAuth(sessUser, false);
+      return sesi.ok ? sesi : null;
+    } catch (e) { return null; }
+  }
+  async function logout() {
+    if (MODE === 'supabase' && client && client.auth && client.auth.signOut) {
+      try { await client.auth.signOut(); } catch (e) {}
+    }
+    return { ok: true };
   }
 
   /* ---------- promo ---------- */
@@ -1081,7 +1167,11 @@
   async function upsertPengguna(payload) {
     if (!DATA) await loadAll();
     var exPgn = payload.ID ? (DATA.pengguna || []).find(function (x) { return String(x.ID) === String(payload.ID); }) : null;
-    var row = { ID: payload.ID || '', Nama: payload.Nama, PIN: String(payload.PIN || ''), Peran: payload.Peran || 'Kasir', Aktif: exPgn ? exPgn.Aktif : true, IzinJSON: payload.IzinJSON || '{}', AksesTransaksi: payload.AksesTransaksi || 'Tidak dibatasi', CabangID: payload.CabangID || '' };
+    // Email adalah kunci penautan ke akun Supabase Auth (login pertama menautkan
+    // auth_id otomatis bila email cocok). Email kosong pada edit mempertahankan
+    // email lama; auth_id tidak pernah ditulis dari form ini.
+    var emailBaru = String(payload.Email || (exPgn ? exPgn.Email : '') || '').trim().toLowerCase();
+    var row = { ID: payload.ID || '', Nama: payload.Nama, Email: emailBaru, Peran: payload.Peran || 'Kasir', Aktif: exPgn ? exPgn.Aktif : true, IzinJSON: payload.IzinJSON || '{}', AksesTransaksi: payload.AksesTransaksi || 'Tidak dibatasi', CabangID: payload.CabangID || '' };
     return upsertInto('pengguna', 'pengguna', row, 'USR');
   }
   async function hapusPengguna(payload) { if (!DATA) await loadAll(); hapusDari('pengguna', 'pengguna', payload.id); return { ok: true }; }
@@ -1435,7 +1525,8 @@
   window.DB = {
     mode: MODE, configured: !!CONFIGURED, isSample: MODE === 'contoh',
     getData: getData, refreshRingkasan: refreshRingkasan,
-    loadAll: loadAll, login: login, saveTransaksi: saveTransaksi,
+    loadAll: loadAll, login: login, getSessionUser: getSessionUser, logout: logout,
+    loadKatalogPublik: loadKatalogPublik, saveTransaksi: saveTransaksi,
     upsertProduk: upsertProduk, hapusProduk: hapusProduk, nonaktifkanProduk: nonaktifkanProduk,
     upsertPelanggan: upsertPelanggan, simpanPengeluaran: simpanPengeluaran,
     simpanUangKas: simpanUangKas, simpanPembelian: simpanPembelian,
