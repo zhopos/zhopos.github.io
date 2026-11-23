@@ -712,8 +712,8 @@
     var row = {
       ID: payload.ID || '', Nama: payload.Nama, Telepon: payload.Telepon || '', Alamat: payload.Alamat || '',
       TotalBeli: Number(payload.TotalBeli || 0), Piutang: Number(payload.Piutang || 0),
-      Poin: Number(payload.Poin || 0), Tier: payload.Tier || '', TanggalLahir: payload.TanggalLahir || '',
-      TerakhirBeli: payload.TerakhirBeli || ''
+      Poin: Number(payload.Poin || 0), Tier: payload.Tier || '', TanggalLahir: payload.TanggalLahir || null,
+      TerakhirBeli: payload.TerakhirBeli || null
     };
     var ex = row.ID ? DATA.pelanggan.find(function (x) { return x.ID === row.ID; }) : null;
     if (ex) { row.TotalBeli = ex.TotalBeli; row.Piutang = ex.Piutang; row.Poin = ex.Poin; row.TerakhirBeli = ex.TerakhirBeli; }
@@ -1071,7 +1071,7 @@
   /* ---------- promo / tier / meja / dapur ---------- */
   async function upsertPromo(payload) {
     if (!DATA) await loadAll();
-    var row = { ID: payload.ID || '', Nama: payload.Nama, Jenis: payload.Jenis || 'DiskonPersen', SyaratJSON: payload.SyaratJSON || '', Nilai: Number(payload.Nilai || 0), Mulai: payload.Mulai || '', Selesai: payload.Selesai || '', JamMulai: payload.JamMulai || '', JamSelesai: payload.JamSelesai || '', Hari: payload.Hari || '', Aktif: boolFlag(payload.Aktif, true), CabangID: payload.CabangID || '' };
+    var row = { ID: payload.ID || '', Nama: payload.Nama, Jenis: payload.Jenis || 'DiskonPersen', SyaratJSON: payload.SyaratJSON || '', Nilai: Number(payload.Nilai || 0), Mulai: payload.Mulai || null, Selesai: payload.Selesai || null, JamMulai: payload.JamMulai || null, JamSelesai: payload.JamSelesai || null, Hari: payload.Hari || '', Aktif: boolFlag(payload.Aktif, true), CabangID: payload.CabangID || '' };
     return upsertInto('promo', 'promo', row, 'PRM');
   }
   async function hapusPromo(payload) { if (!DATA) await loadAll(); hapusDari('promo', 'promo', payload.id); return { ok: true }; }

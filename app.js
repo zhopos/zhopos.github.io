@@ -460,7 +460,7 @@ function renderAll() {
   vsEl.textContent = (pct >= 0 ? '+' : '') + pct + '% vs kemarin';
   vsEl.classList.toggle('down', pct < 0);
   document.getElementById('heroUser').textContent = currentUser ? ('Halo, ' + currentUser.nama + ' (' + currentUser.peran + ') — kasir siap melayani hari ini.') : 'Kasir siap melayani hari ini.';
-  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • ' + currentUser.peran + ' • v4-28') : 'Kasir • v4-28';
+  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • ' + currentUser.peran + ' • v4-29') : 'Kasir • v4-29';
   var bb = document.getElementById('bellBadge');
   if (bb) { var sm = Number(r.stokMenipis || 0); bb.style.display = sm > 0 ? 'flex' : 'none'; bb.textContent = sm > 99 ? '99+' : String(sm); }
   isiNotifPanel();
@@ -2052,8 +2052,10 @@ async function muatPengingatPiutang() {
 }
 async function simpanPelanggan() {
   var nama = document.getElementById('plNama').value; if (!nama) return alert('Nama wajib diisi.');
-  await DB.upsertPelanggan({ ID: document.getElementById('plId').value || '', Nama: nama, Telepon: document.getElementById('plTelp').value, Alamat: document.getElementById('plAlamat').value, TanggalLahir: document.getElementById('plLahir').value });
-  await loadData(); resetPelanggan(); tampilInfo('Pelanggan tersimpan.');
+  try {
+    await DB.upsertPelanggan({ ID: document.getElementById('plId').value || '', Nama: nama, Telepon: document.getElementById('plTelp').value, Alamat: document.getElementById('plAlamat').value, TanggalLahir: document.getElementById('plLahir').value });
+    await loadData(); resetPelanggan(); tampilInfo('Pelanggan tersimpan.');
+  } catch (e) { tampilError('Gagal menyimpan pelanggan: ' + (e.message || e)); }
 }
 async function lunasiSemua(nama, el) { if (!await konfirmasi('Lunasi semua piutang?', 'Semua piutang pelanggan ' + nama + ' akan ditandai lunas.')) return; try { var res = await DB.lunasiSemua({ pelanggan: nama }); tampilInfo('Dilunasi ' + (res.jumlah || 0) + ' transaksi, total ' + rp(res.total || 0)); await loadData(); } catch (e) { tampilError('Gagal melunasi: ' + (e.message || e)); } }
 async function koreksiPoin() {
