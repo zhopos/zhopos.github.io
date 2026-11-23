@@ -124,6 +124,22 @@ function jawabKonfirm(ya) {
   document.getElementById('konfirmBox').style.display = 'none';
   if (_konfirmJanji) { var s = _konfirmJanji; _konfirmJanji = null; s(!!ya); }
 }
+/* Popup info di dalam aplikasi (pengganti alert() untuk Bantuan/Tentang):
+   tampilInfoModal(judul, pesan) membuka modal kartu putih yang sama dengan
+   konfirmasi (backdrop + .konfirm-card); tutupInfoModal() menutupnya lewat
+   tombol Tutup atau ketuk luar popup.
+   Nama sengaja berbeda dari tampilInfo(msg) lama — itu helper toast sukses
+   yang dipakai ~50 tempat; dua fungsi tampilInfo akan saling menimpa. */
+function tampilInfoModal(judul, pesan) {
+  document.getElementById('infoJudul').textContent = judul;
+  document.getElementById('infoPesan').textContent = pesan;
+  document.getElementById('infoBackdrop').style.display = 'block';
+  document.getElementById('infoBox').style.display = 'block';
+}
+function tutupInfoModal() {
+  document.getElementById('infoBackdrop').style.display = 'none';
+  document.getElementById('infoBox').style.display = 'none';
+}
 /* ---------- PANEL NOTIFIKASI (lonceng) ---------- */
 function toggleNotifPanel() {
   var p = document.getElementById('notifPanel'), b = document.getElementById('notifBackdrop');
@@ -163,7 +179,7 @@ function sembunyikanHPP() {
 }
 function hideLoading() { var l = document.getElementById('loading'); if (l) l.style.display = 'none'; }
 /* ---------- IKON / FORMAT RINGKAS ---------- */
-/* Ikon outline v4-25 (sistem sama seperti v4-24): viewBox 0 0 24 24,
+/* Ikon outline v4-26 (sistem sama seperti v4-25): viewBox 0 0 24 24,
    fill none, stroke currentColor, stroke-width 2, round caps/joins.
    ikon() SELALU menulis width/height eksplisit di tag SVG — ikon yang
    disuntik lewat innerHTML tidak boleh mengandalkan CSS saja (tanpa
@@ -443,7 +459,7 @@ function renderAll() {
   vsEl.textContent = (pct >= 0 ? '+' : '') + pct + '% vs kemarin';
   vsEl.classList.toggle('down', pct < 0);
   document.getElementById('heroUser').textContent = currentUser ? ('Halo, ' + currentUser.nama + ' (' + currentUser.peran + ') — kasir siap melayani hari ini.') : 'Kasir siap melayani hari ini.';
-  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • ' + currentUser.peran) : 'Kasir • v4-25';
+  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • ' + currentUser.peran + ' • v4-26') : 'Kasir • v4-26';
   var bb = document.getElementById('bellBadge');
   if (bb) { var sm = Number(r.stokMenipis || 0); bb.style.display = sm > 0 ? 'flex' : 'none'; bb.textContent = sm > 99 ? '99+' : String(sm); }
   isiNotifPanel();
