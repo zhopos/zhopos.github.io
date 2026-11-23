@@ -689,6 +689,7 @@
     return upsertInto('produk', 'produk', row, 'PRD');
   }
   async function hapusProduk(id) { if (!DATA) await loadAll(); await hapusDari('produk', 'produk', id); return { ok: true }; }
+  async function hapusPelanggan(id) { if (!DATA) await loadAll(); await hapusDari('pelanggan', 'pelanggan', id); return { ok: true }; }
   // Nonaktifkan produk (dipakai bila produk sudah pernah terjual/dibeli dan
   // database menolak hapus). upsertProduk tidak bisa dipakai di sini karena
   // ia selalu menulis Aktif: true — jadi PATCH langsung kolom aktif saja.
@@ -1528,7 +1529,7 @@
     loadAll: loadAll, login: login, getSessionUser: getSessionUser, logout: logout,
     loadKatalogPublik: loadKatalogPublik, saveTransaksi: saveTransaksi,
     upsertProduk: upsertProduk, hapusProduk: hapusProduk, nonaktifkanProduk: nonaktifkanProduk,
-    upsertPelanggan: upsertPelanggan, simpanPengeluaran: simpanPengeluaran,
+    upsertPelanggan: upsertPelanggan, hapusPelanggan: hapusPelanggan, simpanPengeluaran: simpanPengeluaran,
     simpanUangKas: simpanUangKas, simpanPembelian: simpanPembelian,
     prosesPembelian: prosesPembelian, cicilUtang: cicilUtang, simpanRetur: simpanRetur,
     lunasiSemua: lunasiSemua, lunasiSemuaPelanggan: lunasiSemua,

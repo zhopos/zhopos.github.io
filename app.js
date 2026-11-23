@@ -460,7 +460,7 @@ function renderAll() {
   vsEl.textContent = (pct >= 0 ? '+' : '') + pct + '% vs kemarin';
   vsEl.classList.toggle('down', pct < 0);
   document.getElementById('heroUser').textContent = currentUser ? ('Halo, ' + currentUser.nama + ' (' + currentUser.peran + ') — kasir siap melayani hari ini.') : 'Kasir siap melayani hari ini.';
-  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • ' + currentUser.peran + ' • v4-29') : 'Kasir • v4-29';
+  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • ' + currentUser.peran + ' • v4-30') : 'Kasir • v4-30';
   var bb = document.getElementById('bellBadge');
   if (bb) { var sm = Number(r.stokMenipis || 0); bb.style.display = sm > 0 ? 'flex' : 'none'; bb.textContent = sm > 99 ? '99+' : String(sm); }
   isiNotifPanel();
@@ -1565,7 +1565,7 @@ function muatCepat(id) {
   setModeKasir('reguler');
   show('kasir', document.querySelector('nav button.menu[data-sec="kasir"]')); renderCart();
 }
-async function hapusCepat(id, el) { if (!await konfirmasi('Hapus template?', 'Template transaksi cepat ini akan dihapus.')) return; try { await DB.hapusCepat({ id: id }); await loadData(); tampilInfo('Template dihapus.'); } catch (e) { tampilError('Gagal menghapus template: ' + (e.message || e)); } }
+async function hapusCepat(id, el) { if (!await konfirmasi('Hapus template?', 'Template transaksi cepat ini akan dihapus.', 'Ya, Hapus', 'danger')) return; try { await DB.hapusCepat({ id: id }); await loadData(); tampilInfo('Template dihapus.'); } catch (e) { tampilError('Gagal menghapus template: ' + (e.message || e)); } }
 async function parkirTransaksi() {
   if (!cart.length) return alert('Keranjang masih kosong.');
   var h = hitungCart();
@@ -1578,7 +1578,7 @@ async function lanjutkanTertunda(id) {
   cart = items.map(function (i) { return { id: i.id || i.ProdukID || '', nama: i.nama || i.Nama || '', Harga: Number(i.Harga || 0), modal: 0, Qty: Number(i.Qty || 1), diskonItem: 0, satuanDipakai: '', hargaLainLabel: '' }; });
   show('kasir', document.querySelector('nav button.menu[data-sec="kasir"]')); renderCart();
 }
-async function hapusTertunda(id, el) { if (!await konfirmasi('Hapus transaksi tertunda?', 'Transaksi tertunda ini akan dihapus.')) return; try { await DB.hapusTertunda({ id: id }); await loadData(); tampilInfo('Transaksi tertunda dihapus.'); } catch (e) { tampilError('Gagal menghapus transaksi tertunda: ' + (e.message || e)); } }
+async function hapusTertunda(id, el) { if (!await konfirmasi('Hapus transaksi tertunda?', 'Transaksi tertunda ini akan dihapus.', 'Ya, Hapus', 'danger')) return; try { await DB.hapusTertunda({ id: id }); await loadData(); tampilInfo('Transaksi tertunda dihapus.'); } catch (e) { tampilError('Gagal menghapus transaksi tertunda: ' + (e.message || e)); } }
 
 /* ---------- PRODUK ---------- */
 function renderProdukTable() {
@@ -1945,7 +1945,7 @@ function editItemBeli(i) {
 function hapusItemBeliList(i) { beliItems.splice(i, 1); renderBeliItems(); hitungTotalBeli(); }
 async function hapusItemBeliForm() {
   if (beliItemIndex < 0) return;
-  if (!await konfirmasi('Hapus item?', 'Item ini akan dihapus dari pembelian ini.')) return;
+  if (!await konfirmasi('Hapus item?', 'Item ini akan dihapus dari pembelian ini.', 'Ya, Hapus', 'danger')) return;
   beliItems.splice(beliItemIndex, 1); beliItemIndex = -1;
   renderBeliItems(); hitungTotalBeli();
   bukaForm('pembelian', 'formPembelian');
@@ -2034,7 +2034,7 @@ function renderPelanggan() {
   var hanyaPiutang = document.getElementById('plFilterPiutang').checked;
   var list = (DATA.pelanggan || []).filter(function (p) { return !hanyaPiutang || Number(p.Piutang || 0) > 0; });
   document.getElementById('pelangganTable').innerHTML = list.map(function (p) {
-    return '<div class="cart-item"><span><b>' + esc(p.Nama) + '</b><br><small>' + esc(p.Telepon || '') + ' • ' + esc(tierOtomatis(p)) + ' • Poin ' + (p.Poin || 0) + ' • Piutang ' + rp(p.Piutang || 0) + '<br>Terakhir beli: ' + esc(p.TerakhirBeli || '—') + '</small></span><span><button class="secondary" onclick="editPelanggan(\'' + esc(p.ID) + '\')">Edit</button> <button class="secondary" onclick="lunasiSemua(\'' + escJS(p.Nama) + '\', this)">Lunasi Semua</button></span></div>';
+    return '<div class="cart-item"><span><b>' + esc(p.Nama) + '</b><br><small>' + esc(p.Telepon || '') + ' • ' + esc(tierOtomatis(p)) + ' • Poin ' + (p.Poin || 0) + ' • Piutang ' + rp(p.Piutang || 0) + '<br>Terakhir beli: ' + esc(p.TerakhirBeli || '—') + '</small></span><span><button class="secondary" onclick="editPelanggan(\'' + esc(p.ID) + '\')">Edit</button> <button class="secondary" onclick="lunasiSemua(\'' + escJS(p.Nama) + '\', this)">Lunasi Semua</button> <button class="danger" onclick="hapusPelanggan(\'' + esc(p.ID) + '\', this)">Hapus</button></span></div>';
   }).join('') || 'Belum ada pelanggan.';
 }
 function editPelanggan(id) {
@@ -2043,6 +2043,27 @@ function editPelanggan(id) {
   show('pelanggan', document.querySelector('nav button.menu[data-sec="pelanggan"]')); bukaForm('pelanggan');
 }
 function resetPelanggan() { ['plId', 'plNama', 'plTelp', 'plAlamat', 'plLahir'].forEach(function (i) { document.getElementById(i).value = ''; }); tutupForm('pelanggan'); }
+async function hapusPelanggan(id, el) {
+  var pl = (DATA.pelanggan || []).find(function (x) { return String(x.ID) === String(id); });
+  var nama = pl ? pl.Nama : 'pelanggan ini';
+  // Pelanggan bawaan "Umum" dipakai semua transaksi tanpa pelanggan — tidak boleh dihapus.
+  if (pl && pl.Nama === 'Umum') {
+    await konfirmasi('Tidak bisa dihapus', 'Pelanggan "Umum" adalah pelanggan bawaan yang dipakai untuk transaksi tanpa pelanggan, jadi tidak bisa dihapus.', 'Mengerti', 'primary');
+    return;
+  }
+  // Pelanggan yang sudah punya riwayat transaksi tidak bisa dihapus supaya
+  // riwayat transaksi tetap benar (transaksi menyimpan nama pelanggan sebagai
+  // teks; riwayat poin pelanggan_id ON DELETE CASCADE ikut terhapus).
+  var jmlTrx = (DATA.transaksi || []).filter(function (t) { return pl && t.Pelanggan === pl.Nama; }).length;
+  var pernahTransaksi = jmlTrx > 0 || Number(pl ? pl.TotalBeli || 0 : 0) > 0 || Number(pl ? pl.Piutang || 0 : 0) > 0;
+  if (pernahTransaksi) {
+    await konfirmasi('Tidak bisa dihapus', 'Pelanggan "' + nama + '" sudah pernah bertransaksi (' + jmlTrx + ' transaksi, total beli ' + rp(pl.TotalBeli || 0) + '), jadi tidak bisa dihapus supaya riwayat transaksi tetap benar.', 'Mengerti', 'primary');
+    return;
+  }
+  if (!await konfirmasi('Hapus pelanggan?', 'Pelanggan "' + nama + '" akan dihapus permanen.', 'Ya, Hapus', 'danger')) return;
+  try { await DB.hapusPelanggan(id); await loadData(); tutupForm('pelanggan'); tampilInfo('Pelanggan dihapus.'); }
+  catch (e) { tampilError('Gagal menghapus pelanggan: ' + (e.message || e)); }
+}
 async function muatPengingatPiutang() {
   try {
     var res = await DB.pengingatPiutang();
@@ -2057,7 +2078,7 @@ async function simpanPelanggan() {
     await loadData(); resetPelanggan(); tampilInfo('Pelanggan tersimpan.');
   } catch (e) { tampilError('Gagal menyimpan pelanggan: ' + (e.message || e)); }
 }
-async function lunasiSemua(nama, el) { if (!await konfirmasi('Lunasi semua piutang?', 'Semua piutang pelanggan ' + nama + ' akan ditandai lunas.')) return; try { var res = await DB.lunasiSemua({ pelanggan: nama }); tampilInfo('Dilunasi ' + (res.jumlah || 0) + ' transaksi, total ' + rp(res.total || 0)); await loadData(); } catch (e) { tampilError('Gagal melunasi: ' + (e.message || e)); } }
+async function lunasiSemua(nama, el) { if (!await konfirmasi('Lunasi semua piutang?', 'Semua piutang pelanggan ' + nama + ' akan ditandai lunas.', 'Ya, Lunasi', 'primary')) return; try { var res = await DB.lunasiSemua({ pelanggan: nama }); tampilInfo('Dilunasi ' + (res.jumlah || 0) + ' transaksi, total ' + rp(res.total || 0)); await loadData(); } catch (e) { tampilError('Gagal melunasi: ' + (e.message || e)); } }
 async function koreksiPoin() {
   if (currentUser && currentUser.peran !== 'Admin') return alert('Koreksi poin hanya untuk Admin.');
   var id = document.getElementById('poinPelanggan').value; var jumlah = Number(document.getElementById('poinJumlah').value || 0);
@@ -2098,7 +2119,7 @@ async function simpanMeja() {
   await DB.upsertMeja({ Nama: nama, CabangID: cabangAktifId() });
   document.getElementById('mjNama').value = ''; await loadData(); tutupForm('meja'); tampilInfo('Meja ditambah.');
 }
-async function hapusMeja(id, el) { if (!await konfirmasi('Hapus meja?', 'Meja ini akan dihapus dari daftar.')) return; try { await DB.hapusMeja({ id: id }); await loadData(); tampilInfo('Meja dihapus.'); } catch (e) { tampilError('Gagal menghapus meja: ' + (e.message || e)); } }
+async function hapusMeja(id, el) { if (!await konfirmasi('Hapus meja?', 'Meja ini akan dihapus dari daftar.', 'Ya, Hapus', 'danger')) return; try { await DB.hapusMeja({ id: id }); await loadData(); tampilInfo('Meja dihapus.'); } catch (e) { tampilError('Gagal menghapus meja: ' + (e.message || e)); } }
 async function muatDapur() {
   try {
     var res = await DB.getDapur({ cabangId: cabangAktifId() });
@@ -2197,10 +2218,12 @@ async function simpanPromo() {
   var nama = document.getElementById('prmNama').value; if (!nama) return alert('Nama promo wajib diisi.');
   var syarat = document.getElementById('prmSyarat').value;
   try { if (syarat) JSON.parse(syarat); } catch (e) { return alert('Syarat JSON tidak valid.'); }
-  await DB.upsertPromo({ ID: document.getElementById('prmId').value || '', Nama: nama, Jenis: document.getElementById('prmJenis').value, Nilai: parseUang(document.getElementById('prmNilai').value), SyaratJSON: syarat, Mulai: document.getElementById('prmMulai').value, Selesai: document.getElementById('prmSelesai').value, JamMulai: document.getElementById('prmJamMulai').value, JamSelesai: document.getElementById('prmJamSelesai').value, Hari: document.getElementById('prmHari').value, Aktif: true, CabangID: document.getElementById('prmCabang').value || cabangAktifId() });
-  await loadData(); resetPromo(); tampilInfo('Promo tersimpan.');
+  try {
+    await DB.upsertPromo({ ID: document.getElementById('prmId').value || '', Nama: nama, Jenis: document.getElementById('prmJenis').value, Nilai: parseUang(document.getElementById('prmNilai').value), SyaratJSON: syarat, Mulai: document.getElementById('prmMulai').value, Selesai: document.getElementById('prmSelesai').value, JamMulai: document.getElementById('prmJamMulai').value, JamSelesai: document.getElementById('prmJamSelesai').value, Hari: document.getElementById('prmHari').value, Aktif: true, CabangID: document.getElementById('prmCabang').value || cabangAktifId() });
+    await loadData(); resetPromo(); tampilInfo('Promo tersimpan.');
+  } catch (e) { tampilError('Gagal menyimpan promo: ' + (e.message || e)); }
 }
-async function hapusPromo(id, el) { if (!await konfirmasi('Hapus promo?', 'Promo ini akan dihapus.')) return; try { await DB.hapusPromo({ id: id }); await loadData(); tampilInfo('Promo dihapus.'); } catch (e) { tampilError('Gagal menghapus promo: ' + (e.message || e)); } }
+async function hapusPromo(id, el) { if (!await konfirmasi('Hapus promo?', 'Promo ini akan dihapus.', 'Ya, Hapus', 'danger')) return; try { await DB.hapusPromo({ id: id }); await loadData(); tampilInfo('Promo dihapus.'); } catch (e) { tampilError('Gagal menghapus promo: ' + (e.message || e)); } }
 async function catatTier() {
   var nama = document.getElementById('tierNama').value; if (!nama) return alert('Nama tier wajib diisi.');
   await DB.upsertTier({ tier: nama, minTotalBeli: parseUang(document.getElementById('tierMin').value), diskonPersen: document.getElementById('tierDiskon').value, manfaat: document.getElementById('tierManfaat').value });
@@ -2222,17 +2245,17 @@ function renderMaster() {
   document.getElementById('pegawaiTable').innerHTML = '<table><tr><th>Nama</th><th>Jabatan</th><th>Target</th><th>Komisi</th><th></th></tr>' + (DATA.pegawai || []).map(function (p) { return '<tr><td>' + esc(p.Nama) + '</td><td>' + esc(p.Jabatan || '') + '</td><td>' + rp(p.Target || 0) + '</td><td>' + (p.KomisiPersen || 0) + '%</td><td><button class="danger" onclick="hapusPegawai(\'' + esc(p.ID) + '\', this)">Hapus</button></td></tr>'; }).join('') + '</table>';
 }
 async function simpanGrup() { var n = document.getElementById('gNama').value; if (!n) return alert('Nama grup wajib diisi.'); await DB.upsertGrup({ id: document.getElementById('gId').value || '', nama: n }); document.getElementById('gNama').value = ''; await loadData(); tutupForm('master'); tampilInfo('Grup tersimpan.'); }
-async function hapusGrup(id, el) { if (!await konfirmasi('Hapus grup?', 'Grup ini akan dihapus.')) return; try { await DB.hapusGrup({ id: id }); await loadData(); tampilInfo('Grup dihapus.'); } catch (e) { tampilError('Gagal menghapus grup: ' + (e.message || e)); } }
+async function hapusGrup(id, el) { if (!await konfirmasi('Hapus grup?', 'Grup ini akan dihapus.', 'Ya, Hapus', 'danger')) return; try { await DB.hapusGrup({ id: id }); await loadData(); tampilInfo('Grup dihapus.'); } catch (e) { tampilError('Gagal menghapus grup: ' + (e.message || e)); } }
 async function simpanSatuan() { var n = document.getElementById('stNama').value; if (!n) return alert('Nama satuan wajib diisi.'); await DB.upsertSatuan({ id: document.getElementById('stId').value || '', nama: n, singkatan: document.getElementById('stSingkat').value, desimal: document.getElementById('stDesimal').value }); document.getElementById('stNama').value = ''; document.getElementById('stSingkat').value = ''; await loadData(); tutupForm('master'); tampilInfo('Satuan tersimpan.'); }
-async function hapusSatuan(id, el) { if (!await konfirmasi('Hapus satuan?', 'Satuan ini akan dihapus.')) return; try { await DB.hapusSatuan({ id: id }); await loadData(); tampilInfo('Satuan dihapus.'); } catch (e) { tampilError('Gagal menghapus satuan: ' + (e.message || e)); } }
+async function hapusSatuan(id, el) { if (!await konfirmasi('Hapus satuan?', 'Satuan ini akan dihapus.', 'Ya, Hapus', 'danger')) return; try { await DB.hapusSatuan({ id: id }); await loadData(); tampilInfo('Satuan dihapus.'); } catch (e) { tampilError('Gagal menghapus satuan: ' + (e.message || e)); } }
 async function simpanJenisBayar() { var n = document.getElementById('jbNama').value; if (!n) return alert('Nama wajib diisi.'); await DB.upsertJenisBayar({ id: document.getElementById('jbId').value || '', nama: n }); document.getElementById('jbNama').value = ''; await loadData(); tutupForm('master'); tampilInfo('Jenis bayar tersimpan.'); }
-async function hapusJenisBayar(id, el) { if (!await konfirmasi('Hapus jenis bayar?', 'Jenis bayar ini akan dihapus.')) return; try { await DB.hapusJenisBayar({ id: id }); await loadData(); tampilInfo('Jenis bayar dihapus.'); } catch (e) { tampilError('Gagal menghapus jenis bayar: ' + (e.message || e)); } }
+async function hapusJenisBayar(id, el) { if (!await konfirmasi('Hapus jenis bayar?', 'Jenis bayar ini akan dihapus.', 'Ya, Hapus', 'danger')) return; try { await DB.hapusJenisBayar({ id: id }); await loadData(); tampilInfo('Jenis bayar dihapus.'); } catch (e) { tampilError('Gagal menghapus jenis bayar: ' + (e.message || e)); } }
 async function simpanItemPengeluaran() { var n = document.getElementById('ipNama').value; if (!n) return alert('Nama wajib diisi.'); await DB.upsertItemPengeluaran({ id: document.getElementById('ipId').value || '', nama: n }); document.getElementById('ipNama').value = ''; await loadData(); tutupForm('master'); tampilInfo('Item tersimpan.'); }
-async function hapusItemPengeluaran(id, el) { if (!await konfirmasi('Hapus item pengeluaran?', 'Item ini akan dihapus.')) return; try { await DB.hapusItemPengeluaran({ id: id }); await loadData(); tampilInfo('Item dihapus.'); } catch (e) { tampilError('Gagal menghapus item: ' + (e.message || e)); } }
+async function hapusItemPengeluaran(id, el) { if (!await konfirmasi('Hapus item pengeluaran?', 'Item ini akan dihapus.', 'Ya, Hapus', 'danger')) return; try { await DB.hapusItemPengeluaran({ id: id }); await loadData(); tampilInfo('Item dihapus.'); } catch (e) { tampilError('Gagal menghapus item: ' + (e.message || e)); } }
 async function simpanTeks() { var n = document.getElementById('txNama').value; if (!n) return alert('Nama wajib diisi.'); await DB.simpanTeks({ id: document.getElementById('txId').value || '', nama: n, keterangan: document.getElementById('txKet').value, jenis: document.getElementById('txJenis').value }); document.getElementById('txNama').value = ''; document.getElementById('txKet').value = ''; await loadData(); tutupForm('master'); tampilInfo('Teks tersimpan.'); }
-async function hapusTeks(id, el) { if (!await konfirmasi('Hapus teks?', 'Teks ini akan dihapus.')) return; try { await DB.hapusTeks({ id: id }); await loadData(); tampilInfo('Teks dihapus.'); } catch (e) { tampilError('Gagal menghapus teks: ' + (e.message || e)); } }
+async function hapusTeks(id, el) { if (!await konfirmasi('Hapus teks?', 'Teks ini akan dihapus.', 'Ya, Hapus', 'danger')) return; try { await DB.hapusTeks({ id: id }); await loadData(); tampilInfo('Teks dihapus.'); } catch (e) { tampilError('Gagal menghapus teks: ' + (e.message || e)); } }
 async function simpanPegawai() { var n = document.getElementById('pgwNama').value; if (!n) return alert('Nama wajib diisi.'); await DB.upsertPegawai({ id: document.getElementById('pgwId').value || '', nama: n, telepon: document.getElementById('pgwTelp').value, jabatan: document.getElementById('pgwJabatan').value, target: parseUang(document.getElementById('pgwTarget').value), komisiPersen: document.getElementById('pgwKomisi').value }); ['pgwNama', 'pgwTelp', 'pgwJabatan', 'pgwTarget', 'pgwKomisi'].forEach(function (i) { document.getElementById(i).value = ''; }); await loadData(); tutupForm('master'); tampilInfo('Pegawai tersimpan.'); }
-async function hapusPegawai(id, el) { if (!await konfirmasi('Hapus pegawai?', 'Pegawai ini akan dihapus.')) return; try { await DB.hapusPegawai({ id: id }); await loadData(); tampilInfo('Pegawai dihapus.'); } catch (e) { tampilError('Gagal menghapus pegawai: ' + (e.message || e)); } }
+async function hapusPegawai(id, el) { if (!await konfirmasi('Hapus pegawai?', 'Pegawai ini akan dihapus.', 'Ya, Hapus', 'danger')) return; try { await DB.hapusPegawai({ id: id }); await loadData(); tampilInfo('Pegawai dihapus.'); } catch (e) { tampilError('Gagal menghapus pegawai: ' + (e.message || e)); } }
 
 /* ---------- BAHAN & RESEP ---------- */
 function renderBahan() {
@@ -2244,7 +2267,7 @@ function renderBahan() {
   document.getElementById('resepHpp').textContent = 'HPP dari resep: ' + rp(hpp);
 }
 async function simpanBahan() { var nama = document.getElementById('bNama').value; if (!nama) return alert('Nama bahan wajib diisi.'); await DB.upsertBahan({ Nama: nama, Satuan: document.getElementById('bSatuan').value, Stok: document.getElementById('bStok').value, HargaPerSatuan: parseUang(document.getElementById('bHarga').value), StokMinimum: document.getElementById('bMin').value }); ['bNama', 'bSatuan', 'bStok', 'bHarga'].forEach(function (i) { document.getElementById(i).value = ''; }); await loadData(); tutupForm('master'); tampilInfo('Bahan tersimpan.'); }
-async function hapusBahan(id, el) { if (!await konfirmasi('Hapus bahan?', 'Bahan ini akan dihapus.')) return; try { await DB.hapusBahan({ id: id }); await loadData(); tampilInfo('Bahan dihapus.'); } catch (e) { tampilError('Gagal menghapus bahan: ' + (e.message || e)); } }
+async function hapusBahan(id, el) { if (!await konfirmasi('Hapus bahan?', 'Bahan ini akan dihapus.', 'Ya, Hapus', 'danger')) return; try { await DB.hapusBahan({ id: id }); await loadData(); tampilInfo('Bahan dihapus.'); } catch (e) { tampilError('Gagal menghapus bahan: ' + (e.message || e)); } }
 function tambahResepRow() {
   var bid = document.getElementById('resepBahan').value; var b = (DATA.bahan || []).find(function (x) { return x.ID === bid; }); if (!b) return alert('Pilih bahan dulu.');
   resepDraft.push({ bahanId: bid, namaBahan: b.Nama, qty: Number(document.getElementById('resepQty').value || 0) });
@@ -2369,7 +2392,7 @@ async function simpanPengguna() {
   await DB.upsertPengguna({ ID: document.getElementById('uId').value || '', Nama: nama, Email: email, Peran: document.getElementById('uPeran').value, CabangID: document.getElementById('uCabang').value, AksesTransaksi: document.getElementById('uAkses').value, IzinJSON: JSON.stringify(bacaIzin()) });
   await loadData(); resetPengguna(); tampilInfo('Pengguna tersimpan.');
 }
-async function hapusPengguna(id, el) { if (!await konfirmasi('Hapus pengguna?', 'Pengguna ini tidak bisa lagi login ke aplikasi.')) return; try { await DB.hapusPengguna({ id: id }); await loadData(); tampilInfo('Pengguna dihapus.'); } catch (e) { tampilError('Gagal menghapus pengguna: ' + (e.message || e)); } }
+async function hapusPengguna(id, el) { if (!await konfirmasi('Hapus pengguna?', 'Pengguna ini tidak bisa lagi login ke aplikasi.', 'Ya, Hapus', 'danger')) return; try { await DB.hapusPengguna({ id: id }); await loadData(); tampilInfo('Pengguna dihapus.'); } catch (e) { tampilError('Gagal menghapus pengguna: ' + (e.message || e)); } }
 
 /* ---------- LOGO STRUK (3 slot ala Griyo) ----------
    LogoToko  = Logo 1, Mode teks — logo utama di atas struk.
@@ -2451,7 +2474,7 @@ async function simpanCabang() {
   ['cbNama', 'cbAlamat', 'cbTelp'].forEach(function (i) { document.getElementById(i).value = ''; });
   await loadData(); tutupForm('pengaturan'); tampilInfo('Cabang tersimpan.');
 }
-async function hapusCabang(id, el) { if (!await konfirmasi('Hapus cabang?', 'Cabang ini akan dihapus.')) return; try { await DB.hapusCabang({ id: id }); await loadData(); tampilInfo('Cabang dihapus.'); } catch (e) { tampilError('Gagal menghapus cabang: ' + (e.message || e)); } }
+async function hapusCabang(id, el) { if (!await konfirmasi('Hapus cabang?', 'Cabang ini akan dihapus.', 'Ya, Hapus', 'danger')) return; try { await DB.hapusCabang({ id: id }); await loadData(); tampilInfo('Cabang dihapus.'); } catch (e) { tampilError('Gagal menghapus cabang: ' + (e.message || e)); } }
 async function setCabangAktif(id) { await DB.setCabangAktif({ id: id }); await loadData(); tampilInfo('Cabang aktif diganti.'); }
 async function simpanTerjemahan() {
   var istilah = ['Kasir', 'Pelanggan', 'Lunas', 'Kurang', 'Belum Dibayar', 'Total', 'Subtotal', 'Kembali', 'Proses', 'Selesai', 'Diambil', 'Antri'];
