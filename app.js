@@ -121,6 +121,9 @@ function konfirmasi(judul, pesan, labelYa, kelasYa) {
   });
 }
 function jawabKonfirm(ya) {
+  // v4-32: selama impor berjalan, modal dipakai sebagai layar progres —
+  // tidak bisa ditutup (tombol disembunyikan, klik luar diabaikan).
+  if (typeof _imporBerjalan !== 'undefined' && _imporBerjalan) return;
   document.getElementById('konfirmBackdrop').style.display = 'none';
   document.getElementById('konfirmBox').style.display = 'none';
   if (_konfirmJanji) { var s = _konfirmJanji; _konfirmJanji = null; s(!!ya); }
@@ -255,7 +258,10 @@ function setModeLabel() {
   mb.textContent = contoh ? 'Mode Contoh' : '';
   mb.style.display = contoh ? '' : 'none';
   var ds = document.getElementById('drawerSync');
-  if (ds) { ds.innerHTML = contoh ? '<b>Mode Contoh</b> — isi config.js untuk terhubung' : 'Terhubung' + (lastSyncAt ? ' • Terakhir: ' + lastSyncAt.toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''); }
+  if (ds) {
+    if (contoh) ds.innerHTML = '<b>Mode Contoh</b> — isi config.js untuk terhubung';
+    else perbaruiIndikatorOffline(); // v4-32: baris sync + status offline
+  }
 }
 
 /* ---------- MUAT DATA / LOGIN / PERAN ---------- */
@@ -288,6 +294,11 @@ async function loadData() {
       var sesi = null;
       try { sesi = await DB.getSessionUser(); } catch (e) { sesi = null; }
       if (!sesi) {
+        // v4-32: offline tanpa sesi tersimpan — login pertama kali butuh
+        // internet; beri tahu di layar login, bukan layar kosong.
+        var sedangOfflineLogin = false;
+        try { sedangOfflineLogin = navigator.onLine === false; } catch (e2) {}
+        var ln = document.getElementById('loginOfflineNote'); if (ln) ln.style.display = sedangOfflineLogin ? '' : 'none';
         try { sessionStorage.removeItem('pos_user'); } catch (e) {}
         document.getElementById('loginBox').style.display = 'block';
         document.body.classList.add('belum-login');
@@ -301,6 +312,34 @@ async function loadData() {
     }
     var d = await withTimeout(DB.loadAll(), 20000, 'Server tidak menjawab dalam 20 detik. Periksa koneksi internet, lalu muat ulang halaman.');
     DATA = Object.assign(DATA, d || {});
+    return selesaiMuatData();
+  } catch (e) {
+    hideLoading();
+    // v4-32: belum pernah online di perangkat ini -> layar penjelasan,
+    // bukan layar kosong / alert.
+    if (String((e && e.message) || e) === 'OFFLINE_TANPA_SNAPSHOT') { tampilkanOfflineAwal(); return false; }
+    // Timeout / koneksi putus di tengah jalan (loadAll sendiri sudah
+    // mencoba snapshot) — coba sekali lagi dari salinan lokal.
+    var snap = null;
+    try { if (DB.muatDariSnapshot) snap = await DB.muatDariSnapshot(); } catch (e2) { snap = null; }
+    if (snap) {
+      DATA = Object.assign(DATA, snap);
+      var okSnap = selesaiMuatData();
+      if (okSnap) { tampilInfo('Mode offline — memakai salinan data terakhir di perangkat ini.'); perbaruiIndikatorOffline(); }
+      return okSnap;
+    }
+    tampilError('Gagal memuat data: ' + e.message); alert('Gagal memuat data: ' + e.message); return false;
+  }
+}
+/* Layar penjelasan saat offline dan belum pernah ada snapshot (v4-32). */
+function tampilkanOfflineAwal() {
+  var el = document.getElementById('offlineAwal'); if (el) el.style.display = '';
+  var lb = document.getElementById('loginBox'); if (lb) lb.style.display = 'none';
+  document.querySelectorAll('main section').forEach(function (s) { s.style.display = 'none'; });
+  hideLoading();
+}
+/* Bagian akhir loadData (dipakai jalur online maupun snapshot offline). */
+function selesaiMuatData() {
     var p = DATA.pengaturan || {};
     document.getElementById('namaTokoHead').textContent = p.NamaToko || 'ZPOS';
     var nd = document.getElementById('namaTokoDrawer'); if (nd) nd.textContent = p.NamaToko || 'ZPOS';
@@ -324,14 +363,112 @@ async function loadData() {
     if (currentUser) document.getElementById('userLabel').textContent = '• ' + currentUser.nama + ' (' + currentUser.peran + ')';
     document.getElementById('loginBox').style.display = 'none';
     document.body.classList.remove('belum-login');
+    var oa = document.getElementById('offlineAwal'); if (oa) oa.style.display = 'none';
     document.querySelectorAll('main section').forEach(function (s) { s.style.display = ''; });
     renderAll(); applyRole(); hideLoading();
+    // v4-32: bila online dan ada antrean offline, sinkronkan otomatis.
+    try { if (DB.configured) sinkronisasiOtomatis(); } catch (e) {}
     return true;
-  } catch (e) { hideLoading(); tampilError('Gagal memuat data: ' + e.message); alert('Gagal memuat data: ' + e.message); return false; }
 }
 async function muatUlangManual() {
   var ok = await loadData();
   if (ok) tampilInfo('Data diperbarui • ' + (lastSyncAt ? lastSyncAt.toLocaleTimeString('id-ID') : ''));
+}
+
+/* ---------- STATUS OFFLINE + ANTREAN + SINKRONISASI OTOMATIS (v4-32) ----------
+   Badge di header selalu menunjukkan status: "Online" (teal) atau
+   "Offline — N menunggu diunggah" (kuning; merah bila ada yang gagal).
+   Ketuk badge -> daftar antrean (jenis + waktu + ringkasan) dan, bila ada
+   yang gagal, daftar "Gagal disinkronkan" + tombol "Coba lagi" per entri
+   dan "Coba lagi semua". Sinkronisasi jalan otomatis saat event 'online'
+   dan setiap kali aplikasi dibuka dalam keadaan online. */
+async function perbaruiIndikatorOffline() {
+  var badge = document.getElementById('offlineBadge'); if (!badge) return;
+  var st = { offline: false, jumlah: 0, gagal: [] };
+  try { if (DB.statusOffline) st = await DB.statusOffline(); } catch (e) {}
+  var gagal = (st.gagal || []).length;
+  if (st.offline) {
+    badge.textContent = gagal > 0 ? ('Offline — ' + st.jumlah + ' menunggu • ' + gagal + ' gagal') : ('Offline — ' + st.jumlah + ' menunggu diunggah');
+    badge.style.background = gagal > 0 ? '#dc2626' : '#d97706';
+    badge.style.color = '#fff';
+  } else if (st.jumlah > 0) {
+    badge.textContent = 'Online — ' + st.jumlah + ' menunggu diunggah';
+    badge.style.background = '#d97706';
+    badge.style.color = '#fff';
+  } else {
+    badge.textContent = 'Online';
+    badge.style.background = '';
+    badge.style.color = '';
+  }
+  var ds = document.getElementById('drawerSync');
+  if (ds && !DB.isSample) {
+    ds.innerHTML = st.offline
+      ? ('<b>Offline</b> — ' + st.jumlah + ' perubahan menunggu diunggah' + (gagal > 0 ? ' • ' + gagal + ' gagal' : ''))
+      : ('Terhubung' + (lastSyncAt ? ' • Terakhir: ' + lastSyncAt.toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '') + (st.jumlah > 0 ? ' • ' + st.jumlah + ' menunggu diunggah' : ''));
+  }
+}
+function fmtWaktuAntrean(iso) {
+  try { var d = new Date(String(iso || '').replace(' ', 'T')); return d.toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch (e) { return String(iso || ''); }
+}
+async function tampilkanAntreanOffline() {
+  var st = { offline: false, jumlah: 0, gagal: [], antrean: [] };
+  try { if (DB.statusOffline) st = await DB.statusOffline(); } catch (e) {}
+  var box = document.getElementById('antreanIsi'); if (!box) return;
+  var antrean = st.antrean || [];
+  var gagal = st.gagal || [];
+  var html = '';
+  if (!antrean.length) {
+    html = '<p style="margin:0">' + (st.offline ? 'Sedang offline — belum ada perubahan yang menunggu diunggah.' : 'Semua perubahan sudah tersinkron ke server.') + '</p>';
+  } else {
+    html = '<p style="margin:0 0 4px"><b>' + antrean.length + ' perubahan menunggu diunggah</b>' + (st.offline ? ' (offline)' : '') + '</p>';
+    html += antrean.map(function (e) {
+      var baris = '<div style="padding:6px 0;border-top:1px solid #e2e8f0"><b>' + esc(e.ringkasan || e.jenis) + '</b><br><small style="color:#64748b">' + esc(fmtWaktuAntrean(e.dibuatPada)) + '</small>';
+      if (e.galat) baris += '<br><small style="color:#dc2626">Gagal: ' + esc(e.galat) + '</small> <button class="secondary" onclick="cobaLagiSatuOffline(\'' + escJS(e.id) + '\')">Coba lagi</button>';
+      return baris + '</div>';
+    }).join('');
+  }
+  box.innerHTML = html;
+  var btnSemua = document.getElementById('antreanCobaLagi');
+  if (btnSemua) btnSemua.style.display = gagal.length ? '' : 'none';
+  document.getElementById('antreanBackdrop').style.display = 'block';
+  document.getElementById('antreanBox').style.display = 'block';
+}
+function tutupAntreanOffline() {
+  document.getElementById('antreanBackdrop').style.display = 'none';
+  document.getElementById('antreanBox').style.display = 'none';
+}
+async function cobaLagiSatuOffline(id) {
+  try {
+    var hasil = await DB.cobaLagiOutbox(id);
+    if (hasil.ok) { await loadData(); tampilInfo('Sinkronisasi selesai: ' + hasil.diunggah + ' perubahan diunggah.'); tutupAntreanOffline(); }
+    else tampilError('Sinkronisasi berhenti: ' + (hasil.galat || 'gagal') + ' — periksa daftar antrean.');
+  } catch (e) { tampilError('Sinkronisasi gagal: ' + (e.message || e)); }
+  perbaruiIndikatorOffline(); tampilkanAntreanOffline();
+}
+async function cobaLagiSemuaOffline() {
+  try {
+    var hasil = await DB.sinkronkanOutbox();
+    if (hasil.ok) { await loadData(); tampilInfo('Sinkronisasi selesai: ' + hasil.diunggah + ' perubahan diunggah.'); tutupAntreanOffline(); }
+    else tampilError('Sinkronisasi berhenti: ' + (hasil.galat || 'gagal') + ' — periksa daftar antrean.');
+  } catch (e) { tampilError('Sinkronisasi gagal: ' + (e.message || e)); }
+  perbaruiIndikatorOffline(); tampilkanAntreanOffline();
+}
+async function sinkronisasiOtomatis() {
+  if (!currentUser) { perbaruiIndikatorOffline(); return; } // belum login: jangan sinkronkan tanpa sesi
+  var st = null;
+  try { if (!DB.statusOffline) return; st = await DB.statusOffline(); } catch (e) { return; }
+  if (!st || !st.jumlah) { perbaruiIndikatorOffline(); return; }
+  var mati = false; try { mati = navigator.onLine === false; } catch (e) {}
+  if (mati) { perbaruiIndikatorOffline(); return; }
+  var hasil = null;
+  try { hasil = await DB.sinkronkanOutbox(); } catch (e) { tampilError('Sinkronisasi gagal: ' + (e.message || e)); perbaruiIndikatorOffline(); return; }
+  if (hasil.ok) {
+    await loadData();
+    tampilInfo('Sinkronisasi selesai: ' + hasil.diunggah + ' perubahan diunggah.');
+  } else if (hasil.galat && hasil.galat !== 'Masih offline.') {
+    tampilError('Sinkronisasi berhenti: ' + hasil.galat + ' — ketuk badge status untuk melihat antrean.');
+  }
+  perbaruiIndikatorOffline();
 }
 async function doLogin() {
   var email = document.getElementById('loginEmail').value, kataSandi = document.getElementById('loginKataSandi').value;
@@ -460,7 +597,7 @@ function renderAll() {
   vsEl.textContent = (pct >= 0 ? '+' : '') + pct + '% vs kemarin';
   vsEl.classList.toggle('down', pct < 0);
   document.getElementById('heroUser').textContent = currentUser ? ('Halo, ' + currentUser.nama + ' (' + currentUser.peran + ') — kasir siap melayani hari ini.') : 'Kasir siap melayani hari ini.';
-  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • ' + currentUser.peran + ' • v4-31') : 'Kasir • v4-31';
+  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • ' + currentUser.peran + ' • v4-32') : 'Kasir • v4-32';
   var bb = document.getElementById('bellBadge');
   if (bb) { var sm = Number(r.stokMenipis || 0); bb.style.display = sm > 0 ? 'flex' : 'none'; bb.textContent = sm > 99 ? '99+' : String(sm); }
   isiNotifPanel();
@@ -1706,7 +1843,7 @@ function unduhFile(nama, isi, tipe) {
   var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([isi], { type: tipe })); a.download = nama; a.click();
 }
 
-/* ---------- IMPOR PRODUK DARI CSV (v4-31) ----------
+/* ---------- IMPOR PRODUK DARI CSV (progres + ringkasan akhir v4-32) ----------
    Alur: pilih file -> analisis (parse + petakan header + validasi) ->
    pratinjau di modal konfirmasi -> impor berurutan lewat DB.upsertProduk.
    Baris bermasalah DILEWATI (bukan menggagalkan impor) dan dilaporkan
@@ -1892,21 +2029,54 @@ async function prosesTeksCSVImpor(teks) {
   if (!setuju) return;
   await jalankanImporProduk(hasil);
 }
+/* Progres impor (v4-32, temuan uji live impor CSV): modal konfirmasi dipakai
+   ulang sebagai layar progres — tombol disembunyikan selama impor supaya
+   tidak tertutup tanpa sengaja, dan jawabKonfirm() menolak menutup selama
+   _imporBerjalan true. */
+var _imporBerjalan = false;
+function tampilProgresImpor(teks) {
+  _imporBerjalan = true;
+  document.getElementById('konfirmJudul').textContent = 'Mengimpor produk…';
+  document.getElementById('konfirmPesan').textContent = teks;
+  var tombol = document.querySelector('#konfirmBox .konfirm-tombol'); if (tombol) tombol.style.display = 'none';
+  document.getElementById('konfirmBackdrop').style.display = 'block';
+  document.getElementById('konfirmBox').style.display = 'block';
+}
+function sembunyiProgresImpor() {
+  _imporBerjalan = false;
+  var tombol = document.querySelector('#konfirmBox .konfirm-tombol'); if (tombol) tombol.style.display = '';
+  document.getElementById('konfirmBackdrop').style.display = 'none';
+  document.getElementById('konfirmBox').style.display = 'none';
+}
 /* Simpan tiap baris valid berurutan lewat jalur yang sama dengan
    simpanProduk. Satu baris gagal tidak menghentikan impor — dicatat dan
-   dilaporkan di akhir. loadData() dipanggil SEKALI setelah semua selesai. */
+   dilaporkan di akhir. loadData() dipanggil SEKALI setelah semua selesai.
+   v4-32: progres "Mengimpor N/M produk..." terlihat selama impor +
+   ringkasan akhir di modal (bukan hanya toast singkat). */
 async function jalankanImporProduk(hasil) {
   var berhasil = 0, gagal = 0, pesanGagal = '';
-  for (var i = 0; i < hasil.siap.length; i++) {
-    try { await DB.upsertProduk(hasil.siap[i]); berhasil++; }
-    catch (e) { gagal++; if (!pesanGagal) pesanGagal = (e && e.message) || String(e); }
+  var total = hasil.siap.length;
+  try {
+    tampilProgresImpor('Mengimpor 0/' + total + ' produk...\nJangan tutup atau muat ulang halaman selama impor berjalan.');
+    for (var i = 0; i < total; i++) {
+      try { await DB.upsertProduk(hasil.siap[i]); berhasil++; }
+      catch (e) { gagal++; if (!pesanGagal) pesanGagal = (e && e.message) || String(e); }
+      if ((i + 1) % 5 === 0 || i === total - 1) tampilProgresImpor('Mengimpor ' + (i + 1) + '/' + total + ' produk...\nJangan tutup atau muat ulang halaman selama impor berjalan.');
+    }
+  } finally {
+    sembunyiProgresImpor();
   }
   await loadData();
   var dilewati = hasil.masalah.length - hasil.duplikat;
-  if (gagal === 0) tampilInfo('Impor selesai: ' + berhasil + ' produk ditambahkan, ' + dilewati + ' dilewati, ' + hasil.duplikat + ' duplikat.');
-  else tampilError('Impor selesai sebagian: ' + berhasil + ' berhasil, ' + gagal + ' gagal: ' + pesanGagal);
+  var ringkas = 'Impor selesai: ' + berhasil + ' produk ditambahkan, ' + dilewati + ' dilewati, ' + hasil.duplikat + ' duplikat.';
+  if (gagal > 0) ringkas += '\n' + gagal + ' gagal: ' + pesanGagal;
+  await konfirmasi('Impor selesai', ringkas, 'Mengerti', 'primary');
 }
 function imporProdukDariCSV() {
+  // v4-32: impor butuh cek duplikat ke server — tolak saat offline.
+  var sedangOffline = false;
+  try { sedangOffline = navigator.onLine === false || (DB.sedangOffline && DB.sedangOffline()); } catch (e) {}
+  if (sedangOffline) { tampilError('Impor CSV butuh internet.'); return; }
   var inp = document.createElement('input');
   inp.type = 'file'; inp.accept = '.csv';
   inp.onchange = function () {
@@ -1923,7 +2093,9 @@ function imporProdukDariCSV() {
 
 /* ---------- STOK ---------- */
 function renderStok() {
-  document.getElementById('stokTable').innerHTML = (DATA.produk || []).map(function (p) { var s = stokProduk(p); var tipis = s <= Number(p.StokMinimum || 5); return '<div class="cart-item"><span><b>' + esc(p.Nama) + '</b><br><small>' + rp(p.HargaJual) + ' • Stok min. ' + (p.StokMinimum || 5) + '</small></span>' + (tipis ? '<span class="badge warn">Stok ' + s + '</span>' : '<b>Stok ' + s + '</b>') + '</div>'; }).join('') || 'Belum ada produk.';
+  // v4-32: stok negatif (dua perangkat offline menjual barang terakhir
+  // yang sama) ditandai jelas "Stok Minus — cek", jangan diam-diam.
+  document.getElementById('stokTable').innerHTML = (DATA.produk || []).map(function (p) { var s = stokProduk(p); var tipis = s <= Number(p.StokMinimum || 5); var minus = s < 0; return '<div class="cart-item"><span><b>' + esc(p.Nama) + '</b><br><small>' + rp(p.HargaJual) + ' • Stok min. ' + (p.StokMinimum || 5) + '</small></span>' + (minus ? '<span class="badge bad">Stok Minus — cek (' + s + ')</span>' : (tipis ? '<span class="badge warn">Stok ' + s + '</span>' : '<b>Stok ' + s + '</b>')) + '</div>'; }).join('') || 'Belum ada produk.';
   document.getElementById('opnameTable').innerHTML = (DATA.opname || []).slice(0, 50).map(function (o) { return '<div class="cart-item"><span><b>' + esc(o.NamaProduk) + '</b><br><small>' + esc(o.Tanggal || '') + ' • Sistem ' + o.StokSistem + ' • Fisik ' + o.StokFisik + '</small></span><b>Selisih ' + o.Selisih + '</b></div>'; }).join('') || 'Belum ada opname.';
 }
 async function muatLaporanStok() {
@@ -2708,6 +2880,13 @@ async function muatLogs() {
 }
 // Boot: tautan katalog publik (?katalog=ID) dibuka tanpa login.
 (function () {
+  // v4-32: kembali online -> sinkronkan antrean otomatis; offline ->
+  // perbarui badge. Setiap tulis offline berhasil -> badge diperbarui.
+  try {
+    if (DB.setOnOutboxBerubah) DB.setOnOutboxBerubah(perbaruiIndikatorOffline);
+    window.addEventListener('online', function () { sinkronisasiOtomatis(); });
+    window.addEventListener('offline', function () { perbaruiIndikatorOffline(); });
+  } catch (e) {}
   var katId = '';
   try { var q = new URLSearchParams(window.location.search); katId = q.get('katalog') || ''; } catch (e) { katId = ''; }
   if (katId) tampilKatalogPublik(katId); else loadData();

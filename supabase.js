@@ -20,6 +20,16 @@
   }
   var MODE = (CONFIGURED && client) ? 'supabase' : 'contoh';
 
+  /* ---------- STATUS OFFLINE (v4-32) ----------
+     offlineMode = true bila DATA berasal dari snapshot IndexedDB (bukan
+     dari server). Selama offline, persist()/removeRow() menjadi no-op
+     (seperti Mode Contoh) sehingga semua metode tulis tetap berjalan
+     in-memory, lalu dicatat ke outbox untuk diunggah saat online.
+     _replay = true selama sinkronisasi (cek stok dilewati supaya
+     penjualan offline yang diulang tidak ditolak karena stok menipis). */
+  var offlineMode = false;
+  var _replay = false;
+
   /* ---------- util ---------- */
   function todayStr(d) {
     var x = d ? new Date(d) : new Date();
@@ -43,6 +53,17 @@
   }
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
   function parseJSON(s, fb) { try { return JSON.parse(s || ''); } catch (e) { return fb; } }
+  // Offline (v4-32): navigator.onLine saja tidak bisa dipercaya (bisa true
+  // padahal koneksi mati) — galat jaringan dikenali dari pesannya.
+  function jaringanMati() { try { return typeof navigator !== 'undefined' && navigator.onLine === false; } catch (e) { return false; } }
+  function galatJaringan(e) {
+    var m = String((e && e.message) || e || '');
+    return /failed to fetch|network|load failed|networkerror|network request failed|offline/i.test(m);
+  }
+  // localStorage (dijaga: tidak ada di Node/sim, bisa diblokir di privat).
+  function lsGet(k) { try { if (typeof localStorage === 'undefined' || !localStorage) return null; return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { if (typeof localStorage === 'undefined' || !localStorage) return; localStorage.setItem(k, v); } catch (e) {} }
+  function lsHapus(k) { try { if (typeof localStorage === 'undefined' || !localStorage) return; localStorage.removeItem(k); } catch (e) {} }
 
   /* ---------- pemetaan snake_case <-> PascalCase ---------- */
   var SPECIAL = { id: 'ID', sku: 'SKU', json: 'JSON', wa: 'WA', url: 'URL', hpp: 'HPP' };
@@ -256,6 +277,7 @@
   }
   async function persist(table, pascalRow, conflictKey) {
     if (MODE !== 'supabase' || !client) return;
+    if (offlineMode) return; // v4-32: tulis offline hanya in-memory + outbox
     var row = toSnake(pascalRow);
     // FK kosong ('') tidak valid di Postgres (23503) — ubah jadi null (tanpa referensi).
     Object.keys(row).forEach(function (k) {
@@ -273,6 +295,7 @@
   }
   async function removeRow(table, id) {
     if (MODE !== 'supabase' || !client) return;
+    if (offlineMode) return; // v4-32: hapus offline hanya in-memory + outbox
     var res = await client.from(table).delete().eq('id', id);
     if (res.error) throw new Error(res.error.message);
   }
@@ -280,6 +303,7 @@
   // resep satu produk). No-op di Mode Contoh, seperti removeRow.
   async function hapusBarisWhere(table, kolom, nilai) {
     if (MODE !== 'supabase' || !client) return;
+    if (offlineMode) return; // v4-32: hapus offline hanya in-memory + outbox
     var res = await client.from(table).delete().eq(kolom, nilai);
     if (res.error) throw new Error(res.error.message);
   }
@@ -299,12 +323,10 @@
   }
 
   /* ---------- loadAll ---------- */
-  async function loadAll() {
-    if (MODE === 'contoh') {
-      DATA = sampleToData();
-      DATA.ringkasan = computeRingkasan(DATA);
-      return DATA;
-    }
+  // Tarik semua data dari server (tanpa menyentuh DATA / snapshot) —
+  // dipakai loadAll online dan sinkronkanOutbox (replay butuh data server
+  // segar supaya nilai yang dihitung tidak ganda dengan perubahan offline).
+  async function muatDariServer() {
     var d = emptyData();
     // Muat semua tabel paralel (sebelumnya berurutan: 35x round-trip, puluhan detik).
     var results = await Promise.all(TABLES.map(function (t) { return client.from(t).select('*'); }));
@@ -319,8 +341,38 @@
     // terjemahan: tabel istilah/terjemahan -> object
     var rt = await client.from('terjemahan').select('*');
     if (!rt.error) (rt.data || []).forEach(function (r) { d.terjemahan[r.istilah] = r.terjemahan; });
+    return d;
+  }
+  async function loadAll() {
+    if (MODE === 'contoh') {
+      DATA = sampleToData();
+      DATA.ringkasan = computeRingkasan(DATA);
+      return DATA;
+    }
+    // v4-32: offline -> salinan terakhir dari IndexedDB (bukan galat).
+    if (jaringanMati()) {
+      var snap0 = await muatDariSnapshot();
+      if (snap0) return snap0;
+      throw new Error('OFFLINE_TANPA_SNAPSHOT');
+    }
+    var d;
+    try { d = await muatDariServer(); }
+    catch (e) {
+      if (galatJaringan(e)) {
+        var snap = await muatDariSnapshot();
+        if (snap) return snap;
+        throw new Error('OFFLINE_TANPA_SNAPSHOT');
+      }
+      throw e;
+    }
     DATA = d;
     DATA.ringkasan = computeRingkasan(DATA);
+    offlineMode = false;
+    // v4-32: snapshot HANYA ditimpa bila tidak ada antrean yang belum
+    // diunggah — bila ada, snapshot lama (yang berisi perubahan offline)
+    // dipertahankan supaya sinkronisasi yang gagal masih bisa
+    // mengembalikan tampilan ke keadaan offline.
+    try { if ((await bacaOutbox()).length === 0) await tulisSnapshot(); } catch (e) {}
     return DATA;
   }
   /* ---------- katalog publik (tanpa login) ----------
@@ -358,22 +410,28 @@
     var uid = authUser.id, em = String(authUser.email || '').trim().toLowerCase();
     var row = null;
     var q1 = await client.from('pengguna').select('*').eq('auth_id', uid).maybeSingle();
-    if (q1.error) return { ok: false, error: 'Gagal membaca data pengguna: ' + q1.error.message };
+    // v4-32: galat jaringan dilempar (bukan {ok:false}) supaya getSessionUser
+    // bisa membedakan "offline" dari "akun memang tidak terdaftar".
+    if (q1.error) { if (galatJaringan(q1.error)) throw new Error(q1.error.message || 'Gagal memuat pengguna'); return { ok: false, error: 'Gagal membaca data pengguna: ' + q1.error.message }; }
     row = q1.data || null;
     if (!row && em) {
       var q2 = await client.from('pengguna').select('*').eq('email', em).maybeSingle();
-      if (q2.error) return { ok: false, error: 'Gagal membaca data pengguna: ' + q2.error.message };
+      if (q2.error) { if (galatJaringan(q2.error)) throw new Error(q2.error.message || 'Gagal memuat pengguna'); return { ok: false, error: 'Gagal membaca data pengguna: ' + q2.error.message }; }
       row = q2.data || null;
       if (row) {
         // Tautan otomatis saat login pertama: isi auth_id baris yang email-nya cocok.
         var up = await client.from('pengguna').update({ auth_id: uid }).eq('id', row.id);
-        if (up.error) return { ok: false, error: 'Akun belum tertaut ke pengguna toko. Minta Admin menautkan lewat SQL Editor.' };
+        if (up.error) { if (galatJaringan(up.error)) throw new Error(up.error.message || 'Gagal menautkan akun'); return { ok: false, error: 'Akun belum tertaut ke pengguna toko. Minta Admin menautkan lewat SQL Editor.' }; }
         row.auth_id = uid;
       }
     }
     if (!row) return { ok: false, error: 'Akun belum terdaftar sebagai pengguna toko.' };
     if (!boolFlag(row.aktif, true)) return { ok: false, error: 'Pengguna tidak aktif.' };
     var u = toPascal(row);
+    // v4-32: simpan salinan pengguna terakhir di perangkat — dipakai
+    // getSessionUser saat offline (tanpa ini, sesi Auth yang tersimpan
+    // tidak bisa dipulihkan offline karena cariPenggunaAuth butuh network).
+    lsSet('zpos_sesi_pengguna', JSON.stringify({ auth_id: uid, nama: u.Nama, peran: u.Peran, ID: u.ID, CabangID: u.CabangID || '', IzinJSON: u.IzinJSON || '{}', AksesTransaksi: u.AksesTransaksi || 'Tidak dibatasi', email: em }));
     if (tulisLog) { try { addLog(DATA, u.Nama, 'Login', u.Nama + ' masuk'); } catch (e) {} }
     return { ok: true, nama: u.Nama, peran: u.Peran, ID: u.ID, CabangID: u.CabangID || '', IzinJSON: u.IzinJSON || '{}', AksesTransaksi: u.AksesTransaksi || 'Tidak dibatasi', email: em };
   }
@@ -398,7 +456,9 @@
       res = await client.auth.signInWithPassword({ email: emLogin, password: String(kataSandi) });
     } catch (e) { return { ok: false, error: 'Login gagal: ' + (e.message || e) }; }
     if ((res && res.error) || !res || !res.data || !res.data.user) return { ok: false, error: 'Email atau kata sandi salah.' };
-    var sesi = await cariPenggunaAuth(res.data.user, true);
+    var sesi;
+    try { sesi = await cariPenggunaAuth(res.data.user, true); }
+    catch (e) { try { await client.auth.signOut(); } catch (e2) {} return { ok: false, error: 'Tidak bisa memeriksa akun — periksa koneksi internet.' }; }
     if (!sesi.ok) { try { await client.auth.signOut(); } catch (e) {} return sesi; }
     return sesi;
   }
@@ -414,9 +474,22 @@
     try {
       var sesi = await cariPenggunaAuth(sessUser, false);
       return sesi.ok ? sesi : null;
-    } catch (e) { return null; }
+    } catch (e) {
+      // v4-32: offline — cariPenggunaAuth butuh network. Pakai salinan
+      // pengguna terakhir yang tersimpan di perangkat (ditulis saat login
+      // online), bila auth_id-nya cocok dengan sesi Auth yang tersimpan.
+      if (!galatJaringan(e)) return null;
+      try {
+        var c = JSON.parse(lsGet('zpos_sesi_pengguna') || 'null');
+        if (c && String(c.auth_id || '') === String(sessUser.id) && c.nama) {
+          return { ok: true, nama: c.nama, peran: c.peran, ID: c.ID, CabangID: c.CabangID || '', IzinJSON: c.IzinJSON || '{}', AksesTransaksi: c.AksesTransaksi || 'Tidak dibatasi', email: c.email || '' };
+        }
+      } catch (e2) {}
+      return null;
+    }
   }
   async function logout() {
+    lsHapus('zpos_sesi_pengguna');
     if (MODE === 'supabase' && client && client.auth && client.auth.signOut) {
       try { await client.auth.signOut(); } catch (e) {}
     }
@@ -505,11 +578,14 @@
         if (v) isi = Number(v.isi || 1);
       }
       var butuh = Number(it.Qty || 0) * isi;
-      if (stokOf(DATA, prod) < butuh) throw new Error('Stok produk tidak mencukupi: ' + prod.Nama);
+      // v4-32: penjualan offline SELALU diizinkan (aturan Bos) — cek stok
+      // dilewati saat offline maupun saat mengulang antrean (replay);
+      // stok yang jadi negatif ditandai "Stok Minus — cek" di halaman Stok.
+      if (!offlineMode && !_replay && stokOf(DATA, prod) < butuh) throw new Error('Stok produk tidak mencukupi: ' + prod.Nama);
       // bahan baku via resep
       (DATA.resep || []).filter(function (r) { return String(r.ProdukID) === String(prod.ID); }).forEach(function (r) {
         var b = DATA.bahan.find(function (x) { return x.ID === r.BahanID; });
-        if (b && Number(b.Stok || 0) < Number(r.QtyPakai || 0) * butuh) throw new Error('Stok bahan tidak mencukupi: ' + b.Nama);
+        if (!offlineMode && !_replay && b && Number(b.Stok || 0) < Number(r.QtyPakai || 0) * butuh) throw new Error('Stok bahan tidak mencukupi: ' + b.Nama);
       });
     }
     // 3. Siapkan pengurangan stok (FEFO: batch paling cepat kedaluwarsa dulu) + bahan.
@@ -554,7 +630,11 @@
     });
     labaTotal -= diskonTotal + promoDiskon + poinDiskon;
     // 4. Simpan transaksi + detail
-    var id = uid('TRX');
+    // v4-32: id boleh dibawa dari payload (transaksi yang dibuat offline
+    // memakai id ini; saat diulang ke server, id yang sama dipakai lagi
+    // supaya operasi berikutnya yang merujuk id itu — bayar, batal, retur
+    // — tetap menemukan transaksinya).
+    var id = payload.id || payload.ID || uid('TRX');
     var trx = {
       ID: id, Tanggal: nowISO(), Pelanggan: payload.pelanggan || 'Umum', Kasir: payload.kasir || '',
       Total: total, Diskon: diskonTotal, Bayar: bayar, Sisa: sisa, Metode: payload.metode || 'Tunai',
@@ -697,14 +777,14 @@
     if (!DATA) await loadAll();
     var ex = DATA.produk.find(function (x) { return String(x.ID) === String(id); });
     if (ex) ex.Aktif = false;
-    if (MODE !== 'supabase' || !client) return { ok: true };
+    if (MODE !== 'supabase' || !client || offlineMode) { refreshRingkasan(); return { ok: true }; }
     var res = await client.from('produk').update({ aktif: false }).eq('id', id);
     if (res.error) throw new Error(res.error.message);
     refreshRingkasan();
     return { ok: true };
   }
   async function updateProdukStokHarga(prod) {
-    if (MODE !== 'supabase' || !client) return;
+    if (MODE !== 'supabase' || !client || offlineMode) return;
     var res = await client.from('produk').update({ stok: Number(prod.Stok || 0), harga_modal: Number(prod.HargaModal || 0), harga_jual: Number(prod.HargaJual || 0) }).eq('id', prod.ID);
     if (res.error) throw new Error(res.error.message);
   }
@@ -731,7 +811,7 @@
   /* ---------- pengeluaran & kas ---------- */
   async function simpanPengeluaran(payload) {
     if (!DATA) await loadAll();
-    var row = { ID: uid('PGL'), Tanggal: nowISO(), Kategori: payload.kategori || 'Lainnya', Keterangan: payload.keterangan || '', Nominal: Number(payload.nominal || 0), EfekLaba: payload.efekLaba || 'TidakMengurangi', CabangID: payload.cabangId || cabangAktifId(DATA) };
+    var row = { ID: payload.id || payload.ID || uid('PGL'), Tanggal: nowISO(), Kategori: payload.kategori || 'Lainnya', Keterangan: payload.keterangan || '', Nominal: Number(payload.nominal || 0), EfekLaba: payload.efekLaba || 'TidakMengurangi', CabangID: payload.cabangId || cabangAktifId(DATA) };
     DATA.pengeluaran.unshift(row); await persist('pengeluaran', row);
     var saldo = (DATA.kas || []).reduce(function (a, k) { return a + Number(k.Masuk || 0) - Number(k.Keluar || 0); }, 0) - row.Nominal;
     var kasRow = { ID: uid('KAS'), Tanggal: nowISO(), Jenis: 'Keluar', Keterangan: 'Pengeluaran: ' + row.Kategori + ' — ' + row.Keterangan, Masuk: 0, Keluar: row.Nominal, Saldo: saldo, CabangID: row.CabangID };
@@ -743,7 +823,7 @@
     if (!DATA) await loadAll();
     var nominal = Number(payload.nominal || 0);
     var saldo = (DATA.kas || []).reduce(function (a, k) { return a + Number(k.Masuk || 0) - Number(k.Keluar || 0); }, 0) + (payload.jenis === 'Keluar' ? -nominal : nominal);
-    var row = { ID: uid('KAS'), Tanggal: nowISO(), Jenis: payload.jenis || 'Masuk', Keterangan: payload.keterangan || '', Masuk: payload.jenis === 'Keluar' ? 0 : nominal, Keluar: payload.jenis === 'Keluar' ? nominal : 0, Saldo: saldo, CabangID: payload.cabangId || cabangAktifId(DATA) };
+    var row = { ID: payload.id || payload.ID || uid('KAS'), Tanggal: nowISO(), Jenis: payload.jenis || 'Masuk', Keterangan: payload.keterangan || '', Masuk: payload.jenis === 'Keluar' ? 0 : nominal, Keluar: payload.jenis === 'Keluar' ? nominal : 0, Saldo: saldo, CabangID: payload.cabangId || cabangAktifId(DATA) };
     DATA.kas.push(row); await persist('kas', row);
     refreshRingkasan(); return { ok: true, id: row.ID };
   }
@@ -751,7 +831,8 @@
   /* ---------- pembelian & utang ---------- */
   async function simpanPembelian(payload) {
     if (!DATA) await loadAll();
-    var id = uid('PBL');
+    // v4-32: id dari payload dipakai lagi saat replay (lihat saveTransaksi).
+    var id = payload.id || payload.ID || uid('PBL');
     var total = Number(payload.total || 0);
     var row = { ID: id, Tanggal: nowISO(), Pemasok: payload.pemasok || '', Total: total, Bayar: Number(payload.bayar || 0), Sisa: total - Number(payload.bayar || 0), Status: 'Draft', Catatan: payload.catatan || '', CabangID: payload.cabangId || cabangAktifId(DATA), Diskon: Number(payload.diskon || 0), Pajak: Number(payload.pajak || 0), BiayaLain: Number(payload.biayaLain || 0), Diproses: false };
     DATA.pembelian.unshift(row); await persist('pembelian', row);
@@ -834,7 +915,7 @@
     if (!trx) throw new Error('Transaksi tidak ditemukan.');
     var qty = Number(payload.qty || 1);
     var nominal = Number(payload.nominal || 0);
-    var row = { ID: uid('RTR'), Tanggal: nowISO(), TransaksiID: trx.ID, Produk: payload.produk || '', Qty: qty, Nominal: nominal, Alasan: payload.alasan || '', CabangID: trx.CabangID || cabangAktifId(DATA) };
+    var row = { ID: payload.id || payload.ID || uid('RTR'), Tanggal: nowISO(), TransaksiID: trx.ID, Produk: payload.produk || '', Qty: qty, Nominal: nominal, Alasan: payload.alasan || '', CabangID: trx.CabangID || cabangAktifId(DATA) };
     DATA.retur.unshift(row); await persist('retur', row);
     var prod = DATA.produk.find(function (x) { return x.ID === payload.produkId || x.Nama === payload.produk; });
     // stokQty (opsional): jumlah yang kembali ke stok bisa berbeda dari qty
@@ -901,10 +982,12 @@
     if (satuan) { var vr = parseJSON(prod.VarianJSON || '[]', []); var v = vr.find(function (x) { return x.label === satuan; }); if (v) isi = Number(v.isi || 1); }
     var butuh = qty * isi;
     var cabangId = trx.CabangID || cabangAktifId(DATA);
-    if (lacakStok(prod) && stokOf(DATA, prod) < butuh) throw new Error('Stok produk tidak mencukupi: ' + prod.Nama);
+    // v4-32: seperti saveTransaksi — tambah item offline/replay tidak
+    // boleh ditolak karena stok (kasir tidak boleh macet).
+    if (!offlineMode && !_replay && lacakStok(prod) && stokOf(DATA, prod) < butuh) throw new Error('Stok produk tidak mencukupi: ' + prod.Nama);
     (DATA.resep || []).filter(function (r) { return String(r.ProdukID) === String(prod.ID); }).forEach(function (r) {
       var b = DATA.bahan.find(function (x) { return x.ID === r.BahanID; });
-      if (b && Number(b.Stok || 0) < Number(r.QtyPakai || 0) * butuh) throw new Error('Stok bahan tidak mencukupi: ' + b.Nama);
+      if (!offlineMode && !_replay && b && Number(b.Stok || 0) < Number(r.QtyPakai || 0) * butuh) throw new Error('Stok bahan tidak mencukupi: ' + b.Nama);
     });
     var subtotal = harga * qty;
     var namaProduk = prod.Nama + (payload.note ? ' (' + String(payload.note).trim() + ')' : '');
@@ -915,7 +998,7 @@
       ex.Qty = Number(ex.Qty || 0) + qty;
       ex.Subtotal = Number(ex.Subtotal || 0) + subtotal;
       ex.Laba = Number(ex.Laba || 0) + (harga - Number(prod.HargaModal || 0)) * qty;
-      if (MODE === 'supabase' && client) {
+      if (MODE === 'supabase' && client && !offlineMode) {
         var upd = await client.from('transaksi_detail').update({ qty: ex.Qty, subtotal: ex.Subtotal, laba: ex.Laba }).eq('transaksi_id', trx.ID).eq('produk_id', prod.ID);
         if (upd.error) throw new Error(upd.error.message);
       }
@@ -1049,7 +1132,7 @@
   /* ---------- transaksi cepat & tertunda ---------- */
   async function simpanCepat(payload) {
     if (!DATA) await loadAll();
-    var row = { ID: uid('CEP'), Nama: payload.nama, Pelanggan: payload.pelanggan || 'Umum', ItemsJSON: JSON.stringify(payload.items || []), CabangID: payload.cabangId || cabangAktifId(DATA) };
+    var row = { ID: payload.id || payload.ID || uid('CEP'), Nama: payload.nama, Pelanggan: payload.pelanggan || 'Umum', ItemsJSON: JSON.stringify(payload.items || []), CabangID: payload.cabangId || cabangAktifId(DATA) };
     DATA.transaksiCepat.unshift(row); await persist('transaksi_cepat', row);
     return { ok: true, id: row.ID };
   }
@@ -1057,7 +1140,7 @@
   async function parkirTransaksi(payload) { return simpanTertunda(payload); }
   async function simpanTertunda(payload) {
     if (!DATA) await loadAll();
-    var row = { ID: uid('TTD'), Tanggal: nowISO(), Pelanggan: payload.pelanggan || 'Umum', Kasir: payload.kasir || '', ItemsJSON: JSON.stringify(payload.items || []), Total: Number(payload.total || 0), CabangID: payload.cabangId || cabangAktifId(DATA), Meja: payload.meja || '', Catatan: payload.catatan || '' };
+    var row = { ID: payload.id || payload.ID || uid('TTD'), Tanggal: nowISO(), Pelanggan: payload.pelanggan || 'Umum', Kasir: payload.kasir || '', ItemsJSON: JSON.stringify(payload.items || []), Total: Number(payload.total || 0), CabangID: payload.cabangId || cabangAktifId(DATA), Meja: payload.meja || '', Catatan: payload.catatan || '' };
     DATA.transaksiTertunda.unshift(row); await persist('transaksi_tertunda', row);
     return { ok: true, id: row.ID };
   }
@@ -1118,7 +1201,7 @@
     if (!prod) throw new Error('Produk tidak ditemukan.');
     var sistem = stokOf(DATA, prod);
     var fisik = Number(payload.stokFisik || 0);
-    var row = { ID: uid('OPN'), Tanggal: nowISO(), ProdukID: prod.ID, NamaProduk: prod.Nama, StokSistem: sistem, StokFisik: fisik, Selisih: fisik - sistem, Keterangan: payload.keterangan || '', CabangID: payload.cabangId || cabangAktifId(DATA), Pengguna: '' };
+    var row = { ID: payload.id || payload.ID || uid('OPN'), Tanggal: nowISO(), ProdukID: prod.ID, NamaProduk: prod.Nama, StokSistem: sistem, StokFisik: fisik, Selisih: fisik - sistem, Keterangan: payload.keterangan || '', CabangID: payload.cabangId || cabangAktifId(DATA), Pengguna: '' };
     DATA.opname.unshift(row); await persist('opname', row);
     setStok(DATA, prod, fisik);
     await persist('produk', prod);
@@ -1468,7 +1551,7 @@
   }
   async function catatLaporBos(payload) {
     if (!DATA) await loadAll();
-    var row = { ID: uid('LB'), Tanggal: nowISO(), CabangID: (payload && payload.cabangId) || cabangAktifId(DATA), Isi: (payload && payload.teks) || '', Terkirim: 'YA', Cara: (payload && payload.cara) || 'WhatsApp' };
+    var row = { ID: (payload && (payload.id || payload.ID)) || uid('LB'), Tanggal: nowISO(), CabangID: (payload && payload.cabangId) || cabangAktifId(DATA), Isi: (payload && payload.teks) || '', Terkirim: 'YA', Cara: (payload && payload.cara) || 'WhatsApp' };
     DATA.laporBos = DATA.laporBos || [];
     DATA.laporBos.unshift(row);
     await persist('lapor_bos', row);
@@ -1522,44 +1605,376 @@
     return { ok: true };
   }
 
-  /* ---------- ekspor global ---------- */
-  window.DB = {
-    mode: MODE, configured: !!CONFIGURED, isSample: MODE === 'contoh',
-    getData: getData, refreshRingkasan: refreshRingkasan,
-    loadAll: loadAll, login: login, getSessionUser: getSessionUser, logout: logout,
-    loadKatalogPublik: loadKatalogPublik, saveTransaksi: saveTransaksi,
+  /* ============================================================
+     OFFLINE (v4-32) — IndexedDB + outbox + sinkronisasi
+     - snapshot: salinan DATA terakhir yang berhasil dimuat online,
+       ditulis setiap loadAll online berhasil dan setiap tulis berhasil.
+     - outbox: antrean perubahan offline {id, dibuatPada, seq, jenis,
+       args, ringkasan, galat}, diunggah FIFO saat online.
+     - Replay memakai DATA SERVER SEGAR (bukan DATA offline) supaya
+       nilai yang dihitung (stok, total, piutang) tidak ganda dengan
+       perubahan yang sudah diterapkan offline. Bila replay gagal di
+       tengah jalan, DATA dikembalikan ke keadaan offline.
+     - Bila IndexedDB tidak tersedia, dipakai fallback memori (offline
+       tetap jalan selama halaman tidak dimuat ulang).
+     ============================================================ */
+  var IDB_NAMA = 'zpos-offline', IDB_VERSI = 1;
+  var _idbDb = null, _idbGagal = false;
+  var _memSnapshot = null, _memOutbox = [];
+  var _outboxSeq = 0;
+  var onOutboxBerubah = null;
+  function idbGlobal() {
+    try { if (typeof indexedDB !== 'undefined' && indexedDB) return indexedDB; } catch (e) {}
+    try { if (typeof global !== 'undefined' && global.indexedDB) return global.indexedDB; } catch (e) {}
+    return null;
+  }
+  function idbMinta(req) {
+    return new Promise(function (res, rej) {
+      req.onsuccess = function () { res(req.result); };
+      req.onerror = function () { rej(req.error || new Error('IndexedDB gagal')); };
+    });
+  }
+  function idbBuka() {
+    if (_idbGagal) return Promise.resolve(null);
+    if (_idbDb) return Promise.resolve(_idbDb);
+    var idb = idbGlobal();
+    if (!idb) { _idbGagal = true; return Promise.resolve(null); }
+    return new Promise(function (res) {
+      var req;
+      try { req = idb.open(IDB_NAMA, IDB_VERSI); } catch (e) { _idbGagal = true; return res(null); }
+      req.onupgradeneeded = function () {
+        var db = req.result;
+        try {
+          if (!db.objectStoreNames.contains('snapshot')) db.createObjectStore('snapshot', { keyPath: 'kunci' });
+          if (!db.objectStoreNames.contains('outbox')) db.createObjectStore('outbox', { keyPath: 'id' });
+        } catch (e) {}
+      };
+      req.onsuccess = function () { _idbDb = req.result; res(_idbDb); };
+      req.onerror = function () { _idbGagal = true; res(null); };
+    });
+  }
+  async function idbTulis(store, nilai) {
+    var db = await idbBuka();
+    if (!db) {
+      if (store === 'snapshot') { _memSnapshot = clone(nilai); return; }
+      var i = _memOutbox.findIndex(function (x) { return x.id === nilai.id; });
+      if (i >= 0) _memOutbox[i] = clone(nilai); else _memOutbox.push(clone(nilai));
+      return;
+    }
+    var tx = db.transaction(store, 'readwrite');
+    await idbMinta(tx.objectStore(store).put(nilai));
+  }
+  async function idbBaca(store, kunci) {
+    var db = await idbBuka();
+    if (!db) {
+      if (store === 'snapshot') return _memSnapshot ? clone(_memSnapshot) : null;
+      var f = _memOutbox.find(function (x) { return x.id === kunci; });
+      return f ? clone(f) : null;
+    }
+    var tx = db.transaction(store, 'readonly');
+    var hasil = await idbMinta(tx.objectStore(store).get(kunci));
+    return hasil == null ? null : hasil;
+  }
+  async function idbBacaSemua(store) {
+    var db = await idbBuka();
+    if (!db) {
+      if (store === 'snapshot') return _memSnapshot ? [clone(_memSnapshot)] : [];
+      return _memOutbox.map(function (x) { return clone(x); });
+    }
+    var tx = db.transaction(store, 'readonly');
+    var hasil = await idbMinta(tx.objectStore(store).getAll());
+    return hasil || [];
+  }
+  async function idbHapus(store, kunci) {
+    var db = await idbBuka();
+    if (!db) {
+      if (store === 'snapshot') { if (_memSnapshot && _memSnapshot.kunci === kunci) _memSnapshot = null; }
+      else _memOutbox = _memOutbox.filter(function (x) { return x.id !== kunci; });
+      return;
+    }
+    var tx = db.transaction(store, 'readwrite');
+    await idbMinta(tx.objectStore(store).delete(kunci));
+  }
+  async function tulisSnapshot() {
+    if (MODE !== 'supabase' || !DATA) return;
+    var salinan = clone(DATA);
+    delete salinan.ringkasan; // dihitung ulang saat dibaca
+    await idbTulis('snapshot', { kunci: 'data', data: salinan, disimpanPada: nowISO() });
+  }
+  async function bacaSnapshot() {
+    var rek = await idbBaca('snapshot', 'data');
+    if (!rek || !rek.data) return null;
+    return rek.data;
+  }
+  // Muat snapshot ke DATA + masuk MODE OFFLINE. Dipakai loadAll saat
+  // offline dan app.js saat loadData gagal karena koneksi putus.
+  async function muatDariSnapshot() {
+    var snap = null;
+    try { snap = await bacaSnapshot(); } catch (e) { snap = null; }
+    if (!snap) return null;
+    offlineMode = true;
+    DATA = snap;
+    DATA.ringkasan = computeRingkasan(DATA);
+    return DATA;
+  }
+  async function tambahOutbox(jenis, args, ringkasan) {
+    var entri = { id: uid('OUT'), dibuatPada: nowISO(), seq: Date.now() * 1000 + (_outboxSeq++ % 1000), jenis: jenis, args: clone(args || []), ringkasan: ringkasan || '', galat: '' };
+    await idbTulis('outbox', entri);
+    return entri;
+  }
+  async function bacaOutbox() {
+    var semua = await idbBacaSemua('outbox');
+    semua.sort(function (a, b) { return (a.seq || 0) - (b.seq || 0) || (String(a.dibuatPada || '') < String(b.dibuatPada || '') ? -1 : 1); });
+    return semua;
+  }
+  async function hapusOutbox(id) { await idbHapus('outbox', id); }
+  async function tandaiGagalOutbox(id, galat) {
+    var e = await idbBaca('outbox', id);
+    if (!e) return;
+    e.galat = galat;
+    await idbTulis('outbox', e);
+  }
+  function rp0(n) { return 'Rp' + Number(n || 0).toLocaleString('id-ID'); }
+  // Ringkasan satu baris untuk daftar antrean (dihitung SEBELUM tulis,
+  // karena hapus memakai nama yang sudah tidak ada sesudahnya).
+  function ringkasTulis(nama, args) {
+    var p = args[0] || {};
+    var cariNama = function (arr, id) { var x = (DATA[arr] || []).find(function (r) { return String(r.ID) === String(id); }); return x ? (x.Nama || '') : ''; };
+    switch (nama) {
+      case 'saveTransaksi': {
+        var tot = 0; (p.items || []).forEach(function (it) { tot += Number(it.Harga || 0) * Number(it.Qty || 0); });
+        return 'Transaksi ' + rp0(tot) + ' — ' + (p.pelanggan || 'Umum') + ' (' + (p.items || []).length + ' item)';
+      }
+      case 'tambahItemTrx': return 'Tambah item ke ' + (p.id || '') + ' — ' + cariNama('produk', p.produkId) + ' x' + (p.qty || 1);
+      case 'tambahPembayaran': return 'Bayar ' + rp0(p.nominal) + ' — ' + (p.id || '');
+      case 'batalkanTransaksi': return 'Batalkan transaksi ' + (p.id || '');
+      case 'simpanRetur': return 'Retur ' + (p.produk || '') + ' — ' + (p.transaksiId || '');
+      case 'lunasiSemua': return 'Lunasi semua piutang ' + (p.pelanggan || p.nama || '');
+      case 'upsertProduk': return 'Produk: ' + (p.Nama || '');
+      case 'hapusProduk': return 'Hapus produk: ' + (typeof p === 'string' ? cariNama('produk', p) : (p.Nama || p.id || ''));
+      case 'nonaktifkanProduk': return 'Nonaktifkan produk: ' + (typeof p === 'string' ? cariNama('produk', p) : (p.id || ''));
+      case 'upsertPelanggan': return 'Pelanggan: ' + (p.Nama || '');
+      case 'hapusPelanggan': return 'Hapus pelanggan: ' + (typeof p === 'string' ? cariNama('pelanggan', p) : (p.Nama || p.id || ''));
+      case 'upsertPromo': return 'Promo: ' + (p.Nama || '');
+      case 'hapusPromo': return 'Hapus promo: ' + (p.id || '');
+      case 'simpanPengeluaran': return 'Pengeluaran ' + rp0(p.nominal) + ' — ' + (p.kategori || 'Lainnya');
+      case 'simpanUangKas': return 'Kas ' + (p.jenis || '') + ' ' + rp0(p.nominal);
+      case 'simpanPembelian': return 'Pembelian ' + rp0(p.total) + ' — ' + (p.pemasok || '');
+      case 'prosesPembelian': return 'Proses pembelian ' + (p.id || p.ID || '');
+      case 'cicilUtang': return 'Cicil utang ' + rp0(p.nominal);
+      case 'simpanOpname': return 'Opname: ' + cariNama('produk', p.produkId);
+      case 'simpanCepat': return 'Transaksi cepat: ' + (p.nama || '');
+      case 'hapusCepat': return 'Hapus transaksi cepat';
+      case 'simpanTertunda': return 'Parkir transaksi ' + rp0(p.total) + ' — ' + (p.pelanggan || 'Umum');
+      case 'hapusTertunda': return 'Hapus transaksi tertunda';
+      case 'upsertPengguna': return 'Pengguna: ' + (p.Nama || '');
+      case 'hapusPengguna': return 'Hapus pengguna: ' + (p.id || '');
+      case 'upsertCabang': return 'Cabang: ' + (p.Nama || '');
+      case 'hapusCabang': return 'Hapus cabang: ' + (p.id || '');
+      case 'setCabangAktif': return 'Ganti cabang aktif';
+      case 'ubahStatusPesanan': return 'Ubah status pesanan ' + (p.id || '');
+      case 'ubahTransaksi': return 'Ubah transaksi ' + (p.id || '');
+      case 'koreksiPoin': return 'Koreksi poin ' + (p.pelangganId || '');
+      case 'simpanTeks': return 'Teks: ' + (p.nama || '');
+      case 'hapusTeks': return 'Hapus teks: ' + (p.id || '');
+      case 'upsertGrup': return 'Grup: ' + (p.nama || '');
+      case 'hapusGrup': return 'Hapus grup: ' + (p.id || '');
+      case 'upsertSatuan': return 'Satuan: ' + (p.nama || '');
+      case 'hapusSatuan': return 'Hapus satuan: ' + (p.id || '');
+      case 'upsertJenisBayar': return 'Jenis bayar: ' + (p.nama || '');
+      case 'hapusJenisBayar': return 'Hapus jenis bayar: ' + (p.id || '');
+      case 'upsertItemPengeluaran': return 'Item pengeluaran: ' + (p.nama || '');
+      case 'hapusItemPengeluaran': return 'Hapus item pengeluaran: ' + (p.id || '');
+      case 'upsertPegawai': return 'Pegawai: ' + (p.nama || '');
+      case 'hapusPegawai': return 'Hapus pegawai: ' + (p.id || '');
+      case 'upsertKatalog': return 'Katalog: ' + (p.Nama || '');
+      case 'upsertPemasok': return 'Pemasok: ' + (p.Nama || '');
+      case 'simpanResep': return 'Resep produk';
+      case 'upsertBahan': return 'Bahan: ' + (p.Nama || '');
+      case 'hapusBahan': return 'Hapus bahan: ' + (p.id || '');
+      case 'catatLaporBos': return 'Lapor Bos';
+      case 'simpanTerjemahan': return 'Terjemahan';
+      case 'upsertTier': return 'Tier: ' + (p.tier || p.Tier || '');
+      case 'upsertMeja': return 'Meja: ' + (p.Nama || '');
+      case 'hapusMeja': return 'Hapus meja: ' + (p.id || '');
+      case 'updateStatusDapur': return 'Dapur: ' + (p.id || '') + ' → ' + (p.status || '');
+      default: return nama;
+    }
+  }
+  // Semua metode tulis (dipakai replay + pembungkus ekspor). Metode baca
+  // tidak ada di sini — tidak pernah diantrekan.
+  var METODE_TULIS = {
+    saveTransaksi: saveTransaksi, tambahItemTrx: tambahItemTrx, tambahPembayaran: tambahPembayaran,
+    batalkanTransaksi: batalkanTransaksi, simpanRetur: simpanRetur, lunasiSemua: lunasiSemua,
     upsertProduk: upsertProduk, hapusProduk: hapusProduk, nonaktifkanProduk: nonaktifkanProduk,
-    upsertPelanggan: upsertPelanggan, hapusPelanggan: hapusPelanggan, simpanPengeluaran: simpanPengeluaran,
-    simpanUangKas: simpanUangKas, simpanPembelian: simpanPembelian,
-    prosesPembelian: prosesPembelian, cicilUtang: cicilUtang, simpanRetur: simpanRetur,
-    lunasiSemua: lunasiSemua, lunasiSemuaPelanggan: lunasiSemua,
-    simpanCepat: simpanCepat, hapusCepat: hapusCepat,
-    parkirTransaksi: parkirTransaksi, simpanTertunda: simpanTertunda,
-    muatTertunda: muatTertunda, hapusTertunda: hapusTertunda,
+    upsertPelanggan: upsertPelanggan, hapusPelanggan: hapusPelanggan,
     upsertPromo: upsertPromo, hapusPromo: hapusPromo, upsertTier: upsertTier,
     upsertMeja: upsertMeja, hapusMeja: hapusMeja, updateStatusDapur: updateStatusDapur,
+    simpanPengeluaran: simpanPengeluaran, simpanUangKas: simpanUangKas,
+    simpanPembelian: simpanPembelian, prosesPembelian: prosesPembelian, cicilUtang: cicilUtang,
+    simpanCepat: simpanCepat, hapusCepat: hapusCepat, parkirTransaksi: parkirTransaksi,
+    simpanTertunda: simpanTertunda, hapusTertunda: hapusTertunda,
     simpanOpname: simpanOpname, simpanPengaturan: simpanPengaturan,
     upsertPengguna: upsertPengguna, hapusPengguna: hapusPengguna,
     upsertCabang: upsertCabang, hapusCabang: hapusCabang, setCabangAktif: setCabangAktif,
-    tambahPembayaran: tambahPembayaran, tambahItemTrx: tambahItemTrx, ubahStatusPesanan: ubahStatusPesanan,
-    ubahTransaksi: ubahTransaksi,
-    batalkanTransaksi: batalkanTransaksi, koreksiPoin: koreksiPoin,
-    simpanTeks: simpanTeks, upsertTeks: simpanTeks, hapusTeks: hapusTeks,
-    upsertGrup: upsertGrup, hapusGrup: hapusGrup,
-    upsertSatuan: upsertSatuan, hapusSatuan: hapusSatuan,
+    ubahStatusPesanan: ubahStatusPesanan, ubahTransaksi: ubahTransaksi,
+    koreksiPoin: koreksiPoin, simpanTeks: simpanTeks, hapusTeks: hapusTeks,
+    upsertGrup: upsertGrup, hapusGrup: hapusGrup, upsertSatuan: upsertSatuan, hapusSatuan: hapusSatuan,
     upsertJenisBayar: upsertJenisBayar, hapusJenisBayar: hapusJenisBayar,
     upsertItemPengeluaran: upsertItemPengeluaran, hapusItemPengeluaran: hapusItemPengeluaran,
     upsertPegawai: upsertPegawai, hapusPegawai: hapusPegawai,
     upsertKatalog: upsertKatalog, upsertPemasok: upsertPemasok,
+    simpanResep: simpanResep, upsertBahan: upsertBahan, hapusBahan: hapusBahan,
+    catatLaporBos: catatLaporBos, simpanTerjemahan: simpanTerjemahan
+  };
+  var _tulisDalam = false;
+  // Pembungkus semua metode tulis yang diekspor: online -> jalan biasa
+  // (+ snapshot diperbarui); offline -> jalan in-memory, lalu satu entri
+  // outbox + snapshot baru. Panggilan bersarang (mis. lunasiSemua yang
+  // memanggil tambahPembayaran di dalam) hanya dicatat sekali oleh
+  // pemanggil terluar. Bila tulis gagal (validasi dsb.), tidak dicatat.
+  function bungkusTulis(nama, fn) {
+    return async function () {
+      var args = Array.prototype.slice.call(arguments);
+      // Tambah pengguna BARU butuh Auth admin di server — tetap online.
+      // Edit pengguna yang sudah ada boleh diantrekan (hanya baris tabel).
+      if (nama === 'upsertPengguna' && offlineMode) {
+        var p0 = args[0] || {};
+        var ada = p0.ID && (DATA.pengguna || []).some(function (x) { return String(x.ID) === String(p0.ID); });
+        if (!ada) throw new Error('Tambah pengguna baru butuh internet (akun login dibuat di server).');
+      }
+      if (!offlineMode) {
+        var hasilOnline = await fn.apply(null, args);
+        try { if ((await bacaOutbox()).length === 0) await tulisSnapshot(); } catch (e) {}
+        return hasilOnline;
+      }
+      if (_tulisDalam) return fn.apply(null, args);
+      var ringkasan = '';
+      try { ringkasan = ringkasTulis(nama, args); } catch (e) { ringkasan = nama; }
+      _tulisDalam = true;
+      try {
+        var hasil = await fn.apply(null, args);
+        var argsSimpan = clone(args);
+        // Id yang dibuat di client saat offline disimpan ke payload antrean
+        // supaya replay memakai id yang sama (lihat saveTransaksi).
+        var nid = hasil && (hasil.id || hasil.ID);
+        if (nid && argsSimpan[0] && typeof argsSimpan[0] === 'object') {
+          if (!argsSimpan[0].id) argsSimpan[0].id = nid;
+          if (!argsSimpan[0].ID) argsSimpan[0].ID = nid;
+        }
+        if (hasil && hasil.kodeAlternatif && argsSimpan[0] && typeof argsSimpan[0] === 'object' && !argsSimpan[0].kodeAlternatif) argsSimpan[0].kodeAlternatif = hasil.kodeAlternatif;
+        await tambahOutbox(nama, argsSimpan, ringkasan);
+        await tulisSnapshot();
+        if (typeof onOutboxBerubah === 'function') { try { onOutboxBerubah(); } catch (e) {} }
+        return hasil;
+      } finally { _tulisDalam = false; }
+    };
+  }
+  var DB_EKSPOR_TULIS = {};
+  Object.keys(METODE_TULIS).forEach(function (nama) { DB_EKSPOR_TULIS[nama] = bungkusTulis(nama, METODE_TULIS[nama]); });
+  // Kembalikan DATA ke keadaan offline bila sinkronisasi gagal di tengah
+  // jalan — utamanya dari snapshot (berisi perubahan offline), bila tidak
+  // ada snapshot pakai DATA sebelum sinkronisasi.
+  async function pulihkanDataOffline(dataOffline, modeOffline) {
+    var snap = null;
+    try { snap = await bacaSnapshot(); } catch (e) { snap = null; }
+    if (snap) { DATA = snap; DATA.ringkasan = computeRingkasan(DATA); }
+    else if (dataOffline) { DATA = dataOffline; }
+    offlineMode = !!modeOffline;
+  }
+  // Unggah antrean SATU PER SATU sesuai urutan (FIFO) lewat metode DB
+  // yang sudah ada, terhadap DATA SERVER SEGAR. Berhasil -> hapus dari
+  // outbox. Gagal -> BERHENTI di entri itu (jangan loncat), tandai galat,
+  // kembalikan DATA ke keadaan offline. Galat jaringan bukan salah entri:
+  // antrean tetap menunggu, tanpa tanda gagal.
+  async function sinkronkanOutbox() {
+    var antrean = await bacaOutbox();
+    if (!antrean.length) return { ok: true, diunggah: 0, gagal: 0 };
+    if (jaringanMati()) return { ok: false, diunggah: 0, gagal: antrean.length, galat: 'Masih offline.' };
+    var dataOffline = DATA;
+    var offlineDulu = offlineMode;
+    var dataServer;
+    try { dataServer = await muatDariServer(); }
+    catch (e) {
+      if (galatJaringan(e)) return { ok: false, diunggah: 0, gagal: antrean.length, galat: 'Masih offline.' };
+      return { ok: false, diunggah: 0, gagal: antrean.length, galat: (e && e.message) || String(e) };
+    }
+    DATA = dataServer;
+    DATA.ringkasan = computeRingkasan(DATA);
+    offlineMode = false;
+    _replay = true;
+    var diunggah = 0;
+    try {
+      for (var i = 0; i < antrean.length; i++) {
+        var e = antrean[i];
+        var fn = METODE_TULIS[e.jenis];
+        if (!fn) {
+          await tandaiGagalOutbox(e.id, 'Jenis antrean tidak dikenal: ' + e.jenis);
+          await pulihkanDataOffline(dataOffline, offlineDulu);
+          return { ok: false, diunggah: diunggah, gagal: 1, galat: 'Jenis antrean tidak dikenal: ' + e.jenis, entriGagal: e };
+        }
+        try {
+          await fn.apply(null, e.args || []);
+          await hapusOutbox(e.id);
+          diunggah++;
+        } catch (err) {
+          var pesan = (err && err.message) || String(err);
+          if (galatJaringan(err)) {
+            await pulihkanDataOffline(dataOffline, true);
+            return { ok: false, diunggah: diunggah, gagal: 1, galat: 'Koneksi putus saat sinkronisasi.', entriGagal: e };
+          }
+          await tandaiGagalOutbox(e.id, pesan);
+          await pulihkanDataOffline(dataOffline, offlineDulu);
+          return { ok: false, diunggah: diunggah, gagal: 1, galat: pesan, entriGagal: e };
+        }
+      }
+    } finally { _replay = false; }
+    try { await tulisSnapshot(); } catch (e) {}
+    if (typeof onOutboxBerubah === 'function') { try { onOutboxBerubah(); } catch (e) {} }
+    return { ok: true, diunggah: diunggah, gagal: 0 };
+  }
+  // Coba lagi satu entri yang gagal: hapus tanda gagalnya lalu jalankan
+  // sinkronisasi dari depan (entri gagal selalu yang tertua, jadi antrean
+  // dimulai dari situ). "Coba lagi semua" = sinkronkanOutbox().
+  async function cobaLagiOutbox(id) {
+    var antrean = await bacaOutbox();
+    var e = null;
+    for (var i = 0; i < antrean.length; i++) if (String(antrean[i].id) === String(id)) { e = antrean[i]; break; }
+    if (!e) return { ok: false, diunggah: 0, gagal: 0, galat: 'Antrean tidak ditemukan.' };
+    if (e.galat) { e.galat = ''; await idbTulis('outbox', e); }
+    return sinkronkanOutbox();
+  }
+  async function statusOffline() {
+    var antrean = await bacaOutbox();
+    var gagal = antrean.filter(function (x) { return x.galat; });
+    return { offline: offlineMode, jumlah: antrean.length, gagal: gagal, antrean: antrean };
+  }
+  function sedangOffline() { return offlineMode; }
+
+  /* ---------- ekspor global ---------- */
+  /* Metode tulis diekspor lewat bungkusTulis (v4-32: antrean offline);
+     metode baca diekspor langsung. */
+  window.DB = Object.assign({
+    mode: MODE, configured: !!CONFIGURED, isSample: MODE === 'contoh',
+    getData: getData, refreshRingkasan: refreshRingkasan,
+    loadAll: loadAll, login: login, getSessionUser: getSessionUser, logout: logout,
+    loadKatalogPublik: loadKatalogPublik,
+    muatDariSnapshot: muatDariSnapshot, sedangOffline: sedangOffline,
+    statusOffline: statusOffline, sinkronkanOutbox: sinkronkanOutbox,
+    cobaLagiOutbox: cobaLagiOutbox,
+    setOnOutboxBerubah: function (fn) { onOutboxBerubah = fn; },
+    muatTertunda: muatTertunda,
     getLaporan: getLaporan, getLaporanLengkap: getLaporanLengkap,
     getLaporanStok: getLaporanStok, saranOrder: saranOrder, hitungPromo: hitungPromo,
     getRiwayatPoin: getRiwayatPoin, getStruk: getStruk, getDapur: getDapur,
     getTopKasir: getTopKasir, getLogs: getLogs,
-    kirimLaporBos: kirimLaporBos, catatLaporBos: catatLaporBos,
+    kirimLaporBos: kirimLaporBos,
     exportProdukCSV: exportProdukCSV, exportLaporanExcel: exportLaporanExcel,
-    cetakLabelBarcode: cetakLabelBarcode, hitungHPP: hitungHPP, simpanResep: simpanResep,
-    upsertBahan: upsertBahan, hapusBahan: hapusBahan,
+    cetakLabelBarcode: cetakLabelBarcode, hitungHPP: hitungHPP,
     pengingatPiutang: pengingatPiutang, tagihanGabungan: tagihanGabungan,
-    getTerjemahan: getTerjemahan, simpanTerjemahan: simpanTerjemahan
-  };
+    getTerjemahan: getTerjemahan
+  }, DB_EKSPOR_TULIS, {
+    lunasiSemuaPelanggan: DB_EKSPOR_TULIS.lunasiSemua,
+    upsertTeks: DB_EKSPOR_TULIS.simpanTeks
+  });
 })();
