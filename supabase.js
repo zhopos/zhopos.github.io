@@ -807,6 +807,19 @@
     if (ex) row.Hutang = ex.Hutang;
     return upsertInto('pemasok', 'pemasok', row, 'PMS');
   }
+  // v4-33: pemasok akhirnya bisa dihapus (dulu tabel pemasok tanpa aksi).
+  // Guard seperti produk: pemasok yang sudah dipakai di pembelian tidak
+  // boleh dihapus — riwayat pembelian + utang merujuk namanya.
+  async function hapusPemasok(payload) {
+    if (!DATA) await loadAll();
+    var id = typeof payload === 'string' ? payload : (payload.id || payload.ID || '');
+    var pm = (DATA.pemasok || []).find(function (x) { return String(x.ID) === String(id); });
+    if (!pm) throw new Error('Pemasok tidak ditemukan.');
+    var dipakai = (DATA.pembelian || []).some(function (p) { return String(p.Pemasok || '') === String(pm.Nama); });
+    if (dipakai) throw new Error('Pemasok "' + pm.Nama + '" sudah pernah dipakai di pembelian, jadi tidak bisa dihapus.');
+    await hapusDari('pemasok', 'pemasok', id);
+    return { ok: true };
+  }
 
   /* ---------- pengeluaran & kas ---------- */
   async function simpanPengeluaran(payload) {
@@ -929,9 +942,29 @@
       if (scRetur) await persist('stok_cabang', scRetur);
     }
     var sisaLama = Number(trx.Sisa || 0);
+    // v4-33: uang hanya kembali sebesar yang SUDAH dibayar. Retur item yang
+    // belum dibayar (hanya menambah Sisa/piutang) tidak boleh memotong kas —
+    // dulu selalu menulis kas Keluar sebesar nominal, sehingga kas jadi
+    // kurang saat transaksi itu akhirnya dibatalkan.
+    var returKasLama = (DATA.kas || []).filter(function (k) {
+      return k.Jenis === 'Keluar' && String(k.Keterangan || '').indexOf('Retur ' + trx.ID + ' —') === 0;
+    }).reduce(function (a, k) { return a + Number(k.Keluar || 0); }, 0);
+    var kasKeluar = Math.max(0, Math.min(nominal, Number(trx.Bayar || 0) - returKasLama));
     trx.Total = Math.max(0, Number(trx.Total || 0) - nominal);
     trx.Sisa = Math.max(0, sisaLama - nominal);
     if (trx.Sisa === 0 && Number(trx.Bayar || 0) > 0) trx.StatusBayar = 'Lunas';
+    // v4-33: laba berkurang sebesar laba item yang diretur (simetris dengan
+    // tambahItemTrx yang menambah Laba). Laba per unit diambil dari baris
+    // detail; bila detail tidak ditemukan, pakai nominal − modal×qty.
+    var labaRetur = 0;
+    var detRetur = (DATA.detail || []).find(function (x) { return String(x.TransaksiID) === String(trx.ID) && (String(x.ProdukID) === String(prod ? prod.ID : '') || String(x.NamaProduk) === String(row.Produk)); });
+    if (detRetur && Number(detRetur.Qty || 0) > 0) {
+      var labaPerUnit = Number(detRetur.Laba || 0) / Number(detRetur.Qty || 0);
+      labaRetur = labaPerUnit * qty;
+      if (labaPerUnit >= 0) labaRetur = Math.min(labaRetur, Number(detRetur.Laba || 0));
+    }
+    else if (prod) labaRetur = Math.max(0, nominal - Number(prod.HargaModal || 0) * qty);
+    trx.Laba = Math.max(0, Number(trx.Laba || 0) - labaRetur);
     await persist('transaksi', trx);
     // Pelanggan: retur mengurangi TotalBeli sebesar nominal, dan piutang
     // sebesar berkurangnya sisa (simetris dengan tambahItemTrx yang
@@ -942,9 +975,11 @@
       pl.Piutang = Math.max(0, Number(pl.Piutang || 0) - (sisaLama - trx.Sisa));
       await persist('pelanggan', pl);
     }
-    if (nominal > 0) {
-      var saldo = (DATA.kas || []).reduce(function (a, k) { return a + Number(k.Masuk || 0) - Number(k.Keluar || 0); }, 0) - nominal;
-      var kasRow = { ID: uid('KAS'), Tanggal: nowISO(), Jenis: 'Keluar', Keterangan: 'Retur ' + trx.ID + ' — ' + row.Produk, Masuk: 0, Keluar: nominal, Saldo: saldo, CabangID: row.CabangID };
+    // v4-33: kas Keluar hanya sebesar kasKeluar (porsi yang sudah dibayar) —
+    // sisanya hanya mengurangi Sisa/piutang, tanpa menyentuh kas.
+    if (kasKeluar > 0) {
+      var saldo = (DATA.kas || []).reduce(function (a, k) { return a + Number(k.Masuk || 0) - Number(k.Keluar || 0); }, 0) - kasKeluar;
+      var kasRow = { ID: uid('KAS'), Tanggal: nowISO(), Jenis: 'Keluar', Keterangan: 'Retur ' + trx.ID + ' — ' + row.Produk, Masuk: 0, Keluar: kasKeluar, Saldo: saldo, CabangID: row.CabangID };
       DATA.kas.push(kasRow); await persist('kas', kasRow);
     }
     addLog(DATA, '', 'Retur', trx.ID + ' — ' + row.Produk + ' x' + qty);
@@ -1075,6 +1110,14 @@
     var trx = DATA.transaksi.find(function (x) { return x.ID === payload.id; });
     if (!trx) throw new Error('Transaksi tidak ditemukan.');
     var dets = DATA.detail.filter(function (d) { return d.TransaksiID === trx.ID; });
+    // v4-33: retur yang sudah dilakukan mengurangi stok yang dikembalikan
+    // (dulu SEMUA baris detail dikembalikan — item yang sudah diretur
+    // kembali 2x ke stok) dan mengurangi uang yang dikembalikan (uang
+    // retur item yang sudah dibayar tidak boleh dikembalikan 2x).
+    var returTrx = (DATA.retur || []).filter(function (r) { return String(r.TransaksiID) === String(trx.ID); });
+    var returKas = (DATA.kas || []).filter(function (k) {
+      return k.Jenis === 'Keluar' && String(k.Keterangan || '').indexOf('Retur ' + trx.ID + ' —') === 0;
+    }).reduce(function (a, k) { return a + Number(k.Keluar || 0); }, 0);
     // Kembalikan stok (pakai pengali varian: 1 lsn = isi pcs) + bahan baku.
     // Stok dikembalikan ke cabang transaksi itu, bukan cabang aktif.
     var bahanKembali = {};
@@ -1084,7 +1127,11 @@
       if (!prod) continue;
       var isi = 1;
       if (d.SatuanDipakai) { var vr = parseJSON(prod.VarianJSON || '[]', []); var v = vr.find(function (x) { return x.label === d.SatuanDipakai; }); if (v) isi = Number(v.isi || 1); }
-      var kembali = Number(d.Qty || 0) * isi;
+      // Qty yang sudah diretur untuk produk ini (baris retur cocok lewat
+      // nama produk di detail; stokQty retur sudah dalam satuan pcs).
+      var qtyRetur = 0;
+      returTrx.forEach(function (r) { if (String(r.Produk || '') === String(d.NamaProduk) || String(r.Produk || '') === String(prod.Nama)) qtyRetur += Number(r.Qty || 0); });
+      var kembali = Math.max(0, Number(d.Qty || 0) - qtyRetur) * isi;
       if (lacakStok(prod)) {
         var sc = (DATA.stokCabang || []).find(function (x) { return String(x.ProdukID) === String(prod.ID) && String(x.CabangID) === String(trx.CabangID || cabangAktifId(DATA)); });
         if (sc) { sc.Stok = Number(sc.Stok || 0) + kembali; await persist('stok_cabang', sc); }
@@ -1114,9 +1161,12 @@
       }
       await persist('pelanggan', pl);
     }
-    if (Number(trx.Bayar || 0) > 0) {
-      var saldo = (DATA.kas || []).reduce(function (a, k) { return a + Number(k.Masuk || 0) - Number(k.Keluar || 0); }, 0) - Number(trx.Bayar);
-      var kasRow = { ID: uid('KAS'), Tanggal: nowISO(), Jenis: 'Keluar', Keterangan: 'Batal transaksi ' + trx.ID + ' (uang kembali)', Masuk: 0, Keluar: Number(trx.Bayar), Saldo: saldo, CabangID: trx.CabangID || cabangAktifId(DATA) };
+    // v4-33: kembalikan yang dibayar, dikurangi uang yang SUDAH kembali
+    // lewat retur — bila tidak, pelanggan menerima uang retur 2x.
+    var kembaliKas = Math.max(0, Number(trx.Bayar || 0) - returKas);
+    if (kembaliKas > 0) {
+      var saldo = (DATA.kas || []).reduce(function (a, k) { return a + Number(k.Masuk || 0) - Number(k.Keluar || 0); }, 0) - kembaliKas;
+      var kasRow = { ID: uid('KAS'), Tanggal: nowISO(), Jenis: 'Keluar', Keterangan: 'Batal transaksi ' + trx.ID + ' (uang kembali)', Masuk: 0, Keluar: kembaliKas, Saldo: saldo, CabangID: trx.CabangID || cabangAktifId(DATA) };
       DATA.kas.push(kasRow); await persist('kas', kasRow);
     }
     DATA.transaksi = DATA.transaksi.filter(function (x) { return x.ID !== trx.ID; });
@@ -1789,6 +1839,7 @@
       case 'hapusPegawai': return 'Hapus pegawai: ' + (p.id || '');
       case 'upsertKatalog': return 'Katalog: ' + (p.Nama || '');
       case 'upsertPemasok': return 'Pemasok: ' + (p.Nama || '');
+      case 'hapusPemasok': return 'Hapus pemasok: ' + (typeof p === 'string' ? cariNama('pemasok', p) : (p.Nama || p.id || ''));
       case 'simpanResep': return 'Resep produk';
       case 'upsertBahan': return 'Bahan: ' + (p.Nama || '');
       case 'hapusBahan': return 'Hapus bahan: ' + (p.id || '');
@@ -1823,7 +1874,7 @@
     upsertJenisBayar: upsertJenisBayar, hapusJenisBayar: hapusJenisBayar,
     upsertItemPengeluaran: upsertItemPengeluaran, hapusItemPengeluaran: hapusItemPengeluaran,
     upsertPegawai: upsertPegawai, hapusPegawai: hapusPegawai,
-    upsertKatalog: upsertKatalog, upsertPemasok: upsertPemasok,
+    upsertKatalog: upsertKatalog, upsertPemasok: upsertPemasok, hapusPemasok: hapusPemasok,
     simpanResep: simpanResep, upsertBahan: upsertBahan, hapusBahan: hapusBahan,
     catatLaporBos: catatLaporBos, simpanTerjemahan: simpanTerjemahan
   };

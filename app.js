@@ -59,6 +59,14 @@ function promoJenisGanti() {
   el.value = promoNilaiAdalahUang() ? fmtUang(el.value) : String(parseUang(el.value));
 }
 function todayStr(d) { var x = d ? new Date(d) : new Date(); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); }
+// v4-33: tanggal dari database sering mentah ISO ("2026-11-24T00:00:00+00:00") —
+// tampilkan sebagai dd-mm-yyyy seperti tanggal lain di aplikasi.
+function fmtTanggalID(s) {
+  if (s == null || s === '') return '—';
+  var m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return String(s);
+  return m[3] + '-' + m[2] + '-' + m[1];
+}
 function show(id, btn) {
   document.querySelectorAll('main section').forEach(function (s) { s.classList.remove('active'); });
   var el = document.getElementById(id); if (el) el.classList.add('active');
@@ -121,7 +129,7 @@ function konfirmasi(judul, pesan, labelYa, kelasYa) {
   });
 }
 function jawabKonfirm(ya) {
-  // v4-32: selama impor berjalan, modal dipakai sebagai layar progres —
+  // v4-33: selama impor berjalan, modal dipakai sebagai layar progres —
   // tidak bisa ditutup (tombol disembunyikan, klik luar diabaikan).
   if (typeof _imporBerjalan !== 'undefined' && _imporBerjalan) return;
   document.getElementById('konfirmBackdrop').style.display = 'none';
@@ -260,7 +268,7 @@ function setModeLabel() {
   var ds = document.getElementById('drawerSync');
   if (ds) {
     if (contoh) ds.innerHTML = '<b>Mode Contoh</b> — isi config.js untuk terhubung';
-    else perbaruiIndikatorOffline(); // v4-32: baris sync + status offline
+    else perbaruiIndikatorOffline(); // v4-33: baris sync + status offline
   }
 }
 
@@ -294,7 +302,7 @@ async function loadData() {
       var sesi = null;
       try { sesi = await DB.getSessionUser(); } catch (e) { sesi = null; }
       if (!sesi) {
-        // v4-32: offline tanpa sesi tersimpan — login pertama kali butuh
+        // v4-33: offline tanpa sesi tersimpan — login pertama kali butuh
         // internet; beri tahu di layar login, bukan layar kosong.
         var sedangOfflineLogin = false;
         try { sedangOfflineLogin = navigator.onLine === false; } catch (e2) {}
@@ -315,7 +323,7 @@ async function loadData() {
     return selesaiMuatData();
   } catch (e) {
     hideLoading();
-    // v4-32: belum pernah online di perangkat ini -> layar penjelasan,
+    // v4-33: belum pernah online di perangkat ini -> layar penjelasan,
     // bukan layar kosong / alert.
     if (String((e && e.message) || e) === 'OFFLINE_TANPA_SNAPSHOT') { tampilkanOfflineAwal(); return false; }
     // Timeout / koneksi putus di tengah jalan (loadAll sendiri sudah
@@ -331,7 +339,7 @@ async function loadData() {
     tampilError('Gagal memuat data: ' + e.message); alert('Gagal memuat data: ' + e.message); return false;
   }
 }
-/* Layar penjelasan saat offline dan belum pernah ada snapshot (v4-32). */
+/* Layar penjelasan saat offline dan belum pernah ada snapshot (v4-33). */
 function tampilkanOfflineAwal() {
   var el = document.getElementById('offlineAwal'); if (el) el.style.display = '';
   var lb = document.getElementById('loginBox'); if (lb) lb.style.display = 'none';
@@ -366,7 +374,7 @@ function selesaiMuatData() {
     var oa = document.getElementById('offlineAwal'); if (oa) oa.style.display = 'none';
     document.querySelectorAll('main section').forEach(function (s) { s.style.display = ''; });
     renderAll(); applyRole(); hideLoading();
-    // v4-32: bila online dan ada antrean offline, sinkronkan otomatis.
+    // v4-33: bila online dan ada antrean offline, sinkronkan otomatis.
     try { if (DB.configured) sinkronisasiOtomatis(); } catch (e) {}
     return true;
 }
@@ -375,7 +383,7 @@ async function muatUlangManual() {
   if (ok) tampilInfo('Data diperbarui • ' + (lastSyncAt ? lastSyncAt.toLocaleTimeString('id-ID') : ''));
 }
 
-/* ---------- STATUS OFFLINE + ANTREAN + SINKRONISASI OTOMATIS (v4-32) ----------
+/* ---------- STATUS OFFLINE + ANTREAN + SINKRONISASI OTOMATIS (v4-33) ----------
    Badge di header selalu menunjukkan status: "Online" (teal) atau
    "Offline — N menunggu diunggah" (kuning; merah bila ada yang gagal).
    Ketuk badge -> daftar antrean (jenis + waktu + ringkasan) dan, bila ada
@@ -597,7 +605,7 @@ function renderAll() {
   vsEl.textContent = (pct >= 0 ? '+' : '') + pct + '% vs kemarin';
   vsEl.classList.toggle('down', pct < 0);
   document.getElementById('heroUser').textContent = currentUser ? ('Halo, ' + currentUser.nama + ' (' + currentUser.peran + ') — kasir siap melayani hari ini.') : 'Kasir siap melayani hari ini.';
-  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • ' + currentUser.peran + ' • v4-32') : 'Kasir • v4-32';
+  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • ' + currentUser.peran + ' • v4-33') : 'Kasir • v4-33';
   var bb = document.getElementById('bellBadge');
   if (bb) { var sm = Number(r.stokMenipis || 0); bb.style.display = sm > 0 ? 'flex' : 'none'; bb.textContent = sm > 99 ? '99+' : String(sm); }
   isiNotifPanel();
@@ -894,17 +902,19 @@ async function cekPromo() {
   } catch (e) { /* promo gagal dihitung: transaksi tetap jalan tanpa promo */ }
 }
 function tukarPoin() {
-  if ((DATA.pengaturan || {}).PoinAktif === 'TIDAK') return alert('Fitur poin sedang dimatikan di Pengaturan.');
+  if ((DATA.pengaturan || {}).PoinAktif === 'TIDAK') return tampilError('Fitur poin sedang dimatikan di Pengaturan.');
   var nama = document.getElementById('kasirPelanggan').value;
   var pl = (DATA.pelanggan || []).find(function (p) { return p.Nama === nama; });
-  if (!pl) return alert('Pilih pelanggan terdaftar dulu (bukan Umum).');
-  if ((pl.Poin || 0) < 100) return alert('Poin pelanggan kurang dari 100 (saldo: ' + (pl.Poin || 0) + ').');
+  if (!pl) return tampilError('Pilih pelanggan terdaftar dulu (bukan Umum).');
+  // v4-33: beri pesan jelas lewat toast (dulu alert() — tidak terlihat di
+  // browser penguji dan tidak memberi tahu kenapa tombol diam).
+  if ((pl.Poin || 0) < 100) return tampilError('Poin belum cukup — butuh min. 100 poin, poin kamu ' + (pl.Poin || 0) + '.');
   var maks = Math.floor((pl.Poin || 0) / 100) * 100;
   var v = prompt('Tukar berapa poin? (kelipatan 100, maks ' + maks + ', 100 poin = Rp1.000)', String(Math.min(100, maks)));
   if (!v) return;
   var n = Math.floor(Number(v) / 100) * 100;
-  if (n < 100 || n > maks) return alert('Jumlah tidak valid.');
-  poinDipakai = n; renderCart(); alert('Poin ditukar: ' + n + ' poin = ' + rp(n / 100 * 1000) + ' diskon.');
+  if (n < 100 || n > maks) return tampilError('Jumlah tidak valid.');
+  poinDipakai = n; renderCart(); tampilInfo('Poin ditukar: ' + n + ' poin = ' + rp(n / 100 * 1000) + ' diskon.');
 }
 /* ---------- PEMBAYARAN ---------- */
 function goCheckout() {
@@ -964,11 +974,16 @@ async function simpanTransaksi() {
   if (!cart.length) return alert('Keranjang masih kosong.');
   sedangMenyimpan = true;
   var btnSelesai = document.getElementById('btnSelesai'); if (btnSelesai) btnSelesai.disabled = true;
+  var teksSelesai = btnSelesai ? btnSelesai.textContent : '';
   try {
     sembunyiError();
     // Promo harus segar sebelum total dihitung (cekPromo di-debounce 400 ms —
     // tanpa await ini, struk bisa memakai total tanpa promo).
     await cekPromo();
+    // v4-33: umpan balik instan — tombol "Menyimpan…" + toast, supaya ketuk
+    // tidak terasa diam selama simpan + loadData berjalan.
+    if (btnSelesai) btnSelesai.textContent = 'Menyimpan…';
+    tampilInfo('Menyimpan…');
     var h = hitungCart();
     var namaPelanggan = document.getElementById('kasirPelanggan').value;
     var pl = (DATA.pelanggan || []).find(function (p) { return p.Nama === namaPelanggan; });
@@ -976,7 +991,7 @@ async function simpanTransaksi() {
     var janjiSimpan = DB.saveTransaksi(payload);
     // Buka kunci hanya saat simpan benar-benar selesai — timeout 15 detik
     // TIDAK membatalkan simpan yang sedang jalan di latar belakang.
-    janjiSimpan.then(function () { sedangMenyimpan = false; if (btnSelesai) btnSelesai.disabled = false; }, function () { sedangMenyimpan = false; if (btnSelesai) btnSelesai.disabled = false; });
+    janjiSimpan.then(function () { sedangMenyimpan = false; if (btnSelesai) { btnSelesai.disabled = false; btnSelesai.textContent = teksSelesai; } }, function () { sedangMenyimpan = false; if (btnSelesai) { btnSelesai.disabled = false; btnSelesai.textContent = teksSelesai; } });
     var res = await withTimeout(janjiSimpan, 15000, 'Server tidak menjawab saat menyimpan (15 detik). Periksa koneksi internet, lalu coba lagi.');
     lastStruk = buatStruk(res, payload, h, pl);
     var el = document.getElementById('struk'); el.style.display = 'block'; el.innerHTML = strukKeHtml(lastStruk);
@@ -1340,6 +1355,8 @@ function renderTrx() {
   document.getElementById('laporanTable').innerHTML = html;
 }
 async function lunasi(id, nominal) {
+  var _btn = null, _teksBtn = '';
+  try { _btn = (typeof event !== 'undefined' && event && event.target) || null; } catch (e) { _btn = null; }
   var trx = (DATA.transaksi || []).find(function (x) { return x.ID === id; });
   if (!trx) return;
   var sisa = Number(trx.Sisa || 0);
@@ -1347,10 +1364,25 @@ async function lunasi(id, nominal) {
   if (!(n > 0)) return;
   if (n > sisa) n = sisa;
   if (!await konfirmasi('Bayar sisa ' + rp(n) + '?', 'Pembayaran dicatat sebagai pelunasan ' + (trx.Pelanggan || 'transaksi') + ' (' + (trx.KodeAlternatif || trx.ID) + ').', 'Ya, Bayar', 'primary')) return;
-  try { await DB.tambahPembayaran({ id: id, nominal: n }); await loadData(); tampilInfo('Pembayaran ' + rp(n) + ' tercatat.'); } catch (e) { tampilError('Gagal mencatat pembayaran: ' + (e.message || e)); }
+  // v4-33: umpan balik instan — tombol "Menyimpan…" + toast.
+  if (_btn) { _teksBtn = _btn.textContent; _btn.disabled = true; _btn.textContent = 'Menyimpan…'; }
+  tampilInfo('Menyimpan…');
+  try { await DB.tambahPembayaran({ id: id, nominal: n }); await loadData(); tampilInfo('Pembayaran ' + rp(n) + ' tercatat.'); } catch (e) { tampilError('Gagal mencatat pembayaran: ' + (e.message || e)); } finally { if (_btn) { _btn.disabled = false; _btn.textContent = _teksBtn; } }
 }
 async function ubahStatus(id, status) { if (!status) return; await DB.ubahStatusPesanan({ id: id, status: status }); await loadData(); }
+// v4-33: struk yang tersimpan di memori (lastStruk) harus dibersihkan bila
+// transaksinya sudah dibatalkan/dihapus — pratinjau struk di Kasir jangan
+// menampilkan struk basi dari transaksi yang sudah tidak ada.
+function bersihkanStrukBilaTerhapus(id) {
+  if (lastStrukData && String(lastStrukData.id || '') === String(id)) {
+    lastStruk = ''; lastStrukData = null; lastWaTelp = '';
+    var el = document.getElementById('struk'); if (el) { el.style.display = 'none'; el.innerHTML = ''; }
+    var sp = document.getElementById('strukPrint'); if (sp) sp.innerHTML = '';
+  }
+}
 async function batalkanTransaksi(id) {
+  var _btn = null, _teksBtn = '';
+  try { _btn = (typeof event !== 'undefined' && event && event.target) || null; } catch (e) { _btn = null; }
   var t = (DATA.transaksi || []).find(function (x) { return x.ID === id; });
   if (!t) return;
   // Batalkan BOLEH untuk trx Lunas (Bos 12:33 WIB) — hanya dari detail trx
@@ -1362,7 +1394,10 @@ async function batalkanTransaksi(id) {
   // diam-diam (kembali null) sehingga tombol Batalkan tampak tidak berfungsi.
   // Pakai modal konfirmasi dalam aplikasi, seperti semua aksi hapus lainnya.
   if (!await konfirmasi('Batalkan transaksi ini?', pesan, 'Ya, Batalkan')) return;
-  try { await DB.batalkanTransaksi({ id: id, alasan: '' }); await loadData(); tampilInfo('Transaksi dibatalkan. Stok dikembalikan.'); } catch (e) { tampilError('Gagal membatalkan: ' + (e.message || e)); }
+  // v4-33: umpan balik instan — tombol "Membatalkan…" + toast.
+  if (_btn) { _teksBtn = _btn.textContent; _btn.disabled = true; _btn.textContent = 'Membatalkan…'; }
+  tampilInfo('Membatalkan…');
+  try { await DB.batalkanTransaksi({ id: id, alasan: '' }); bersihkanStrukBilaTerhapus(id); await loadData(); tampilInfo('Transaksi dibatalkan. Stok dikembalikan.'); } catch (e) { tampilError('Gagal membatalkan: ' + (e.message || e)); } finally { if (_btn) { _btn.disabled = false; _btn.textContent = _teksBtn; } }
 }
 function strukUlang(id) {
   var t = (DATA.transaksi || []).find(function (x) { return x.ID === id; });
@@ -1442,6 +1477,9 @@ function renderDetailTrx() {
   } else {
     var list = detailTersortir();
     var idx = -1; list.forEach(function (x, i) { if (x.ID === t.ID) idx = i; });
+    // v4-33: daftar terurut terbaru dulu — sblm (idx-1) = LEBIH BARU,
+    // ssdh (idx+1) = LEBIH LAMA. Jadi ‹ ke yang lebih lama (ssdh) dan
+    // › ke yang lebih baru (sblm); dulu terbalik.
     var sblm = idx > 0 ? list[idx - 1].ID : '', ssdh = (idx >= 0 && idx < list.length - 1) ? list[idx + 1].ID : '';
     html += '<div class="dtop"><div><div class="dtop-total">' + rp(t.Total) + '</div><div style="margin-top:6px"><span class="dkode">' + esc(kode) + '</span></div></div>'
       + '<div style="text-align:right"><div>' + d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + jamMenit(d) + '</div><div style="margin-top:6px;font-size:16px">' + esc(t.Pelanggan || '') + '</div></div></div>'
@@ -1462,7 +1500,7 @@ function renderDetailTrx() {
       + htmlRiwayatRetur(t)
       + '<div style="text-align:right;color:#64748b;margin:0 4px">- ' + esc(t.Kasir || '') + '</div>'
       + '<button class="primary" style="width:100%;margin:12px 0 0" onclick="transaksiBaruDariDetail()">＋ Transaksi Baru</button>'
-      + '<div style="display:flex;justify-content:space-between;margin:14px 4px"><button class="nav-arrow" ' + (sblm ? 'onclick="bukaDetailTrx(\'' + esc(sblm) + '\')"' : 'disabled') + '>‹</button><button class="nav-arrow" ' + (ssdh ? 'onclick="bukaDetailTrx(\'' + esc(ssdh) + '\')"' : 'disabled') + '>›</button></div>'
+      + '<div style="display:flex;justify-content:space-between;margin:14px 4px"><button class="nav-arrow" ' + (ssdh ? 'onclick="bukaDetailTrx(\'' + esc(ssdh) + '\')"' : 'disabled') + '>‹</button><button class="nav-arrow" ' + (sblm ? 'onclick="bukaDetailTrx(\'' + esc(sblm) + '\')"' : 'disabled') + '>›</button></div>'
       + '<div class="detail-tabs"><button class="detail-tab" onclick="bukaLebih(\'' + esc(t.ID) + '\')"><span>•••</span>Lebih</button><button class="detail-tab" onclick="detailTabKe(\'struk\')"><span>' + ikon('receipt', 17) + '</span>Struk</button><button class="detail-tab" onclick="detailTabKe(\'bayar\')"><span>' + ikon('banknote', 17) + '</span>Pembayaran</button></div>';
   }
   el.innerHTML = html;
@@ -1539,6 +1577,8 @@ function returHitung() {
   var tt = document.getElementById('returTotalNom'); if (tt) tt.textContent = rp(total);
 }
 async function simpanReturDetail() {
+  var _btn = null, _teksBtn = '';
+  try { _btn = (typeof event !== 'undefined' && event && event.target) || null; } catch (e) { _btn = null; }
   var t = (DATA.transaksi || []).find(function (x) { return x.ID === detailTrxId; }); if (!t) return;
   var items = (DATA.detail || []).filter(function (x) { return x.TransaksiID === t.ID; });
   var pilih = [];
@@ -1552,6 +1592,9 @@ async function simpanReturDetail() {
   var alasan = (document.getElementById('returAlasanDetail') || {}).value || '';
   var totalNom = pilih.reduce(function (a, p) { return a + Number(p.item.Harga || 0) * p.qty; }, 0);
   if (!await konfirmasi('Simpan retur?', pilih.length + ' item dikembalikan, total kembali ' + rp(totalNom) + '. Stok dikembalikan dan total transaksi dikurangi.', 'Ya, Simpan Retur', 'primary')) return;
+  // v4-33: umpan balik instan — tombol "Menyimpan…" + toast.
+  if (_btn) { _teksBtn = _btn.textContent; _btn.disabled = true; _btn.textContent = 'Menyimpan…'; }
+  tampilInfo('Menyimpan…');
   try {
     for (var k = 0; k < pilih.length; k++) {
       var p = pilih[k];
@@ -1565,7 +1608,7 @@ async function simpanReturDetail() {
     await loadData();
     detailTab = 'detail'; renderDetailTrx();
     tampilInfo('Retur tersimpan. Stok dikembalikan, total kembali ' + rp(totalNom) + '.');
-  } catch (e) { tampilError('Gagal menyimpan retur: ' + (e.message || e)); }
+  } catch (e) { tampilError('Gagal menyimpan retur: ' + (e.message || e)); } finally { if (_btn) { _btn.disabled = false; _btn.textContent = _teksBtn; } }
 }
 /* ---------- TAMBAH ITEM ke Transaksi Lama (alur Griyo) ---------- */
 var tambahProdukId = '';
@@ -1593,6 +1636,8 @@ function tambahHitungTotal() {
   el.textContent = rp(Number(p.HargaJual || 0) * qty);
 }
 async function simpanTambahItem() {
+  var _btn = null, _teksBtn = '';
+  try { _btn = (typeof event !== 'undefined' && event && event.target) || null; } catch (e) { _btn = null; }
   var t = (DATA.transaksi || []).find(function (x) { return x.ID === detailTrxId; }); if (!t) return;
   if (!tambahProdukId) return tampilError('Pilih produk dulu.');
   var p = (DATA.produk || []).find(function (x) { return x.ID === tambahProdukId; }); if (!p) return tampilError('Produk tidak ditemukan.');
@@ -1602,12 +1647,15 @@ async function simpanTambahItem() {
   if (t.StatusBayar === 'Lunas') {
     if (!await konfirmasi('Transaksi sudah lunas, anda ingin menambah item baru?', 'Item ditambahkan dan transaksi menjadi belum lunas sampai sisa dibayar.', 'Ya', 'primary')) return;
   }
+  // v4-33: umpan balik instan — tombol "Menyimpan…" + toast.
+  if (_btn) { _teksBtn = _btn.textContent; _btn.disabled = true; _btn.textContent = 'Menyimpan…'; }
+  tampilInfo('Menyimpan…');
   try {
     var res = await DB.tambahItemTrx({ id: t.ID, produkId: p.ID, qty: qty, harga: Number(p.HargaJual || 0), satuan: satuan, note: note });
     await loadData();
     detailTab = 'detail'; renderDetailTrx();
     tampilInfo('Item ditambahkan. Total ' + rp(res.total || 0) + ' • Kurang ' + rp(res.sisa || 0) + '.');
-  } catch (e) { tampilError('Gagal menambah item: ' + (e.message || e)); }
+  } catch (e) { tampilError('Gagal menambah item: ' + (e.message || e)); } finally { if (_btn) { _btn.disabled = false; _btn.textContent = _teksBtn; } }
 }
 /* ---------- SHEET "LEBIH" di Detail Transaksi ---------- */
 function bukaLebih(id) {
@@ -1843,7 +1891,7 @@ function unduhFile(nama, isi, tipe) {
   var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([isi], { type: tipe })); a.download = nama; a.click();
 }
 
-/* ---------- IMPOR PRODUK DARI CSV (progres + ringkasan akhir v4-32) ----------
+/* ---------- IMPOR PRODUK DARI CSV (progres + ringkasan akhir v4-33) ----------
    Alur: pilih file -> analisis (parse + petakan header + validasi) ->
    pratinjau di modal konfirmasi -> impor berurutan lewat DB.upsertProduk.
    Baris bermasalah DILEWATI (bukan menggagalkan impor) dan dilaporkan
@@ -2029,7 +2077,7 @@ async function prosesTeksCSVImpor(teks) {
   if (!setuju) return;
   await jalankanImporProduk(hasil);
 }
-/* Progres impor (v4-32, temuan uji live impor CSV): modal konfirmasi dipakai
+/* Progres impor (v4-33, temuan uji live impor CSV): modal konfirmasi dipakai
    ulang sebagai layar progres — tombol disembunyikan selama impor supaya
    tidak tertutup tanpa sengaja, dan jawabKonfirm() menolak menutup selama
    _imporBerjalan true. */
@@ -2051,7 +2099,7 @@ function sembunyiProgresImpor() {
 /* Simpan tiap baris valid berurutan lewat jalur yang sama dengan
    simpanProduk. Satu baris gagal tidak menghentikan impor — dicatat dan
    dilaporkan di akhir. loadData() dipanggil SEKALI setelah semua selesai.
-   v4-32: progres "Mengimpor N/M produk..." terlihat selama impor +
+   v4-33: progres "Mengimpor N/M produk..." terlihat selama impor +
    ringkasan akhir di modal (bukan hanya toast singkat). */
 async function jalankanImporProduk(hasil) {
   var berhasil = 0, gagal = 0, pesanGagal = '';
@@ -2073,7 +2121,7 @@ async function jalankanImporProduk(hasil) {
   await konfirmasi('Impor selesai', ringkas, 'Mengerti', 'primary');
 }
 function imporProdukDariCSV() {
-  // v4-32: impor butuh cek duplikat ke server — tolak saat offline.
+  // v4-33: impor butuh cek duplikat ke server — tolak saat offline.
   var sedangOffline = false;
   try { sedangOffline = navigator.onLine === false || (DB.sedangOffline && DB.sedangOffline()); } catch (e) {}
   if (sedangOffline) { tampilError('Impor CSV butuh internet.'); return; }
@@ -2093,10 +2141,10 @@ function imporProdukDariCSV() {
 
 /* ---------- STOK ---------- */
 function renderStok() {
-  // v4-32: stok negatif (dua perangkat offline menjual barang terakhir
+  // v4-33: stok negatif (dua perangkat offline menjual barang terakhir
   // yang sama) ditandai jelas "Stok Minus — cek", jangan diam-diam.
   document.getElementById('stokTable').innerHTML = (DATA.produk || []).map(function (p) { var s = stokProduk(p); var tipis = s <= Number(p.StokMinimum || 5); var minus = s < 0; return '<div class="cart-item"><span><b>' + esc(p.Nama) + '</b><br><small>' + rp(p.HargaJual) + ' • Stok min. ' + (p.StokMinimum || 5) + '</small></span>' + (minus ? '<span class="badge bad">Stok Minus — cek (' + s + ')</span>' : (tipis ? '<span class="badge warn">Stok ' + s + '</span>' : '<b>Stok ' + s + '</b>')) + '</div>'; }).join('') || 'Belum ada produk.';
-  document.getElementById('opnameTable').innerHTML = (DATA.opname || []).slice(0, 50).map(function (o) { return '<div class="cart-item"><span><b>' + esc(o.NamaProduk) + '</b><br><small>' + esc(o.Tanggal || '') + ' • Sistem ' + o.StokSistem + ' • Fisik ' + o.StokFisik + '</small></span><b>Selisih ' + o.Selisih + '</b></div>'; }).join('') || 'Belum ada opname.';
+  document.getElementById('opnameTable').innerHTML = (DATA.opname || []).slice(0, 50).map(function (o) { return '<div class="cart-item"><span><b>' + esc(o.NamaProduk) + '</b><br><small>' + fmtTanggalID(o.Tanggal) + ' • Sistem ' + o.StokSistem + ' • Fisik ' + o.StokFisik + '</small></span><b>Selisih ' + o.Selisih + '</b></div>'; }).join('') || 'Belum ada opname.';
 }
 async function muatLaporanStok() {
   try {
@@ -2169,7 +2217,28 @@ function renderPembelian() {
   });
   html = html || '<p style="color:#64748b">Belum ada pembelian.</p>';
   document.getElementById('pembelianTable').innerHTML = html;
-  document.getElementById('pemasokTable').innerHTML = '<table><tr><th>Nama</th><th>Telepon</th><th>Hutang</th></tr>' + (DATA.pemasok || []).map(function (p) { return '<tr><td>' + esc(p.Nama) + '</td><td>' + esc(p.Telepon || '') + '</td><td>' + rp(p.Hutang || 0) + '</td></tr>'; }).join('') + '</table>';
+  document.getElementById('pemasokTable').innerHTML = '<table><tr><th>Nama</th><th>Telepon</th><th>Hutang</th><th></th></tr>' + (DATA.pemasok || []).map(function (p) { return '<tr><td>' + esc(p.Nama) + '</td><td>' + esc(p.Telepon || '') + '</td><td>' + rp(p.Hutang || 0) + '</td><td><button class="secondary" onclick="editPemasok(\'' + esc(p.ID) + '\')">Edit</button> <button class="danger" onclick="hapusPemasok(\'' + esc(p.ID) + '\', this)">Hapus</button></td></tr>'; }).join('') + '</table>';
+}
+// v4-33: pemasok akhirnya bisa diedit/dihapus (dulu tabel tanpa aksi).
+function editPemasok(id) {
+  var p = (DATA.pemasok || []).find(function (x) { return String(x.ID) === String(id); }); if (!p) return;
+  document.getElementById('pmId').value = p.ID; document.getElementById('pmNama').value = p.Nama;
+  document.getElementById('pmTelp').value = p.Telepon || ''; document.getElementById('pmAlamat').value = p.Alamat || '';
+  var judul = document.querySelector('#formPemasok h3'); if (judul) judul.textContent = 'Edit Pemasok';
+  bukaForm('pembelian', 'formPemasok');
+}
+async function hapusPemasok(id, el) {
+  var p = (DATA.pemasok || []).find(function (x) { return String(x.ID) === String(id); });
+  var nama = p ? p.Nama : 'pemasok ini';
+  // Guard di sisi aplikasi (seperti hapus pelanggan "Umum"): beri tahu dulu
+  // sebelum konfirmasi hapus — guard yang sama juga ada di DB.hapusPemasok.
+  var dipakai = (DATA.pembelian || []).some(function (x) { return String(x.Pemasok || '') === String(nama); });
+  if (dipakai) {
+    await konfirmasi('Tidak bisa dihapus', 'Pemasok "' + nama + '" sudah pernah dipakai di pembelian, jadi tidak bisa dihapus.', 'Mengerti', 'primary');
+    return;
+  }
+  if (!await konfirmasi('Hapus pemasok?', 'Pemasok "' + nama + '" akan dihapus.', 'Ya, Hapus', 'danger')) return;
+  try { await DB.hapusPemasok({ id: id }); await loadData(); tampilInfo('Pemasok dihapus.'); } catch (e) { tampilError('Gagal menghapus pemasok: ' + (e.message || e)); }
 }
 function baruPembelian() {
   beliItems = []; beliItemIndex = -1; beliItemProdukId = '';
@@ -2197,13 +2266,18 @@ function hitungTotalBeli() {
   return tot;
 }
 async function simpanPembelian() {
+  var _btn = null, _teksBtn = '';
+  try { _btn = (typeof event !== 'undefined' && event && event.target) || null; } catch (e) { _btn = null; }
   if (!beliItems.length) return tampilError('Tambahkan minimal 1 item pembelian.');
   var pemasok = document.getElementById('beliPemasok').value;
   if (!pemasok) return tampilError('Pilih pemasok dulu.');
   var total = hitungTotalBeli();
+  // v4-33: umpan balik instan — tombol "Menyimpan…" + toast.
+  if (_btn) { _teksBtn = _btn.textContent; _btn.disabled = true; _btn.textContent = 'Menyimpan…'; }
+  tampilInfo('Menyimpan…');
   try {
     await DB.simpanPembelian({ pemasok: pemasok, items: beliItems, total: total, diskon: parseUang(document.getElementById('beliDiskon').value), pajak: parseUang(document.getElementById('beliPajak').value), biayaLain: parseUang(document.getElementById('beliBiaya').value), bayar: parseUang(document.getElementById('beliBayar').value), catatan: document.getElementById('beliCatatan').value, cabangId: cabangAktifId() });
-  } catch (e) { return tampilError('Gagal menyimpan pembelian: ' + (e.message || e)); }
+  } catch (e) { return tampilError('Gagal menyimpan pembelian: ' + (e.message || e)); } finally { if (_btn) { _btn.disabled = false; _btn.textContent = _teksBtn; } }
   beliItems = []; renderBeliItems(); await loadData(); tutupForm('pembelian'); tampilInfo('DRAFT pembelian tersimpan. Tekan PROSES untuk menambah stok.');
 }
 var sedangProsesBeli = false;
@@ -2211,12 +2285,18 @@ async function prosesPembelian(id, el) {
   if (sedangProsesBeli) return; // cegah dua ketuk PROSES bersamaan
   if (!await konfirmasi('Proses pembelian?', 'Stok bertambah, pengeluaran dan utang pemasok tercatat. Proses ini tidak bisa dibatalkan.', 'Ya, Proses', 'primary')) return;
   sedangProsesBeli = true;
+  // v4-33: umpan balik instan — tombol "Memproses…" + toast.
+  var _teksBeli = el ? el.textContent : '';
+  if (el) { el.disabled = true; el.textContent = 'Memproses…'; }
+  tampilInfo('Memproses…');
   try { await DB.prosesPembelian({ id: id }); await loadData(); tampilInfo('Pembelian diproses. Stok bertambah.'); }
   catch (e) { tampilError('Gagal memproses pembelian: ' + (e.message || e)); }
-  finally { sedangProsesBeli = false; }
+  finally { sedangProsesBeli = false; if (el) { el.disabled = false; el.textContent = _teksBeli; } }
 }
 async function prosesPembelianDetail(id) {
-  await prosesPembelian(id, null);
+  var _el = null;
+  try { _el = (typeof event !== 'undefined' && event && event.target) || null; } catch (e) { _el = null; }
+  await prosesPembelian(id, _el);
   if (detailPembelianId) renderDetailPembelian();
 }
 /* --- Picker pemasok (ketik untuk cari) --- */
@@ -2366,7 +2446,7 @@ function renderDetailPembelian() {
     + (p.Catatan ? '<div class="ditem"><span>Catatan</span><b>' + esc(p.Catatan) + '</b></div>' : '')
     + (diproses ? '' : '<button class="primary" style="width:100%;padding:13px;margin-top:12px" onclick="prosesPembelianDetail(\'' + esc(p.ID) + '\')">PROSES — Tambah Stok</button>');
 }
-async function simpanPemasok() { var nama = document.getElementById('pmNama').value; if (!nama) return alert('Nama wajib diisi.'); await DB.upsertPemasok({ Nama: nama, Telepon: document.getElementById('pmTelp').value, Alamat: document.getElementById('pmAlamat').value }); ['pmNama', 'pmTelp', 'pmAlamat'].forEach(function (i) { document.getElementById(i).value = ''; }); await loadData(); tutupForm('pembelian'); tampilInfo('Pemasok tersimpan.'); }
+async function simpanPemasok() { var nama = document.getElementById('pmNama').value; if (!nama) return alert('Nama wajib diisi.'); await DB.upsertPemasok({ ID: document.getElementById('pmId').value || '', Nama: nama, Telepon: document.getElementById('pmTelp').value, Alamat: document.getElementById('pmAlamat').value }); ['pmId', 'pmNama', 'pmTelp', 'pmAlamat'].forEach(function (i) { document.getElementById(i).value = ''; }); await loadData(); tutupForm('pembelian'); tampilInfo('Pemasok tersimpan.'); }
 
 /* ---------- PENGELUARAN & KAS ---------- */
 async function simpanPengeluaran() {
@@ -2421,7 +2501,7 @@ function renderPelanggan() {
   var hanyaPiutang = document.getElementById('plFilterPiutang').checked;
   var list = (DATA.pelanggan || []).filter(function (p) { return !hanyaPiutang || Number(p.Piutang || 0) > 0; });
   document.getElementById('pelangganTable').innerHTML = list.map(function (p) {
-    return '<div class="cart-item"><span><b>' + esc(p.Nama) + '</b><br><small>' + esc(p.Telepon || '') + ' • ' + esc(tierOtomatis(p)) + ' • Poin ' + (p.Poin || 0) + ' • Piutang ' + rp(p.Piutang || 0) + '<br>Terakhir beli: ' + esc(p.TerakhirBeli || '—') + '</small></span><span><button class="secondary" onclick="editPelanggan(\'' + esc(p.ID) + '\')">Edit</button> <button class="secondary" onclick="lunasiSemua(\'' + escJS(p.Nama) + '\', this)">Lunasi Semua</button> <button class="danger" onclick="hapusPelanggan(\'' + esc(p.ID) + '\', this)">Hapus</button></span></div>';
+    return '<div class="cart-item"><span><b>' + esc(p.Nama) + '</b><br><small>' + esc(p.Telepon || '') + ' • ' + esc(tierOtomatis(p)) + ' • Poin ' + (p.Poin || 0) + ' • Piutang ' + rp(p.Piutang || 0) + '<br>Terakhir beli: ' + fmtTanggalID(p.TerakhirBeli) + '</small></span><span><button class="secondary" onclick="editPelanggan(\'' + esc(p.ID) + '\')">Edit</button> <button class="secondary" onclick="lunasiSemua(\'' + escJS(p.Nama) + '\', this)">Lunasi Semua</button> <button class="danger" onclick="hapusPelanggan(\'' + esc(p.ID) + '\', this)">Hapus</button></span></div>';
   }).join('') || 'Belum ada pelanggan.';
 }
 function editPelanggan(id) {
@@ -2478,7 +2558,7 @@ async function muatRiwayatPoin() {
   try {
     var res = await DB.getRiwayatPoin({ pelangganId: id });
     var list = res.riwayat || res || [];
-    document.getElementById('riwayatPoinBox').innerHTML = '<table><tr><th>Tanggal</th><th>Jenis</th><th>Jumlah</th><th>Sisa</th><th>Keterangan</th></tr>' + list.map(function (r) { return '<tr><td>' + esc(r.Tanggal || '') + '</td><td>' + esc(r.Jenis) + '</td><td>' + r.Jumlah + '</td><td>' + (r.Sisa || '') + '</td><td>' + esc(r.Keterangan || '') + '</td></tr>'; }).join('') + '</table>';
+    document.getElementById('riwayatPoinBox').innerHTML = '<table><tr><th>Tanggal</th><th>Jenis</th><th>Jumlah</th><th>Sisa</th><th>Keterangan</th></tr>' + list.map(function (r) { return '<tr><td>' + fmtTanggalID(r.Tanggal) + '</td><td>' + esc(r.Jenis) + '</td><td>' + r.Jumlah + '</td><td>' + (r.Sisa || '') + '</td><td>' + esc(r.Keterangan || '') + '</td></tr>'; }).join('') + '</table>';
   } catch (e) { alert(e.message); }
 }
 async function tagihanGabungan() {
@@ -2494,7 +2574,7 @@ async function tagihanGabungan() {
 function renderWinback() {
   var batas = new Date(); batas.setDate(batas.getDate() - 30);
   var list = (DATA.pelanggan || []).filter(function (p) { if (!p.TerakhirBeli) return false; return new Date(p.TerakhirBeli) < batas; });
-  document.getElementById('winbackBox').innerHTML = list.map(function (p) { return esc(p.Nama) + ' — terakhir beli ' + esc(p.TerakhirBeli) + ' • ' + (p.Telepon || 'tanpa nomor') + ' <button class="secondary" onclick="window.open(\'https://wa.me/' + String(p.Telepon || '').replace(/\D/g, '') + '?text=' + encodeURIComponent('Halo ' + p.Nama + ', sudah lama tidak mampir ke ' + (DATA.pengaturan.NamaToko || 'toko kami') + '. Ada promo menanti!') + '\',\'_blank\')">' + ikon('chat', 16) + ' Sapa via WA</button>'; }).join('<br>') || 'Tidak ada pelanggan lama yang tidak datang.';
+  document.getElementById('winbackBox').innerHTML = list.map(function (p) { return esc(p.Nama) + ' — terakhir beli ' + fmtTanggalID(p.TerakhirBeli) + ' • ' + (p.Telepon || 'tanpa nomor') + ' <button class="secondary" onclick="window.open(\'https://wa.me/' + String(p.Telepon || '').replace(/\D/g, '') + '?text=' + encodeURIComponent('Halo ' + p.Nama + ', sudah lama tidak mampir ke ' + (DATA.pengaturan.NamaToko || 'toko kami') + '. Ada promo menanti!') + '\',\'_blank\')">' + ikon('chat', 16) + ' Sapa via WA</button>'; }).join('<br>') || 'Tidak ada pelanggan lama yang tidak datang.';
 }
 
 /* ---------- MEJA & DAPUR ---------- */
@@ -2532,7 +2612,10 @@ function renderKatalog() {
   }).join('') || 'Belum ada katalog.';
   var k = (DATA.katalog || [])[0];
   if (k) {
-    var prods = (DATA.produk || []).filter(function (p) { return flagYa(p.TampilkanDiKatalog); });
+    // v4-33: pratinjau memakai filter yang SAMA dengan katalog publik
+    // (loadKatalogPublik: aktif DAN tampilkan_di_katalog) — dulu produk
+    // nonaktif seperti TES Kopi ikut tampil di pratinjau (99 vs 98).
+    var prods = (DATA.produk || []).filter(function (p) { return produkAktif(p) && flagYa(p.TampilkanDiKatalog); });
     document.getElementById('katalogPreview').innerHTML = '<h4>' + esc(k.Nama) + '</h4>' + prods.map(function (p) {
       return '<div class="cart-item"><span>' + (k.TampilkanGambar === 'YA' ? emojiProduk(p.Nama) + ' ' : '') + esc(p.Nama) + (k.TampilkanKeterangan === 'YA' && p.Keterangan ? '<br><small>' + esc(p.Keterangan) + '</small>' : '') + '</span><span>' + (k.TampilkanHarga === 'YA' ? rp(p.HargaJual) : '') + ' <button class="secondary" onclick="window.open(\'https://wa.me/' + String((DATA.pengaturan.TeleponToko || '')).replace(/\D/g, '') + '?text=' + encodeURIComponent('Halo, saya mau pesan ' + p.Nama) + '\',\'_blank\')">' + ikon('chat', 16) + ' Pesan</button></span></div>';
     }).join('') + (k.Footer ? '<p style="color:#64748b;font-size:13px">' + esc(k.Footer) + '</p>' : '');
@@ -2602,13 +2685,18 @@ function editPromo(id) {
 }
 function resetPromo() { ['prmId', 'prmNama', 'prmNilai', 'prmSyarat', 'prmMulai', 'prmSelesai', 'prmJamMulai', 'prmJamSelesai', 'prmHari', 'prmCabang'].forEach(function (i) { document.getElementById(i).value = ''; }); tutupForm('promo'); }
 async function simpanPromo() {
+  var _btn = null, _teksBtn = '';
+  try { _btn = (typeof event !== 'undefined' && event && event.target) || null; } catch (e) { _btn = null; }
   var nama = document.getElementById('prmNama').value; if (!nama) return alert('Nama promo wajib diisi.');
   var syarat = document.getElementById('prmSyarat').value;
   try { if (syarat) JSON.parse(syarat); } catch (e) { return alert('Syarat JSON tidak valid.'); }
+  // v4-33: umpan balik instan — tombol "Menyimpan…" + toast.
+  if (_btn) { _teksBtn = _btn.textContent; _btn.disabled = true; _btn.textContent = 'Menyimpan…'; }
+  tampilInfo('Menyimpan…');
   try {
     await DB.upsertPromo({ ID: document.getElementById('prmId').value || '', Nama: nama, Jenis: document.getElementById('prmJenis').value, Nilai: parseUang(document.getElementById('prmNilai').value), SyaratJSON: syarat, Mulai: document.getElementById('prmMulai').value, Selesai: document.getElementById('prmSelesai').value, JamMulai: document.getElementById('prmJamMulai').value, JamSelesai: document.getElementById('prmJamSelesai').value, Hari: document.getElementById('prmHari').value, Aktif: true, CabangID: document.getElementById('prmCabang').value || cabangAktifId() });
     await loadData(); resetPromo(); tampilInfo('Promo tersimpan.');
-  } catch (e) { tampilError('Gagal menyimpan promo: ' + (e.message || e)); }
+  } catch (e) { tampilError('Gagal menyimpan promo: ' + (e.message || e)); } finally { if (_btn) { _btn.disabled = false; _btn.textContent = _teksBtn; } }
 }
 async function hapusPromo(id, el) { if (!await konfirmasi('Hapus promo?', 'Promo ini akan dihapus.', 'Ya, Hapus', 'danger')) return; try { await DB.hapusPromo({ id: id }); await loadData(); tampilInfo('Promo dihapus.'); } catch (e) { tampilError('Gagal menghapus promo: ' + (e.message || e)); } }
 async function catatTier() {
@@ -2619,7 +2707,7 @@ async function catatTier() {
 function renderUlangTahun() {
   var bulan = new Date().getMonth() + 1;
   var list = (DATA.pelanggan || []).filter(function (p) { if (!p.TanggalLahir) return false; return Number(String(p.TanggalLahir).slice(5, 7)) === bulan; });
-  document.getElementById('ulangTahunBox').innerHTML = list.map(function (p) { return esc(p.Nama) + ' — lahir ' + esc(p.TanggalLahir) + ' • Tier ' + esc(p.Tier || '—') + ' • Poin ' + (p.Poin || 0) + ' <button class="secondary" onclick="window.open(\'https://wa.me/' + String(p.Telepon || '').replace(/\D/g, '') + '?text=' + encodeURIComponent('Selamat ulang tahun, ' + p.Nama + '! Ada promo ulang tahun khusus untukmu di ' + (DATA.pengaturan.NamaToko || 'toko kami') + '.') + '\',\'_blank\')">' + ikon('chat', 16) + ' Kirim Ucapan + Promo</button>'; }).join('<br>') || 'Tidak ada pelanggan yang berulang tahun bulan ini.';
+  document.getElementById('ulangTahunBox').innerHTML = list.map(function (p) { return esc(p.Nama) + ' — lahir ' + fmtTanggalID(p.TanggalLahir) + ' • Tier ' + esc(p.Tier || '—') + ' • Poin ' + (p.Poin || 0) + ' <button class="secondary" onclick="window.open(\'https://wa.me/' + String(p.Telepon || '').replace(/\D/g, '') + '?text=' + encodeURIComponent('Selamat ulang tahun, ' + p.Nama + '! Ada promo ulang tahun khusus untukmu di ' + (DATA.pengaturan.NamaToko || 'toko kami') + '.') + '\',\'_blank\')">' + ikon('chat', 16) + ' Kirim Ucapan + Promo</button>'; }).join('<br>') || 'Tidak ada pelanggan yang berulang tahun bulan ini.';
 }
 
 /* ---------- MASTER ---------- */
@@ -2687,28 +2775,75 @@ async function muatLaporan() {
     var res = await DB.getLaporanLengkap({ jenis: jenis, dari: dari, sampai: sampai, cabangId: cabang || undefined });
     var ring = res.ringkasan || {};
     var html = '<h4>Laporan ' + esc(jenis) + ' — ' + esc(dari || '—') + ' s/d ' + esc(sampai || '—') + '</h4>';
-    html += '<p>' + Object.keys(ring).map(function (k) { return esc(k) + ': <b>' + (typeof ring[k] === 'number' ? rp(ring[k]) : esc(ring[k])) + '</b>'; }).join(' • ') + '</p>';
+    // v4-33: hanya nilai UANG yang dibungkus rp() — hitungan (Transaksi,
+    // Item, Jumlah, Produk, StokMenipis) tampil sebagai angka polos, dan
+    // PajakPersen sebagai persen (dulu "Transaksi: Rp 2").
+    var HITUNGAN_LAPORAN = ['Transaksi', 'Item', 'Jumlah', 'Produk', 'StokMenipis'];
+    html += '<p>' + Object.keys(ring).map(function (k) {
+      var v = ring[k];
+      var teks = (typeof v === 'number' && HITUNGAN_LAPORAN.indexOf(k) > -1) ? String(v)
+        : (k === 'PajakPersen' ? String(v) + '%' : (typeof v === 'number' ? rp(v) : esc(v)));
+      return esc(k) + ': <b>' + teks + '</b>';
+    }).join(' • ') + '</p>';
     var baris = res.baris || [];
     if (baris.length) {
       var keys = Object.keys(baris[0]);
       html += '<table><tr>' + keys.map(function (k) { return '<th>' + esc(k) + '</th>'; }).join('') + '</tr>' + baris.map(function (b) { return '<tr>' + keys.map(function (k) { return '<td>' + esc(b[k] == null ? '' : b[k]) + '</td>'; }).join('') + '</tr>'; }).join('') + '</table>';
     } else html += '<p>Tidak ada data pada periode ini.</p>';
     document.getElementById('laporanBox').innerHTML = html;
-    if (jenis === 'penjualan') renderPieTopProduct(baris);
+    if (jenis === 'penjualan') renderPieTopProduct(baris, dari, sampai);
     var tk = await DB.getTopKasir({ dari: dari, sampai: sampai, cabangId: cabang || undefined });
     var top = tk.top || tk || [];
     document.getElementById('topKasirBox').innerHTML = '<h4>Top Kasir</h4><table><tr><th>Kasir</th><th>Omzet</th><th>Jumlah</th><th>Komisi</th></tr>' + top.map(function (t) { return '<tr><td>' + esc(t.kasir) + '</td><td>' + rp(t.omzet) + '</td><td>' + (t.jumlah || 0) + '</td><td>' + rp(t.komisi || 0) + '</td></tr>'; }).join('') + '</table>';
   } catch (e) { alert(e.message); }
 }
-function renderPieTopProduct(baris) {
+function renderPieTopProduct(baris, dari, sampai) {
+  // v4-33: agregasi HANYA dari transaksi Lunas dalam rentang filter
+  // (dulu DATA.detail semua waktu — pie tidak mengikuti filter tanggal),
+  // dengan qty bersih (detail dikurangi retur untuk transaksi yang sama).
+  // ID transaksi diambil dari baris laporan yang sudah terfilter; bila
+  // baris kosong, filter DATA.transaksi sendiri dari dari/sampai.
+  var trxIds = {};
+  if (baris && baris.length) {
+    baris.forEach(function (b) { if (b.ID) trxIds[b.ID] = true; });
+  } else {
+    (DATA.transaksi || []).forEach(function (t) {
+      if (t.StatusBayar !== 'Lunas') return;
+      var tg = String(t.Tanggal || '').slice(0, 10);
+      if (dari && tg < dari) return;
+      if (sampai && tg > sampai) return;
+      trxIds[t.ID] = true;
+    });
+  }
+  var returQty = {};
+  (DATA.retur || []).forEach(function (r) {
+    if (!trxIds[r.TransaksiID]) return;
+    var kunci = r.TransaksiID + '|' + (r.Produk || '');
+    returQty[kunci] = (returQty[kunci] || 0) + Number(r.Qty || 0);
+  });
   var jual = {}; var totalQty = 0;
-  (DATA.detail || []).forEach(function (x) { jual[x.NamaProduk] = (jual[x.NamaProduk] || 0) + Number(x.Qty); totalQty += Number(x.Qty); });
-  var top = Object.keys(jual).map(function (k) { return { nama: k, qty: jual[k] }; }).sort(function (a, b) { return b.qty - a.qty; }).slice(0, 5);
-  if (!top.length) { document.getElementById('pieBox').innerHTML = ''; return; }
-  var warna = ['#0f766e', '#14b8a6', '#2dd4bf', '#5eead4', '#99f6e4'];
-  var persen = top.map(function (t) { return Math.round(t.qty / totalQty * 100); });
+  (DATA.detail || []).forEach(function (x) {
+    if (!trxIds[x.TransaksiID]) return;
+    var q = Number(x.Qty || 0) - (returQty[x.TransaksiID + '|' + (x.NamaProduk || '')] || 0);
+    if (q <= 0) return;
+    jual[x.NamaProduk] = (jual[x.NamaProduk] || 0) + q; totalQty += q;
+  });
+  var semua = Object.keys(jual).map(function (k) { return { nama: k, qty: jual[k] }; }).sort(function (a, b) { return b.qty - a.qty; });
+  var top = semua.slice(0, 5);
+  if (!top.length || totalQty <= 0) { document.getElementById('pieBox').innerHTML = ''; return; }
+  // Sisa produk di luar 5 besar ditampilkan sebagai irisan "Lainnya"
+  // supaya pie tetap genap 100% (dulu sisa pembulatan dilempar ke item
+  // terakhir — ONGKIR 1/13 jadi 32%).
+  var sisaQty = totalQty - top.reduce(function (a, t) { return a + t.qty; }, 0);
+  if (sisaQty > 0) top.push({ nama: 'Lainnya', qty: sisaQty });
+  var warna = ['#0f766e', '#14b8a6', '#2dd4bf', '#5eead4', '#99f6e4', '#94a3b8'];
+  // Largest-remainder: bagi sisa pembulatan ke item dengan sisa desimal
+  // terbesar, bukan ke item terakhir — total tepat 100%.
+  var mentah = top.map(function (t) { return t.qty / totalQty * 100; });
+  var persen = mentah.map(function (v) { return Math.floor(v); });
   var sisa = 100 - persen.reduce(function (a, b) { return a + b; }, 0);
-  persen[persen.length - 1] += sisa;
+  var urutan = mentah.map(function (v, i) { return { i: i, sisaDes: v - Math.floor(v) }; }).sort(function (a, b) { return b.sisaDes - a.sisaDes; });
+  for (var k = 0; k < sisa; k++) persen[urutan[k % urutan.length].i]++;
   var acc = 0; var stops = [];
   persen.forEach(function (p, i) { stops.push(warna[i % warna.length] + ' ' + acc + '% ' + (acc + p) + '%'); acc += p; });
   document.getElementById('pieBox').innerHTML = '<h4>Pie Chart — Top Product (total 100%)</h4><div class="pie" style="background:conic-gradient(' + stops.join(', ') + ')"></div>' + top.map(function (t, i) { return '<div><span style="display:inline-block;width:12px;height:12px;background:' + warna[i % warna.length] + '"></span> ' + esc(t.nama) + ' — ' + t.qty + ' (' + persen[i] + '%)</div>'; }).join('');
@@ -2875,12 +3010,12 @@ async function muatLogs() {
   try {
     var res = await DB.getLogs({ limit: 100 });
     var list = res.logs || DATA.logs || [];
-    document.getElementById('logsBox').innerHTML = '<table><tr><th>Tanggal</th><th>Pengguna</th><th>Aksi</th><th>Detail</th></tr>' + list.map(function (l) { return '<tr><td>' + esc(l.Tanggal || '') + '</td><td>' + esc(l.Pengguna || '') + '</td><td>' + esc(l.Aksi || '') + '</td><td>' + esc(l.Detail || '') + '</td></tr>'; }).join('') + '</table>';
+    document.getElementById('logsBox').innerHTML = '<table><tr><th>Tanggal</th><th>Pengguna</th><th>Aksi</th><th>Detail</th></tr>' + list.map(function (l) { return '<tr><td>' + fmtTanggalID(l.Tanggal) + '</td><td>' + esc(l.Pengguna || '') + '</td><td>' + esc(l.Aksi || '') + '</td><td>' + esc(l.Detail || '') + '</td></tr>'; }).join('') + '</table>';
   } catch (e) { alert(e.message); }
 }
 // Boot: tautan katalog publik (?katalog=ID) dibuka tanpa login.
 (function () {
-  // v4-32: kembali online -> sinkronkan antrean otomatis; offline ->
+  // v4-33: kembali online -> sinkronkan antrean otomatis; offline ->
   // perbarui badge. Setiap tulis offline berhasil -> badge diperbarui.
   try {
     if (DB.setOnOutboxBerubah) DB.setOnOutboxBerubah(perbaruiIndikatorOffline);
