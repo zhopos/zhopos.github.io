@@ -460,7 +460,7 @@ function renderAll() {
   vsEl.textContent = (pct >= 0 ? '+' : '') + pct + '% vs kemarin';
   vsEl.classList.toggle('down', pct < 0);
   document.getElementById('heroUser').textContent = currentUser ? ('Halo, ' + currentUser.nama + ' (' + currentUser.peran + ') — kasir siap melayani hari ini.') : 'Kasir siap melayani hari ini.';
-  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • ' + currentUser.peran + ' • v4-30') : 'Kasir • v4-30';
+  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • ' + currentUser.peran + ' • v4-31') : 'Kasir • v4-31';
   var bb = document.getElementById('bellBadge');
   if (bb) { var sm = Number(r.stokMenipis || 0); bb.style.display = sm > 0 ? 'flex' : 'none'; bb.textContent = sm > 99 ? '99+' : String(sm); }
   isiNotifPanel();
@@ -1704,6 +1704,221 @@ async function exportProduk() {
 }
 function unduhFile(nama, isi, tipe) {
   var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([isi], { type: tipe })); a.download = nama; a.click();
+}
+
+/* ---------- IMPOR PRODUK DARI CSV (v4-31) ----------
+   Alur: pilih file -> analisis (parse + petakan header + validasi) ->
+   pratinjau di modal konfirmasi -> impor berurutan lewat DB.upsertProduk.
+   Baris bermasalah DILEWATI (bukan menggagalkan impor) dan dilaporkan
+   dengan nomor baris + alasan. Produk tanpa nama TIDAK PERNAH diimpor
+   (satu baris nama kosong pernah melumpuhkan seluruh aplikasi, v4-28).
+   Duplikat nama (trim + lowercase) terhadap produk yang sudah ada maupun
+   yang sudah lolos di file yang sama DILEWATI, tidak di-update. */
+function csvSelImpor(v) { var s = String(v == null ? '' : v); return '"' + s.replace(/"/g, '""') + '"'; }
+function templateImporCSV() {
+  var header = ['Nama', 'Kategori', 'SKU/Barcode', 'Harga Jual', 'Harga Modal', 'Stok', 'Satuan', 'Stok Minimum', 'Grup', 'Termasuk Stok', 'Harga Bisa Diganti', 'Tampilkan di Katalog', 'Keterangan'];
+  var contoh = [
+    ['Kabel Data USB', 'Kabel', '899100000001', '15000', '10000', '20', 'pcs', '5', 'Kabel', 'YA', 'YA', 'YA', 'Kabel data 1 meter'],
+    ['Tempered Glass 9H', 'Tempered Glass', '899100000002', '25000', '15000', '10', 'pcs', '5', 'Tempered Glass', 'YA', 'YA', 'YA', 'Anti gores 9H']
+  ];
+  return [header].concat(contoh).map(function (r) { return r.map(csvSelImpor).join(','); }).join('\n');
+}
+function unduhTemplateImpor() { unduhFile('template-impor-produk.csv', templateImporCSV(), 'text/csv'); }
+/* Parser CSV tanpa dependensi: field ber-quote (boleh berisi koma / baris
+   baru, "" = satu tanda kutip), CRLF dan LF, BOM di awal file, pemisah
+   koma ATAU titik-koma (dideteksi dari baris header — file ekspor Excel
+   Indonesia sering bertitik-koma). Baris kosong dipertahankan supaya
+   nomor baris laporan sama dengan nomor baris di file. */
+function parseCSVImpor(teks) {
+  var t = String(teks == null ? '' : teks);
+  if (t.charCodeAt(0) === 0xFEFF) t = t.slice(1);
+  var nl = t.indexOf('\n');
+  var barisPertama = nl === -1 ? t : t.slice(0, nl);
+  var nKoma = 0, nTikom = 0, dalamKutip = false;
+  for (var i = 0; i < barisPertama.length; i++) {
+    var c = barisPertama[i];
+    if (c === '"') dalamKutip = !dalamKutip;
+    else if (!dalamKutip) { if (c === ',') nKoma++; else if (c === ';') nTikom++; }
+  }
+  var delim = nTikom > nKoma ? ';' : ',';
+  var rows = [], row = [], field = '', inQ = false;
+  for (var j = 0; j < t.length; j++) {
+    var ch = t[j];
+    if (inQ) {
+      if (ch === '"') { if (t[j + 1] === '"') { field += '"'; j++; } else inQ = false; }
+      else field += ch;
+    } else if (ch === '"' && field === '') inQ = true;
+    else if (ch === delim) { row.push(field); field = ''; }
+    else if (ch === '\r') { /* CRLF: \n yang memutus baris */ }
+    else if (ch === '\n') { row.push(field); field = ''; rows.push(row); row = []; }
+    else field += ch;
+  }
+  if (field !== '' || row.length > 0) { row.push(field); rows.push(row); }
+  return rows;
+}
+/* Pemetaan header (case-insensitive, spasi di-trim): header ZPOS + alias
+   format ekspor Griyo. Header yang tidak dikenal diabaikan. 'Kode Produk'
+   hanya mengisi SKU bila 'Barcode' kosong (ditangani di analisis).
+   'Non Stok' (kolom ekspor Griyo) dibaca terbalik: YA -> Termasuk Stok
+   TIDAK. */
+function petakanHeaderImpor(headers) {
+  var ALIAS = {
+    'nama': 'Nama', 'produk': 'Nama',
+    'kategori': 'Kategori',
+    'sku/barcode': 'SKU', 'sku': 'SKU', 'barcode': 'SKU', 'kode produk': 'SKU',
+    'harga jual': 'HargaJual',
+    'harga modal': 'HargaModal', 'harga pokok': 'HargaModal',
+    'stok': 'Stok', 'satuan': 'Satuan',
+    'stok minimum': 'StokMinimum', 'stok min': 'StokMinimum',
+    'grup': 'Grup', 'grup produk': 'Grup',
+    'termasuk stok': 'TermasukStok', 'non stok': 'NonStok',
+    'harga bisa diganti': 'HargaBisaDiganti',
+    'tampilkan di katalog': 'TampilkanDiKatalog',
+    'keterangan': 'Keterangan'
+  };
+  var map = {}, punyaNama = false;
+  headers.forEach(function (h, i) {
+    var k = (String(h == null ? '' : h).trim() || '').toLowerCase().replace(/\s+/g, ' ');
+    var f = ALIAS[k];
+    if (f) { map[i] = f; if (f === 'Nama') punyaNama = true; }
+  });
+  return { map: map, punyaNama: punyaNama };
+}
+/* Angka format Indonesia: "12.000" -> 12000, "Rp12.000" -> 12000,
+   "12,5" -> 13 (dibulatkan). Kosong -> 0 (boleh). Bukan angka atau
+   negatif -> tidak ok. */
+function angkaImpor(v) {
+  var s = String(v == null ? '' : v).trim();
+  if (!s) return { ok: true, nilai: 0 };
+  s = s.replace(/^Rp\s*/i, '').replace(/\s/g, '').replace(/\./g, '');
+  if (s.indexOf(',') > -1) s = s.replace(',', '.');
+  if (!/^-?\d+(\.\d+)?$/.test(s)) return { ok: false, nilai: 0 };
+  var n = Math.round(parseFloat(s));
+  if (isNaN(n) || n < 0) return { ok: false, nilai: 0 };
+  return { ok: true, nilai: n };
+}
+function yaTidakImpor(v, def) {
+  var s = (String(v == null ? '' : v).trim() || '').toLowerCase();
+  if (s === '') return !!def;
+  if (s === 'ya' || s === 'true' || s === '1') return true;
+  if (s === 'tidak' || s === 'false' || s === '0') return false;
+  return false;
+}
+/* Validasi satu baris (sudah dipetakan). Mengembalikan { ok, payload }
+   atau { ok:false, alasan }. Payload mengikuti persis bentuk yang
+   dikirim simpanProduk ke DB.upsertProduk. */
+function validasiBarisImpor(obj, noBaris, namaAda) {
+  var nama = String(obj.Nama == null ? '' : obj.Nama).trim();
+  if (!nama) return { ok: false, alasan: 'Nama kosong' };
+  if (namaAda[(nama || '').toLowerCase()]) return { ok: false, alasan: 'sudah ada' };
+  var jual = angkaImpor(obj.HargaJual);
+  if (!jual.ok) return { ok: false, alasan: 'Harga Jual bukan angka' };
+  var modal = angkaImpor(obj.HargaModal);
+  if (!modal.ok) return { ok: false, alasan: 'Harga Modal bukan angka' };
+  var stok = angkaImpor(obj.Stok);
+  if (!stok.ok) return { ok: false, alasan: 'Stok bukan angka' };
+  var stokMin = angkaImpor(obj.StokMinimum);
+  if (!stokMin.ok) return { ok: false, alasan: 'Stok Minimum bukan angka' };
+  var termasukStok;
+  if (obj.NonStok != null && String(obj.NonStok).trim() !== '') termasukStok = !yaTidakImpor(obj.NonStok, false);
+  else termasukStok = yaTidakImpor(obj.TermasukStok, true);
+  return { ok: true, payload: {
+    ID: '', Nama: nama,
+    Kategori: String(obj.Kategori == null ? '' : obj.Kategori).trim(),
+    Grup: String(obj.Grup == null ? '' : obj.Grup).trim(),
+    SKU: String(obj.SKU == null ? '' : obj.SKU).trim(),
+    HargaJual: jual.nilai, HargaModal: modal.nilai, Stok: stok.nilai, StokMinimum: stokMin.nilai,
+    Satuan: String(obj.Satuan == null ? '' : obj.Satuan).trim() || 'pcs',
+    GambarURL: '', Keterangan: String(obj.Keterangan == null ? '' : obj.Keterangan).trim(),
+    HargaBisaDiganti: yaTidakImpor(obj.HargaBisaDiganti, false),
+    TermasukStok: termasukStok,
+    TampilkanDiKatalog: yaTidakImpor(obj.TampilkanDiKatalog, true),
+    HargaLainJSON: '[]', HargaJumlahJSON: '[]', VarianJSON: '[]',
+    CabangID: cabangAktifId()
+  } };
+}
+/* Analisis isi file CSV: { punyaNama, siap:[payload], masalah:[{baris,
+   alasan}], duplikat } — masalah mencakup duplikat (alasan 'sudah ada').
+   Nomor baris = nomor baris di file (baris 1 = header). */
+function analisisCSVImpor(teks) {
+  var baris = parseCSVImpor(teks);
+  var hasil = { punyaNama: false, siap: [], masalah: [], duplikat: 0 };
+  if (!baris.length) return hasil;
+  var peta = petakanHeaderImpor(baris[0]);
+  if (!peta.punyaNama) return hasil;
+  hasil.punyaNama = true;
+  var namaAda = {};
+  (DATA.produk || []).forEach(function (p) { namaAda[String(p.Nama || '').trim().toLowerCase()] = true; });
+  for (var i = 1; i < baris.length; i++) {
+    var r = baris[i];
+    var kosong = r.every(function (c) { return String(c).trim() === ''; });
+    if (kosong) continue;
+    var obj = {};
+    for (var c = 0; c < r.length; c++) {
+      var f = peta.map[c]; if (!f) continue;
+      var v = r[c];
+      if (f === 'SKU') { if (obj.SKU == null || String(obj.SKU).trim() === '') obj.SKU = v; continue; }
+      obj[f] = v;
+    }
+    var cek = validasiBarisImpor(obj, i + 1, namaAda);
+    if (!cek.ok) {
+      hasil.masalah.push({ baris: i + 1, alasan: cek.alasan });
+      if (cek.alasan === 'sudah ada') hasil.duplikat++;
+      continue;
+    }
+    namaAda[(String(cek.payload.Nama).trim() || '').toLowerCase()] = true;
+    hasil.siap.push(cek.payload);
+  }
+  return hasil;
+}
+/* Pratinjau + konfirmasi + eksekusi impor dari teks CSV (dipisah dari
+   pemilih file supaya bisa diuji). */
+async function prosesTeksCSVImpor(teks) {
+  var hasil = analisisCSVImpor(teks);
+  if (!hasil.punyaNama) { tampilError('File CSV tidak punya kolom Nama/Produk.'); return; }
+  var siap = hasil.siap.length;
+  var dilewati = hasil.masalah.length - hasil.duplikat;
+  var ringkas = 'Ringkasan impor:\n' + siap + ' produk siap diimpor\n' + dilewati + ' baris bermasalah dilewati\n' + hasil.duplikat + ' duplikat dilewati';
+  if (hasil.masalah.length) {
+    ringkas += '\n\nBaris bermasalah:';
+    hasil.masalah.slice(0, 10).forEach(function (m) { ringkas += '\nBaris ' + m.baris + ': ' + m.alasan; });
+    if (hasil.masalah.length > 10) ringkas += '\n…dan ' + (hasil.masalah.length - 10) + ' lagi';
+  }
+  if (siap === 0) {
+    await konfirmasi('Tidak ada produk yang bisa diimpor.', ringkas, 'Mengerti', 'primary');
+    return;
+  }
+  var setuju = await konfirmasi('Impor produk?', ringkas, 'Ya, Impor ' + siap + ' produk', 'primary');
+  if (!setuju) return;
+  await jalankanImporProduk(hasil);
+}
+/* Simpan tiap baris valid berurutan lewat jalur yang sama dengan
+   simpanProduk. Satu baris gagal tidak menghentikan impor — dicatat dan
+   dilaporkan di akhir. loadData() dipanggil SEKALI setelah semua selesai. */
+async function jalankanImporProduk(hasil) {
+  var berhasil = 0, gagal = 0, pesanGagal = '';
+  for (var i = 0; i < hasil.siap.length; i++) {
+    try { await DB.upsertProduk(hasil.siap[i]); berhasil++; }
+    catch (e) { gagal++; if (!pesanGagal) pesanGagal = (e && e.message) || String(e); }
+  }
+  await loadData();
+  var dilewati = hasil.masalah.length - hasil.duplikat;
+  if (gagal === 0) tampilInfo('Impor selesai: ' + berhasil + ' produk ditambahkan, ' + dilewati + ' dilewati, ' + hasil.duplikat + ' duplikat.');
+  else tampilError('Impor selesai sebagian: ' + berhasil + ' berhasil, ' + gagal + ' gagal: ' + pesanGagal);
+}
+function imporProdukDariCSV() {
+  var inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = '.csv';
+  inp.onchange = function () {
+    var f = inp.files && inp.files[0]; if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function () {
+      prosesTeksCSVImpor(String(rd.result || '')).catch(function (e) { tampilError('Impor gagal: ' + (e.message || e)); });
+    };
+    rd.onerror = function () { tampilError('File CSV tidak bisa dibaca.'); };
+    rd.readAsText(f);
+  };
+  inp.click();
 }
 
 /* ---------- STOK ---------- */
