@@ -78,6 +78,7 @@ function show(id, btn) {
   tutupForm(id);
   if (id === 'kasir') langkahKasir(1);
   closeDrawer(); window.scrollTo(0, 0);
+  if (typeof navSinkronSesudahShow === 'function') navSinkronSesudahShow(id);
 }
 /* ---------- KASIR 3 LANGKAH ala Griyo: 1) daftar produk, 2) keranjang, 3) pembayaran (#bayar) ---------- */
 var langkahKasirAktif = 1;
@@ -89,10 +90,254 @@ function langkahKasir(n) {
   s2.style.display = n === 2 ? '' : 'none';
   renderCart();
   window.scrollTo(0, 0);
+  if (typeof navSinkronSesudahLangkah === 'function') navSinkronSesudahLangkah(n);
 }
-function kembaliKeKeranjang() { show('kasir', document.querySelector('nav button.menu[data-sec="kasir"]')); langkahKasir(2); }
+function kembaliKeKeranjang() { kembali(); }
 function toggleDrawer() { var n = document.getElementById('nav'); var b = document.getElementById('drawerBackdrop'); var open = n && !n.classList.contains('open'); if (n) n.classList.toggle('open', open); if (b) b.style.display = open ? 'block' : 'none'; }
 function closeDrawer() { var n = document.getElementById('nav'); var b = document.getElementById('drawerBackdrop'); if (n) n.classList.remove('open'); if (b) b.style.display = 'none'; }
+
+/* ---------- RIWAYAT NAVIGASI / TOMBOL KEMBALI ANDROID (v4-35) ----------
+   Masalah: aplikasi pindah layar hanya dengan JavaScript (show/bukaForm/
+   langkahKasir) tanpa History API — tombol kembali Android tidak punya
+   "layar sebelumnya" dan langsung menutup aplikasi. Perbaikan: setiap
+   pindah layar mencatat satu entri history.pushState; tombol kembali
+   (popstate) mundur tepat satu layar: overlay ditutup dulu, form -> daftar,
+   kasir mundur satu langkah (keranjang utuh), daftar/menu -> dashboard,
+   dan di dashboard tekan pertama hanya toast, tekan kedua (<2 detik) baru
+   keluar. Layar login TIDAK dicegat. */
+var NAV = {
+  siap: false,          // entri penjaga sudah dipasang (sekali per login)
+  aktif: null,          // deskriptor layar saat ini {s, f, k, d}
+  tumpuk: [],           // cermin tumpukan riwayat (hanya entri yang kita dorong; penjaga = [0])
+  keluarDalam: 0,       // waktu (ms) tekan-kembali pertama di dashboard
+  izinKeluar: false,    // popstate berikutnya dibiarkan keluar
+  mundurProgram: false, // popstate dari history.back() programatik (tombol dlm aplikasi)
+  tanpaRiwayat: false,  // render dari popstate: jangan catat riwayat lagi
+};
+// Deskriptor layar: s = section, f = form-view (bila form terbuka),
+// k = langkah kasir (1/2, atau 3 untuk section bayar), d = id detail trx.
+function layarBaru(s, f, k, d) { var L = { s: s }; if (f) L.f = f; if (k) L.k = k; if (d) L.d = d; return L; }
+function samaLayar(a, b) {
+  if (!a || !b) return a === b;
+  return a.s === b.s && (a.f || null) === (b.f || null) && (a.k || null) === (b.k || null) && (a.d || null) === (b.d || null);
+}
+function layarDariState(st) {
+  if (!st || !st.s) return { s: 'dashboard' };
+  return layarBaru(st.s, st.f || null, st.k || null, st.d || null);
+}
+// Keputusan murni: status layar saat ini -> tindakan kembali.
+// st: { sudahLogin, overlay, overlayTerkunci, layar, keluarDalamMs }
+function keputusanKembali(st) {
+  if (!st.sudahLogin) return { aksi: 'abaikan' };
+  if (st.overlayTerkunci) return { aksi: 'telan' };
+  if (st.overlay) return { aksi: 'tutupOverlay', overlay: st.overlay };
+  var L = st.layar || { s: 'dashboard' };
+  if (L.f) return { aksi: 'keDaftar', section: L.s };
+  if (L.s === 'detailTrx') return { aksi: 'keDaftar', section: 'daftar' };
+  if (L.s === 'bayar') return { aksi: 'mundurKasir', langkah: 2 };
+  if (L.s === 'kasir' && L.k === 2) return { aksi: 'mundurKasir', langkah: 1 };
+  if (L.s === 'dashboard') {
+    if (st.keluarDalamMs != null && st.keluarDalamMs <= 2000) return { aksi: 'keluar' };
+    return { aksi: 'toastKeluar' };
+  }
+  return { aksi: 'keDashboard' };
+}
+function sudahLoginRiwayat() {
+  try {
+    var lb = document.getElementById('loginBox');
+    if (lb && lb.style.display === 'block') return false;
+    if (document.body && document.body.classList && document.body.classList.contains && document.body.classList.contains('belum-login')) return false;
+    var oa = document.getElementById('offlineAwal');
+    if (oa && oa.style.display !== 'none') return false;
+    return true;
+  } catch (e) { return true; }
+}
+// Overlay mana yang sedang terbuka (paling atas dulu). Modal konfirmasi
+// yang terkunci (impor CSV berjalan) tidak bisa ditutup — kembali ditelan.
+function overlayTerbuka() {
+  var el = function (id) { try { return document.getElementById(id); } catch (e) { return null; } };
+  var sm = el('scanModal'); if (sm && sm.style.display === 'block') return { nama: 'scan' };
+  var kb = el('konfirmBackdrop'); if (kb && kb.style.display === 'block') {
+    if (typeof _imporBerjalan !== 'undefined' && _imporBerjalan) return { nama: 'konfirmasi', terkunci: true };
+    return { nama: 'konfirmasi' };
+  }
+  var ib = el('infoBackdrop'); if (ib && ib.style.display === 'block') return { nama: 'info' };
+  var np = el('notifPanel'); if (np && np.style.display === 'block') return { nama: 'notif' };
+  var lb = el('lebihBackdrop'); if (lb && lb.style.display === 'block') return { nama: 'lebih' };
+  var nav = el('nav'); if (nav && nav.classList && nav.classList.contains && nav.classList.contains('open')) return { nama: 'drawer' };
+  var ml = el('menuLainnyaProduk'); if (ml && ml.style.display === 'block') return { nama: 'dropdown' };
+  var dg = el('dropdownGrupProduk'); if (dg && dg.style.display === 'block') return { nama: 'dropdown' };
+  return null;
+}
+function tutupOverlay(nama) {
+  if (nama === 'scan') { if (typeof tutupScanKamera === 'function') tutupScanKamera(); }
+  else if (nama === 'konfirmasi') { if (typeof jawabKonfirm === 'function') jawabKonfirm(false); }
+  else if (nama === 'info') { if (typeof tutupInfoModal === 'function') tutupInfoModal(); }
+  else if (nama === 'notif') { if (typeof toggleNotifPanel === 'function') toggleNotifPanel(); }
+  else if (nama === 'lebih') { if (typeof tutupLebih === 'function') tutupLebih(); }
+  else if (nama === 'drawer') { closeDrawer(); }
+  else if (nama === 'dropdown') { if (typeof tutupDropdownGrup === 'function') tutupDropdownGrup(); if (typeof tutupMenuLainnyaProduk === 'function') tutupMenuLainnyaProduk(); }
+}
+function navDorong(L) {
+  if (typeof NAV === 'undefined' || !NAV.siap) return false;
+  var n = NAV.tumpuk.length;
+  // (tanpa guard samaLayar di sini: pemanggil sudah memeriksanya, dan
+  // jalur toast/overlay memang sengaja mendorong layar yang sama untuk
+  // memulihkan entri yang baru saja ter-pop.)
+  // Kembali ke layar tepat di bawah puncak via bukaForm (mis. simpan item
+  // pembelian kembali ke formPembelian): jangan dorong duplikat, mundur
+  // satu entri lewat history.back() — popstate-nya yang merender.
+  if (n >= 2 && samaLayar(L, NAV.tumpuk[n - 2])) { navMundurProgram(); return true; }
+  try {
+    if (typeof history === 'undefined' || !history.pushState) return false;
+    history.pushState(L, '');
+  } catch (e) { return false; }
+  NAV.aktif = L; NAV.tumpuk.push(L);
+  return true;
+}
+function navGanti(L) {
+  if (typeof NAV === 'undefined' || !NAV.siap) return false;
+  try {
+    if (typeof history === 'undefined' || !history.replaceState) return false;
+    history.replaceState(L, '');
+  } catch (e) { return false; }
+  NAV.aktif = L;
+  if (NAV.tumpuk.length) NAV.tumpuk[NAV.tumpuk.length - 1] = L;
+  return true;
+}
+function navMundurProgram() {
+  if (typeof NAV === 'undefined' || !NAV.siap || NAV.tumpuk.length < 1) return false;
+  NAV.mundurProgram = true;
+  try { history.back(); } catch (e) { NAV.mundurProgram = false; return false; }
+  return true;
+}
+// Render layar tanpa menyentuh riwayat (dipakai popstate & kembali).
+function terapkanLayar(L) {
+  if (!L) L = { s: 'dashboard' };
+  var s = L.s || 'dashboard';
+  NAV.tanpaRiwayat = true;
+  try {
+    show(s, (typeof document !== 'undefined' && document.querySelector) ? document.querySelector('nav button.menu[data-sec="' + s + '"]') : null);
+    if (L.f) bukaForm(s, L.f);
+    if (s === 'kasir' && L.k) langkahKasir(L.k);
+  } finally { NAV.tanpaRiwayat = false; }
+  NAV.aktif = L;
+}
+// Tombol "← Kembali" di dalam aplikasi: lewat riwayat supaya tumpukan
+// tetap konsisten dengan tombol kembali Android. Bila tidak ada entri
+// riwayat (mis. layar dibuka sebelum penjaga dipasang), lakukan aksi
+// kembali langsung tanpa riwayat.
+function kembali() {
+  if (typeof NAV !== 'undefined' && NAV.siap && NAV.tumpuk.length >= 1) { navMundurProgram(); return; }
+  var L = (typeof NAV !== 'undefined' && NAV.aktif) || { s: 'dashboard' };
+  if (L.f) { tutupForm(L.s); return; }
+  if (L.s === 'detailTrx') { show('daftar', null); return; }
+  if (L.s === 'bayar') { show('kasir', null); langkahKasir(2); return; }
+  if (L.s === 'kasir' && L.k === 2) { langkahKasir(1); return; }
+  if (L.s !== 'dashboard') { show('dashboard', null); return; }
+}
+function saatPopstate(ev) {
+  if (typeof NAV === 'undefined') return;
+  if (NAV.izinKeluar) return;
+  if (NAV.mundurProgram) {
+    NAV.mundurProgram = false;
+    NAV.tumpuk.pop();
+    terapkanLayar(layarDariState(ev && ev.state));
+    return;
+  }
+  if (!NAV.siap) return;
+  NAV.tumpuk.pop(); // pop sudah terjadi: kita mundur satu entri
+  var mendarat = layarDariState(ev && ev.state);
+  var ov = overlayTerbuka();
+  var st = {
+    sudahLogin: sudahLoginRiwayat(),
+    overlay: ov ? ov.nama : null,
+    overlayTerkunci: !!(ov && ov.terkunci),
+    layar: NAV.aktif || { s: 'dashboard' },
+    keluarDalamMs: NAV.keluarDalam ? (Date.now() - NAV.keluarDalam) : null,
+  };
+  var kep = keputusanKembali(st);
+  if (kep.aksi === 'abaikan') return;
+  if (kep.aksi === 'telan') { navDorong(NAV.aktif); return; }
+  if (kep.aksi === 'tutupOverlay') { tutupOverlay(kep.overlay); navDorong(NAV.aktif); return; }
+  if (kep.aksi === 'toastKeluar') {
+    NAV.keluarDalam = Date.now();
+    tampilInfo('Tekan kembali sekali lagi untuk keluar');
+    navDorong({ s: 'dashboard' });
+    return;
+  }
+  if (kep.aksi === 'keluar') {
+    NAV.izinKeluar = true;
+    try { history.back(); } catch (e) {}
+    return;
+  }
+  if (kep.aksi === 'keDaftar') {
+    // Target idealnya entri tempat pop mendarat (mis. formPembelian di
+    // bawah formBeliItem); bila tidak cocok dengan section-nya, ke daftar.
+    var targetDaftar = (ev && ev.state && ev.state.s === kep.section) ? mendarat : layarBaru(kep.section);
+    terapkanLayar(targetDaftar);
+    if (!samaLayar(targetDaftar, mendarat)) navGanti(targetDaftar);
+    return;
+  }
+  var target = kep.aksi === 'mundurKasir' ? layarBaru('kasir', null, kep.langkah)
+    : { s: 'dashboard' };
+  terapkanLayar(target);
+  if (!samaLayar(target, mendarat)) navGanti(target);
+}
+// Pasang entri penjaga dashboard sekali per login (dipanggil di akhir
+// selesaiMuatData, saat aplikasi sudah tampil). Tanpa penjaga, kembali di
+// dashboard tidak memicu popstate dan aplikasi langsung tertutup.
+function pasangPenjagaRiwayat() {
+  if (typeof NAV === 'undefined' || NAV.siap) return;
+  if (typeof history === 'undefined' || !history.pushState) return;
+  try {
+    history.pushState({ s: 'dashboard', penjaga: true }, '');
+    NAV.siap = true;
+    NAV.aktif = { s: 'dashboard' };
+    NAV.tumpuk = [{ s: 'dashboard', penjaga: true }];
+    NAV.keluarDalam = 0; NAV.izinKeluar = false; NAV.mundurProgram = false;
+  } catch (e) {}
+}
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('popstate', saatPopstate);
+}
+// Sinkronisasi riwayat sesudah navigasi (dipanggil show/bukaForm/
+// tutupForm/langkahKasir). Dijaga typeof supaya sim yang mengekstrak
+// fungsi-fungsi itu saja tidak rusak.
+function navSinkronSesudahShow(id) {
+  if (typeof NAV === 'undefined' || NAV.tanpaRiwayat || NAV.mundurProgram) return;
+  var d = (id === 'detailTrx' && typeof detailTrxId !== 'undefined') ? detailTrxId : undefined;
+  var baru = layarBaru(id, null, id === 'kasir' ? 1 : (id === 'bayar' ? 3 : undefined), d);
+  if (samaLayar(baru, NAV.aktif)) return;
+  var lama = NAV.aktif;
+  NAV.aktif = baru; // lacak layar saat ini walau penjaga belum dipasang
+  if (!NAV.siap) return;
+  if (id === 'dashboard') { navGanti(baru); return; }
+  if (lama && (lama.f || lama.s === 'detailTrx')) { navGanti(baru); return; }
+  navDorong(baru);
+}
+function navSinkronSesudahLangkah(n) {
+  if (typeof NAV === 'undefined' || NAV.tanpaRiwayat || NAV.mundurProgram) return;
+  var L = layarBaru('kasir', null, n);
+  if (samaLayar(L, NAV.aktif)) return;
+  NAV.aktif = L;
+  if (!NAV.siap) return;
+  navDorong(L);
+}
+function navSinkronSesudahBukaForm(secId, formId) {
+  if (typeof NAV === 'undefined' || NAV.tanpaRiwayat || NAV.mundurProgram) return;
+  var L = layarBaru(secId, formId || null);
+  if (samaLayar(L, NAV.aktif)) return;
+  NAV.aktif = L;
+  if (!NAV.siap) return;
+  navDorong(L);
+}
+function navSinkronSesudahTutupForm(secId) {
+  if (typeof NAV === 'undefined' || NAV.tanpaRiwayat || NAV.mundurProgram) return;
+  if (!NAV.aktif || !NAV.aktif.f || NAV.aktif.s !== secId) return;
+  if (!NAV.siap) { NAV.aktif = layarBaru(secId); return; }
+  navMundurProgram();
+}
 
 /* ---------- HALAMAN DAFTAR / DETAIL (pola Griyo: daftar + tombol +, isi di halaman sendiri) ----------
    Tiap menu master punya 2 tampilan: .list-view (daftar + tombol +) dan .form-view (isi detail).
@@ -104,12 +349,14 @@ function bukaForm(secId, formId) {
   var f = formId ? document.getElementById(formId) : sec.querySelector('.form-view');
   if (f) f.style.display = 'block';
   window.scrollTo(0, 0);
+  if (typeof navSinkronSesudahBukaForm === 'function') navSinkronSesudahBukaForm(secId, f && f.id);
 }
 function tutupForm(secId) {
   var sec = document.getElementById(secId); if (!sec) return;
   sec.querySelectorAll('.form-view').forEach(function (el) { el.style.display = 'none'; });
   sec.querySelectorAll('.list-view').forEach(function (el) { el.style.display = ''; });
   window.scrollTo(0, 0);
+  if (typeof navSinkronSesudahTutupForm === 'function') navSinkronSesudahTutupForm(secId);
 }
 /* Popup konfirmasi di dalam aplikasi (pengganti popup bawaan browser):
    konfirmasi(judul, pesan, labelYa, kelasYa) mengembalikan Promise<boolean> —
@@ -374,6 +621,9 @@ function selesaiMuatData() {
     var oa = document.getElementById('offlineAwal'); if (oa) oa.style.display = 'none';
     document.querySelectorAll('main section').forEach(function (s) { s.style.display = ''; });
     renderAll(); applyRole(); hideLoading();
+    // v4-35: pasang entri penjaga dashboard untuk tombol kembali Android
+    // (sekali per login; panggil ulang aman karena dijaga NAV.siap).
+    if (typeof pasangPenjagaRiwayat === 'function') pasangPenjagaRiwayat();
     // bila online dan ada antrean offline, sinkronkan otomatis.
     try { if (DB.configured) sinkronisasiOtomatis(); } catch (e) {}
     return true;
@@ -500,9 +750,14 @@ async function logout() {
   document.getElementById('userLabel').textContent = '';
   document.getElementById('loginEmail').value = ''; document.getElementById('loginKataSandi').value = '';
   var kb = document.getElementById('kasirBayar'); if (kb) kb.value = '';
+  // v4-35: kembali ke dashboard supaya login berikutnya mulai bersih;
+  // riwayat direset hanya bila layar login memang tampil (cabang demo
+  // tetap di aplikasi dan penjaga riwayatnya dibiarkan aktif).
+  try { show('dashboard', null); } catch (e) {}
   // Mode Supabase: login selalu wajib setelah keluar. Mode Contoh: login
   // dilewati bila belum ada pengguna sama sekali.
   if (DB.configured || (DATA.pengguna || []).length) {
+    if (typeof NAV !== 'undefined') { NAV.siap = false; NAV.aktif = null; NAV.tumpuk = []; NAV.keluarDalam = 0; NAV.izinKeluar = false; NAV.mundurProgram = false; }
     document.getElementById('loginBox').style.display = 'block';
     document.body.classList.add('belum-login');
     document.querySelectorAll('main section').forEach(function (s) { s.style.display = 'none'; });
@@ -605,7 +860,7 @@ function renderAll() {
   vsEl.textContent = (pct >= 0 ? '+' : '') + pct + '% vs kemarin';
   vsEl.classList.toggle('down', pct < 0);
   document.getElementById('heroUser').textContent = currentUser ? ('Halo, ' + currentUser.nama + ' (' + currentUser.peran + ') — kasir siap melayani hari ini.') : 'Kasir siap melayani hari ini.';
-  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • ' + currentUser.peran + ' • v4-34') : 'Kasir • v4-34';
+  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • ' + currentUser.peran + ' • v4-35') : 'Kasir • v4-35';
   var bb = document.getElementById('bellBadge');
   if (bb) { var sm = Number(r.stokMenipis || 0); bb.style.display = sm > 0 ? 'flex' : 'none'; bb.textContent = sm > 99 ? '99+' : String(sm); }
   isiNotifPanel();
@@ -1525,7 +1780,7 @@ function renderDetailTrx() {
   var items = (DATA.detail || []).filter(function (x) { return x.TransaksiID === t.ID; });
   var no = trxNomor[t.ID] || '';
   var kode = t.KodeAlternatif || String(t.ID).slice(-6);
-  var html = '<div class="dhead"><button class="dhead-btn" onclick="show(\'daftar\',document.querySelector(\'nav button.menu[data-sec=daftar]\'))">←</button><b>Transaksi #' + no + '</b><button class="dhead-btn" onclick="show(\'pengaturan\',document.querySelector(\'nav button.menu[data-sec=pengaturan]\'))">' + ikon('gear', 17) + '</button></div>';
+  var html = '<div class="dhead"><button class="dhead-btn" onclick="kembali()">←</button><b>Transaksi #' + no + '</b><button class="dhead-btn" onclick="show(\'pengaturan\',document.querySelector(\'nav button.menu[data-sec=pengaturan]\'))">' + ikon('gear', 17) + '</button></div>';
   if (detailTab === 'retur') {
     html += '<div class="card" style="margin:12px"><h4 style="margin:0 0 4px">↩ Retur Item</h4>'
       + '<div style="font-size:13px;color:#64748b;margin-bottom:10px">Stok dikembalikan, total transaksi dikurangi. Centang item yang dikembalikan, atur jumlahnya — nominal dihitung otomatis (harga × jumlah).</div>'
@@ -2548,7 +2803,7 @@ function bukaPickerProduk(dariItem) {
   bukaForm('pembelian', 'pickerProduk');
 }
 function kembaliDariPickerProduk() {
-  bukaForm('pembelian', pickerProdukDariItem ? 'formBeliItem' : 'formPembelian');
+  kembali();
 }
 function renderPickerProduk() {
   var q = (document.getElementById('cariProdukBeli').value || '').toLowerCase();
