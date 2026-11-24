@@ -59,7 +59,7 @@ function promoJenisGanti() {
   el.value = promoNilaiAdalahUang() ? fmtUang(el.value) : String(parseUang(el.value));
 }
 function todayStr(d) { var x = d ? new Date(d) : new Date(); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); }
-// v4-33: tanggal dari database sering mentah ISO ("2026-11-24T00:00:00+00:00") —
+// tanggal dari database sering mentah ISO ("2026-11-24T00:00:00+00:00") —
 // tampilkan sebagai dd-mm-yyyy seperti tanggal lain di aplikasi.
 function fmtTanggalID(s) {
   if (s == null || s === '') return '—';
@@ -129,7 +129,7 @@ function konfirmasi(judul, pesan, labelYa, kelasYa) {
   });
 }
 function jawabKonfirm(ya) {
-  // v4-33: selama impor berjalan, modal dipakai sebagai layar progres —
+  // selama impor berjalan, modal dipakai sebagai layar progres —
   // tidak bisa ditutup (tombol disembunyikan, klik luar diabaikan).
   if (typeof _imporBerjalan !== 'undefined' && _imporBerjalan) return;
   document.getElementById('konfirmBackdrop').style.display = 'none';
@@ -268,7 +268,7 @@ function setModeLabel() {
   var ds = document.getElementById('drawerSync');
   if (ds) {
     if (contoh) ds.innerHTML = '<b>Mode Contoh</b> — isi config.js untuk terhubung';
-    else perbaruiIndikatorOffline(); // v4-33: baris sync + status offline
+    else perbaruiIndikatorOffline(); // baris sync + status offline
   }
 }
 
@@ -302,7 +302,7 @@ async function loadData() {
       var sesi = null;
       try { sesi = await DB.getSessionUser(); } catch (e) { sesi = null; }
       if (!sesi) {
-        // v4-33: offline tanpa sesi tersimpan — login pertama kali butuh
+        // offline tanpa sesi tersimpan — login pertama kali butuh
         // internet; beri tahu di layar login, bukan layar kosong.
         var sedangOfflineLogin = false;
         try { sedangOfflineLogin = navigator.onLine === false; } catch (e2) {}
@@ -323,7 +323,7 @@ async function loadData() {
     return selesaiMuatData();
   } catch (e) {
     hideLoading();
-    // v4-33: belum pernah online di perangkat ini -> layar penjelasan,
+    // belum pernah online di perangkat ini -> layar penjelasan,
     // bukan layar kosong / alert.
     if (String((e && e.message) || e) === 'OFFLINE_TANPA_SNAPSHOT') { tampilkanOfflineAwal(); return false; }
     // Timeout / koneksi putus di tengah jalan (loadAll sendiri sudah
@@ -339,7 +339,7 @@ async function loadData() {
     tampilError('Gagal memuat data: ' + e.message); alert('Gagal memuat data: ' + e.message); return false;
   }
 }
-/* Layar penjelasan saat offline dan belum pernah ada snapshot (v4-33). */
+/* Layar penjelasan saat offline dan belum pernah ada snapshot. */
 function tampilkanOfflineAwal() {
   var el = document.getElementById('offlineAwal'); if (el) el.style.display = '';
   var lb = document.getElementById('loginBox'); if (lb) lb.style.display = 'none';
@@ -374,7 +374,7 @@ function selesaiMuatData() {
     var oa = document.getElementById('offlineAwal'); if (oa) oa.style.display = 'none';
     document.querySelectorAll('main section').forEach(function (s) { s.style.display = ''; });
     renderAll(); applyRole(); hideLoading();
-    // v4-33: bila online dan ada antrean offline, sinkronkan otomatis.
+    // bila online dan ada antrean offline, sinkronkan otomatis.
     try { if (DB.configured) sinkronisasiOtomatis(); } catch (e) {}
     return true;
 }
@@ -383,7 +383,7 @@ async function muatUlangManual() {
   if (ok) tampilInfo('Data diperbarui • ' + (lastSyncAt ? lastSyncAt.toLocaleTimeString('id-ID') : ''));
 }
 
-/* ---------- STATUS OFFLINE + ANTREAN + SINKRONISASI OTOMATIS (v4-33) ----------
+/* ---------- STATUS OFFLINE + ANTREAN + SINKRONISASI OTOMATIS ----------
    Badge di header selalu menunjukkan status: "Online" (teal) atau
    "Offline — N menunggu diunggah" (kuning; merah bila ada yang gagal).
    Ketuk badge -> daftar antrean (jenis + waktu + ringkasan) dan, bila ada
@@ -605,7 +605,7 @@ function renderAll() {
   vsEl.textContent = (pct >= 0 ? '+' : '') + pct + '% vs kemarin';
   vsEl.classList.toggle('down', pct < 0);
   document.getElementById('heroUser').textContent = currentUser ? ('Halo, ' + currentUser.nama + ' (' + currentUser.peran + ') — kasir siap melayani hari ini.') : 'Kasir siap melayani hari ini.';
-  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • ' + currentUser.peran + ' • v4-33') : 'Kasir • v4-33';
+  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • ' + currentUser.peran + ' • v4-34') : 'Kasir • v4-34';
   var bb = document.getElementById('bellBadge');
   if (bb) { var sm = Number(r.stokMenipis || 0); bb.style.display = sm > 0 ? 'flex' : 'none'; bb.textContent = sm > 99 ? '99+' : String(sm); }
   isiNotifPanel();
@@ -891,6 +891,89 @@ function scanBarcode() {
   var mirip = (DATA.produk || []).some(function (x) { return String(x.Nama || '').toLowerCase().indexOf(code.toLowerCase()) >= 0; });
   if (!mirip) alert('Barcode / SKU tidak ditemukan: ' + code);
 }
+
+/* ---------- SCAN BARCODE KAMERA (v4-34) ---------- */
+// Pustaka html5-qrcode dimuat via CDN di index.html (global Html5Qrcode).
+// Scan online-only (pustaka + izin kamera butuh internet); cari ketik
+// tetap jalan offline. Kamera belakang (facingMode environment).
+var scanAktif = null; // { target: 'produk'|'kasir', qr: Html5Qrcode }
+var scanTarget = 'produk';
+
+function scanButuhOnline() {
+  try {
+    if (navigator.onLine === false) return true;
+    if (typeof DB !== 'undefined' && DB && DB.sedangOffline && DB.sedangOffline()) return true;
+  } catch (e) {}
+  return false;
+}
+
+async function bukaScanKamera(target) {
+  if (scanButuhOnline()) return tampilError('Scan kamera butuh internet.');
+  if (typeof Html5Qrcode === 'undefined') return tampilError('Pustaka scan belum termuat — periksa internet lalu coba lagi.');
+  var modal = document.getElementById('scanModal');
+  var box = document.getElementById('scanReader');
+  if (!modal || !box) return tampilError('Layar scan tidak tersedia.');
+  await hentikanScan();
+  scanTarget = target === 'kasir' ? 'kasir' : 'produk';
+  modal.style.display = 'block';
+  var qr = new Html5Qrcode('scanReader');
+  scanAktif = { target: scanTarget, qr: qr };
+  try {
+    await qr.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 250, height: 150 } },
+      function (kode) { if (!scanAktif) return; terapkanHasilScan(scanTarget, kode); },
+      function () { /* abaikan galat tiap frame (tidak ada kode di frame) */ });
+  } catch (e) {
+    await hentikanScan();
+    var ditolak = (e && e.name === 'NotAllowedError') || String((e && e.message) || e).indexOf('Permission') >= 0;
+    tampilError(ditolak
+      ? 'Izin kamera ditolak — izinkan kamera di pengaturan browser lalu coba lagi.'
+      : 'Kamera tidak bisa dipakai — pastikan perangkat punya kamera dan tidak dipakai aplikasi lain.');
+  }
+}
+
+async function hentikanScan() {
+  if (scanAktif && scanAktif.qr) {
+    try { await scanAktif.qr.stop(); } catch (e) {}
+    try { await scanAktif.qr.clear(); } catch (e) {}
+  }
+  scanAktif = null;
+  var modal = document.getElementById('scanModal');
+  if (modal) modal.style.display = 'none';
+}
+async function tutupScanKamera() { await hentikanScan(); }
+
+// Cari produk dari kode hasil scan: cocok persis SKU/barcode dulu,
+// kalau tidak ada, cocok substring nama. Kembalikan daftar cocok.
+function cariProdukDariKode(kode) {
+  var k = String(kode || '').trim();
+  if (!k) return [];
+  var semua = (DATA.produk || []).filter(produkAktif);
+  var pas = semua.filter(function (p) { return String(p.SKU || p['SKU/Barcode'] || '').trim() === k; });
+  if (pas.length) return pas;
+  var kl = (k || '').toLowerCase();
+  return semua.filter(function (p) { return String(p.Nama || '').toLowerCase().indexOf(kl) >= 0; });
+}
+
+async function terapkanHasilScan(target, kode) {
+  await hentikanScan();
+  var k = String(kode || '').trim();
+  if (!k) return;
+  if (target === 'kasir') {
+    var inp = document.getElementById('cariProduk');
+    if (inp) inp.value = k;
+    scanBarcode();
+    return;
+  }
+  cariProdukTeks = k;
+  var inp2 = document.getElementById('cariProdukMaster');
+  if (inp2) inp2.value = k;
+  filterGrupProduk = 'Semua';
+  renderProdukTable();
+  var cocok = cariProdukDariKode(k);
+  if (!cocok.length) return tampilError('Barcode ' + k + ' tidak ditemukan');
+  if (cocok.length === 1) return tampilInfo('Ditemukan: ' + cocok[0].Nama);
+  tampilInfo('Ditemukan: ' + cocok.length + ' produk');
+}
 async function cekPromo() {
   if (!cart.length || (DATA.pengaturan || {}).PromoAktif === 'TIDAK') { promoDiskon = 0; promoTerpakai = []; document.getElementById('promoBox').textContent = ''; return; }
   try {
@@ -906,7 +989,7 @@ function tukarPoin() {
   var nama = document.getElementById('kasirPelanggan').value;
   var pl = (DATA.pelanggan || []).find(function (p) { return p.Nama === nama; });
   if (!pl) return tampilError('Pilih pelanggan terdaftar dulu (bukan Umum).');
-  // v4-33: beri pesan jelas lewat toast (dulu alert() — tidak terlihat di
+  // beri pesan jelas lewat toast (dulu alert() — tidak terlihat di
   // browser penguji dan tidak memberi tahu kenapa tombol diam).
   if ((pl.Poin || 0) < 100) return tampilError('Poin belum cukup — butuh min. 100 poin, poin kamu ' + (pl.Poin || 0) + '.');
   var maks = Math.floor((pl.Poin || 0) / 100) * 100;
@@ -980,7 +1063,7 @@ async function simpanTransaksi() {
     // Promo harus segar sebelum total dihitung (cekPromo di-debounce 400 ms —
     // tanpa await ini, struk bisa memakai total tanpa promo).
     await cekPromo();
-    // v4-33: umpan balik instan — tombol "Menyimpan…" + toast, supaya ketuk
+    // umpan balik instan — tombol "Menyimpan…" + toast, supaya ketuk
     // tidak terasa diam selama simpan + loadData berjalan.
     if (btnSelesai) btnSelesai.textContent = 'Menyimpan…';
     tampilInfo('Menyimpan…');
@@ -1364,13 +1447,13 @@ async function lunasi(id, nominal) {
   if (!(n > 0)) return;
   if (n > sisa) n = sisa;
   if (!await konfirmasi('Bayar sisa ' + rp(n) + '?', 'Pembayaran dicatat sebagai pelunasan ' + (trx.Pelanggan || 'transaksi') + ' (' + (trx.KodeAlternatif || trx.ID) + ').', 'Ya, Bayar', 'primary')) return;
-  // v4-33: umpan balik instan — tombol "Menyimpan…" + toast.
+  // umpan balik instan — tombol "Menyimpan…" + toast.
   if (_btn) { _teksBtn = _btn.textContent; _btn.disabled = true; _btn.textContent = 'Menyimpan…'; }
   tampilInfo('Menyimpan…');
   try { await DB.tambahPembayaran({ id: id, nominal: n }); await loadData(); tampilInfo('Pembayaran ' + rp(n) + ' tercatat.'); } catch (e) { tampilError('Gagal mencatat pembayaran: ' + (e.message || e)); } finally { if (_btn) { _btn.disabled = false; _btn.textContent = _teksBtn; } }
 }
 async function ubahStatus(id, status) { if (!status) return; await DB.ubahStatusPesanan({ id: id, status: status }); await loadData(); }
-// v4-33: struk yang tersimpan di memori (lastStruk) harus dibersihkan bila
+// struk yang tersimpan di memori (lastStruk) harus dibersihkan bila
 // transaksinya sudah dibatalkan/dihapus — pratinjau struk di Kasir jangan
 // menampilkan struk basi dari transaksi yang sudah tidak ada.
 function bersihkanStrukBilaTerhapus(id) {
@@ -1394,7 +1477,7 @@ async function batalkanTransaksi(id) {
   // diam-diam (kembali null) sehingga tombol Batalkan tampak tidak berfungsi.
   // Pakai modal konfirmasi dalam aplikasi, seperti semua aksi hapus lainnya.
   if (!await konfirmasi('Batalkan transaksi ini?', pesan, 'Ya, Batalkan')) return;
-  // v4-33: umpan balik instan — tombol "Membatalkan…" + toast.
+  // umpan balik instan — tombol "Membatalkan…" + toast.
   if (_btn) { _teksBtn = _btn.textContent; _btn.disabled = true; _btn.textContent = 'Membatalkan…'; }
   tampilInfo('Membatalkan…');
   try { await DB.batalkanTransaksi({ id: id, alasan: '' }); bersihkanStrukBilaTerhapus(id); await loadData(); tampilInfo('Transaksi dibatalkan. Stok dikembalikan.'); } catch (e) { tampilError('Gagal membatalkan: ' + (e.message || e)); } finally { if (_btn) { _btn.disabled = false; _btn.textContent = _teksBtn; } }
@@ -1477,7 +1560,7 @@ function renderDetailTrx() {
   } else {
     var list = detailTersortir();
     var idx = -1; list.forEach(function (x, i) { if (x.ID === t.ID) idx = i; });
-    // v4-33: daftar terurut terbaru dulu — sblm (idx-1) = LEBIH BARU,
+    // daftar terurut terbaru dulu — sblm (idx-1) = LEBIH BARU,
     // ssdh (idx+1) = LEBIH LAMA. Jadi ‹ ke yang lebih lama (ssdh) dan
     // › ke yang lebih baru (sblm); dulu terbalik.
     var sblm = idx > 0 ? list[idx - 1].ID : '', ssdh = (idx >= 0 && idx < list.length - 1) ? list[idx + 1].ID : '';
@@ -1592,7 +1675,7 @@ async function simpanReturDetail() {
   var alasan = (document.getElementById('returAlasanDetail') || {}).value || '';
   var totalNom = pilih.reduce(function (a, p) { return a + Number(p.item.Harga || 0) * p.qty; }, 0);
   if (!await konfirmasi('Simpan retur?', pilih.length + ' item dikembalikan, total kembali ' + rp(totalNom) + '. Stok dikembalikan dan total transaksi dikurangi.', 'Ya, Simpan Retur', 'primary')) return;
-  // v4-33: umpan balik instan — tombol "Menyimpan…" + toast.
+  // umpan balik instan — tombol "Menyimpan…" + toast.
   if (_btn) { _teksBtn = _btn.textContent; _btn.disabled = true; _btn.textContent = 'Menyimpan…'; }
   tampilInfo('Menyimpan…');
   try {
@@ -1647,7 +1730,7 @@ async function simpanTambahItem() {
   if (t.StatusBayar === 'Lunas') {
     if (!await konfirmasi('Transaksi sudah lunas, anda ingin menambah item baru?', 'Item ditambahkan dan transaksi menjadi belum lunas sampai sisa dibayar.', 'Ya', 'primary')) return;
   }
-  // v4-33: umpan balik instan — tombol "Menyimpan…" + toast.
+  // umpan balik instan — tombol "Menyimpan…" + toast.
   if (_btn) { _teksBtn = _btn.textContent; _btn.disabled = true; _btn.textContent = 'Menyimpan…'; }
   tampilInfo('Menyimpan…');
   try {
@@ -1766,16 +1849,143 @@ async function lanjutkanTertunda(id) {
 async function hapusTertunda(id, el) { if (!await konfirmasi('Hapus transaksi tertunda?', 'Transaksi tertunda ini akan dihapus.', 'Ya, Hapus', 'danger')) return; try { await DB.hapusTertunda({ id: id }); await loadData(); tampilInfo('Transaksi tertunda dihapus.'); } catch (e) { tampilError('Gagal menghapus transaksi tertunda: ' + (e.message || e)); } }
 
 /* ---------- PRODUK ---------- */
+/* v4-34: status filter halaman Produk. Disimpan di variabel (bukan hanya
+   nilai input) supaya renderProdukTable() konsisten saat dipanggil ulang
+   oleh loadData(), dan supaya sim bisa mengujinya tanpa DOM penuh. */
+var filterGrupProduk = 'Semua';
+var cariProdukTeks = '';
+
+// Daftar grup dari produk aktif, lengkap dengan hitungan produk per grup.
+// Produk tanpa Grup masuk "Tanpa grup" (paling akhir); sisanya diurutkan
+// dari grup dengan produk terbanyak.
+function daftarGrupProduk(list) {
+  var hitung = {};
+  (list || []).forEach(function (p) {
+    var g = String(p.Grup || '').trim() || 'Tanpa grup';
+    hitung[g] = (hitung[g] || 0) + 1;
+  });
+  var semua = Object.keys(hitung).map(function (g) { return { nama: g, jumlah: hitung[g] }; });
+  semua.sort(function (a, b) {
+    if (a.nama === 'Tanpa grup') return 1;
+    if (b.nama === 'Tanpa grup') return -1;
+    return b.jumlah - a.jumlah;
+  });
+  return semua;
+}
+
+// Saring daftar produk master: grup dulu, lalu teks cari (Nama ATAU
+// SKU/barcode, case-insensitive, substring). 'Semua' = tanpa filter grup.
+function saringProdukMaster(list, grup, q) {
+  var teks = String(q || '').trim().toLowerCase();
+  return (list || []).filter(function (p) {
+    if (grup && grup !== 'Semua') {
+      var g = String(p.Grup || '').trim() || 'Tanpa grup';
+      if (g !== grup) return false;
+    }
+    if (teks) {
+      var nama = String(p.Nama || '').toLowerCase();
+      var sku = String(p.SKU || p['SKU/Barcode'] || '').toLowerCase();
+      if (nama.indexOf(teks) < 0 && sku.indexOf(teks) < 0) return false;
+    }
+    return true;
+  });
+}
+
+// Total Modal/Jual/Laba atas daftar yang sedang ditampilkan. Hanya produk
+// yang termasuk stok (lacakStok) yang dihitung; HargaModal 0 ditampilkan
+// apa adanya (tidak disembunyikan, tidak ada peringatan).
+function hitungTotalProduk(list) {
+  var t = { modal: 0, jual: 0, laba: 0, produk: 0, stok: 0 };
+  (list || []).forEach(function (p) {
+    t.produk++;
+    if (!lacakStok(p)) return;
+    var stok = stokProduk(p);
+    t.stok += stok;
+    t.modal += stok * Number(p.HargaModal || 0);
+    t.jual += stok * Number(p.HargaJual || 0);
+  });
+  t.laba = t.jual - t.modal;
+  return t;
+}
+
 function renderProdukTable() {
   var hideHPP = sembunyikanHPP();
-  var list = (DATA.produk || []).filter(produkAktif);
-  var totalStok = list.filter(lacakStok).reduce(function (a, p) { return a + stokProduk(p); }, 0);
-  var c1 = document.getElementById('produkCount'); if (c1) c1.textContent = 'Produk: ' + list.length;
-  var c2 = document.getElementById('produkStokCount'); if (c2) c2.textContent = 'Stok: ' + totalStok + ' pcs';
+  // v4-34: baca teks cari dari input bila ada (input ditambahkan bersama
+  // header baru; bila belum ada, pakai status variabel).
+  var inp = document.getElementById('cariProdukMaster');
+  if (inp) cariProdukTeks = inp.value || '';
+  var list = saringProdukMaster((DATA.produk || []).filter(produkAktif), filterGrupProduk, cariProdukTeks);
+  var tot = hitungTotalProduk(list);
+  var c1 = document.getElementById('produkCount'); if (c1) c1.textContent = 'Produk: ' + tot.produk;
+  var c2 = document.getElementById('produkStokCount'); if (c2) c2.textContent = 'Stok: ' + tot.stok + ' pcs';
+  var m = document.getElementById('produkTotalModal'); if (m) m.textContent = rp(tot.modal);
+  var j = document.getElementById('produkTotalJual'); if (j) j.textContent = rp(tot.jual);
+  var l = document.getElementById('produkTotalLaba'); if (l) l.textContent = rp(tot.laba);
+  var hapus = document.getElementById('btnHapusCariProduk'); if (hapus) hapus.style.display = cariProdukTeks ? '' : 'none';
+  var fb = document.getElementById('filterGrupLabel'); if (fb) fb.textContent = filterGrupProduk;
+  renderDropdownGrup();
   document.getElementById('produkTable').innerHTML = list.length ? '<div class="plist">' + list.map(function (p) {
     var laba = Number(p.HargaJual) - Number(p.HargaModal || 0);
     return '<div class="prow" onclick="editProduk(\'' + esc(p.ID) + '\')"><div class="pinfo"><b>' + esc(p.Nama) + '</b><span>Stok: ' + stokProduk(p) + ' ' + esc(p.Satuan || 'pcs') + (p.SKU || p['SKU/Barcode'] ? ' • ' + esc(p.SKU || p['SKU/Barcode']) : '') + '</span></div><div class="pharga"><b>' + rp(p.HargaJual) + '</b>' + (hideHPP ? '' : '<span>Laba: ' + rp(laba) + '</span>') + '</div></div>';
   }).join('') + '</div>' : '<p style="color:#64748b">Belum ada produk. Ketuk tombol + untuk menambah.</p>';
+}
+
+// Isi panel dropdown filter grup (dipanggil tiap render supaya hitungan
+// selalu segar). Panelnya sendiri ditampilkan/disembunyikan oleh
+// toggleDropdownGrup(); elemen belum ada = tidak apa-apa (header baru).
+function renderDropdownGrup() {
+  var d = document.getElementById('dropdownGrupProduk');
+  if (!d) return;
+  var aktif = (DATA.produk || []).filter(produkAktif);
+  var grups = daftarGrupProduk(aktif);
+  var html = '<div class="drop-item' + (filterGrupProduk === 'Semua' ? ' aktif' : '') + '" onclick="pilihGrupProduk(\'Semua\')">Semua (' + aktif.length + ')' + (filterGrupProduk === 'Semua' ? ' ✓' : '') + '</div>';
+  grups.forEach(function (g) {
+    html += '<div class="drop-item' + (filterGrupProduk === g.nama ? ' aktif' : '') + '" onclick="pilihGrupProduk(\'' + escJS(g.nama) + '\')">' + esc(g.nama) + ' (' + g.jumlah + ')' + (filterGrupProduk === g.nama ? ' ✓' : '') + '</div>';
+  });
+  d.innerHTML = html;
+}
+function pilihGrupProduk(grup) {
+  filterGrupProduk = grup || 'Semua';
+  tutupDropdownGrup();
+  renderProdukTable();
+}
+function toggleDropdownGrup() {
+  var d = document.getElementById('dropdownGrupProduk');
+  if (!d) return;
+  if (d.style.display === 'block') { d.style.display = 'none'; return; }
+  renderDropdownGrup();
+  d.style.display = 'block';
+}
+function tutupDropdownGrup() {
+  var d = document.getElementById('dropdownGrupProduk');
+  if (d) d.style.display = 'none';
+}
+function toggleMenuLainnyaProduk() {
+  var d = document.getElementById('menuLainnyaProduk');
+  if (!d) return;
+  d.style.display = d.style.display === 'block' ? 'none' : 'block';
+}
+function tutupMenuLainnyaProduk() {
+  var d = document.getElementById('menuLainnyaProduk');
+  if (d) d.style.display = 'none';
+}
+function bersihkanCariProduk() {
+  cariProdukTeks = '';
+  var inp = document.getElementById('cariProdukMaster');
+  if (inp) inp.value = '';
+  renderProdukTable();
+}
+
+// v4-34: ketuk di luar panel dropdown (filter grup / menu Lainnya)
+// menutup panel. closest() menjaga ketuk di dalam panel/tombolnya.
+// Guard typeof: sim headless (sim-beban dkk.) memakai document tiruan
+// tanpa addEventListener — di sana listener ini dilewati.
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+  document.addEventListener('click', function (ev) {
+    var t = (ev && ev.target) || {};
+    var diDalam = (t.closest && t.closest('#dropdownGrupProduk,#btnFilterGrup,#menuLainnyaProduk,#btnLainnyaProduk')) || null;
+    if (!diDalam) { tutupDropdownGrup(); tutupMenuLainnyaProduk(); }
+  });
 }
 function hitungLabaProduk() {
   var jual = parseUang(document.getElementById('pJual').value), modal = parseUang(document.getElementById('pModal').value);
@@ -1891,7 +2101,7 @@ function unduhFile(nama, isi, tipe) {
   var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([isi], { type: tipe })); a.download = nama; a.click();
 }
 
-/* ---------- IMPOR PRODUK DARI CSV (progres + ringkasan akhir v4-33) ----------
+/* ---------- IMPOR PRODUK DARI CSV (progres + ringkasan akhir) ----------
    Alur: pilih file -> analisis (parse + petakan header + validasi) ->
    pratinjau di modal konfirmasi -> impor berurutan lewat DB.upsertProduk.
    Baris bermasalah DILEWATI (bukan menggagalkan impor) dan dilaporkan
@@ -2077,7 +2287,7 @@ async function prosesTeksCSVImpor(teks) {
   if (!setuju) return;
   await jalankanImporProduk(hasil);
 }
-/* Progres impor (v4-33, temuan uji live impor CSV): modal konfirmasi dipakai
+/* Progres impor (temuan uji live impor CSV): modal konfirmasi dipakai
    ulang sebagai layar progres — tombol disembunyikan selama impor supaya
    tidak tertutup tanpa sengaja, dan jawabKonfirm() menolak menutup selama
    _imporBerjalan true. */
@@ -2099,7 +2309,7 @@ function sembunyiProgresImpor() {
 /* Simpan tiap baris valid berurutan lewat jalur yang sama dengan
    simpanProduk. Satu baris gagal tidak menghentikan impor — dicatat dan
    dilaporkan di akhir. loadData() dipanggil SEKALI setelah semua selesai.
-   v4-33: progres "Mengimpor N/M produk..." terlihat selama impor +
+   progres "Mengimpor N/M produk..." terlihat selama impor +
    ringkasan akhir di modal (bukan hanya toast singkat). */
 async function jalankanImporProduk(hasil) {
   var berhasil = 0, gagal = 0, pesanGagal = '';
@@ -2121,7 +2331,7 @@ async function jalankanImporProduk(hasil) {
   await konfirmasi('Impor selesai', ringkas, 'Mengerti', 'primary');
 }
 function imporProdukDariCSV() {
-  // v4-33: impor butuh cek duplikat ke server — tolak saat offline.
+  // impor butuh cek duplikat ke server — tolak saat offline.
   var sedangOffline = false;
   try { sedangOffline = navigator.onLine === false || (DB.sedangOffline && DB.sedangOffline()); } catch (e) {}
   if (sedangOffline) { tampilError('Impor CSV butuh internet.'); return; }
@@ -2141,7 +2351,7 @@ function imporProdukDariCSV() {
 
 /* ---------- STOK ---------- */
 function renderStok() {
-  // v4-33: stok negatif (dua perangkat offline menjual barang terakhir
+  // stok negatif (dua perangkat offline menjual barang terakhir
   // yang sama) ditandai jelas "Stok Minus — cek", jangan diam-diam.
   document.getElementById('stokTable').innerHTML = (DATA.produk || []).map(function (p) { var s = stokProduk(p); var tipis = s <= Number(p.StokMinimum || 5); var minus = s < 0; return '<div class="cart-item"><span><b>' + esc(p.Nama) + '</b><br><small>' + rp(p.HargaJual) + ' • Stok min. ' + (p.StokMinimum || 5) + '</small></span>' + (minus ? '<span class="badge bad">Stok Minus — cek (' + s + ')</span>' : (tipis ? '<span class="badge warn">Stok ' + s + '</span>' : '<b>Stok ' + s + '</b>')) + '</div>'; }).join('') || 'Belum ada produk.';
   document.getElementById('opnameTable').innerHTML = (DATA.opname || []).slice(0, 50).map(function (o) { return '<div class="cart-item"><span><b>' + esc(o.NamaProduk) + '</b><br><small>' + fmtTanggalID(o.Tanggal) + ' • Sistem ' + o.StokSistem + ' • Fisik ' + o.StokFisik + '</small></span><b>Selisih ' + o.Selisih + '</b></div>'; }).join('') || 'Belum ada opname.';
@@ -2219,7 +2429,7 @@ function renderPembelian() {
   document.getElementById('pembelianTable').innerHTML = html;
   document.getElementById('pemasokTable').innerHTML = '<table><tr><th>Nama</th><th>Telepon</th><th>Hutang</th><th></th></tr>' + (DATA.pemasok || []).map(function (p) { return '<tr><td>' + esc(p.Nama) + '</td><td>' + esc(p.Telepon || '') + '</td><td>' + rp(p.Hutang || 0) + '</td><td><button class="secondary" onclick="editPemasok(\'' + esc(p.ID) + '\')">Edit</button> <button class="danger" onclick="hapusPemasok(\'' + esc(p.ID) + '\', this)">Hapus</button></td></tr>'; }).join('') + '</table>';
 }
-// v4-33: pemasok akhirnya bisa diedit/dihapus (dulu tabel tanpa aksi).
+// pemasok akhirnya bisa diedit/dihapus (dulu tabel tanpa aksi).
 function editPemasok(id) {
   var p = (DATA.pemasok || []).find(function (x) { return String(x.ID) === String(id); }); if (!p) return;
   document.getElementById('pmId').value = p.ID; document.getElementById('pmNama').value = p.Nama;
@@ -2272,7 +2482,7 @@ async function simpanPembelian() {
   var pemasok = document.getElementById('beliPemasok').value;
   if (!pemasok) return tampilError('Pilih pemasok dulu.');
   var total = hitungTotalBeli();
-  // v4-33: umpan balik instan — tombol "Menyimpan…" + toast.
+  // umpan balik instan — tombol "Menyimpan…" + toast.
   if (_btn) { _teksBtn = _btn.textContent; _btn.disabled = true; _btn.textContent = 'Menyimpan…'; }
   tampilInfo('Menyimpan…');
   try {
@@ -2285,7 +2495,7 @@ async function prosesPembelian(id, el) {
   if (sedangProsesBeli) return; // cegah dua ketuk PROSES bersamaan
   if (!await konfirmasi('Proses pembelian?', 'Stok bertambah, pengeluaran dan utang pemasok tercatat. Proses ini tidak bisa dibatalkan.', 'Ya, Proses', 'primary')) return;
   sedangProsesBeli = true;
-  // v4-33: umpan balik instan — tombol "Memproses…" + toast.
+  // umpan balik instan — tombol "Memproses…" + toast.
   var _teksBeli = el ? el.textContent : '';
   if (el) { el.disabled = true; el.textContent = 'Memproses…'; }
   tampilInfo('Memproses…');
@@ -2612,7 +2822,7 @@ function renderKatalog() {
   }).join('') || 'Belum ada katalog.';
   var k = (DATA.katalog || [])[0];
   if (k) {
-    // v4-33: pratinjau memakai filter yang SAMA dengan katalog publik
+    // pratinjau memakai filter yang SAMA dengan katalog publik
     // (loadKatalogPublik: aktif DAN tampilkan_di_katalog) — dulu produk
     // nonaktif seperti TES Kopi ikut tampil di pratinjau (99 vs 98).
     var prods = (DATA.produk || []).filter(function (p) { return produkAktif(p) && flagYa(p.TampilkanDiKatalog); });
@@ -2690,7 +2900,7 @@ async function simpanPromo() {
   var nama = document.getElementById('prmNama').value; if (!nama) return alert('Nama promo wajib diisi.');
   var syarat = document.getElementById('prmSyarat').value;
   try { if (syarat) JSON.parse(syarat); } catch (e) { return alert('Syarat JSON tidak valid.'); }
-  // v4-33: umpan balik instan — tombol "Menyimpan…" + toast.
+  // umpan balik instan — tombol "Menyimpan…" + toast.
   if (_btn) { _teksBtn = _btn.textContent; _btn.disabled = true; _btn.textContent = 'Menyimpan…'; }
   tampilInfo('Menyimpan…');
   try {
@@ -2775,7 +2985,7 @@ async function muatLaporan() {
     var res = await DB.getLaporanLengkap({ jenis: jenis, dari: dari, sampai: sampai, cabangId: cabang || undefined });
     var ring = res.ringkasan || {};
     var html = '<h4>Laporan ' + esc(jenis) + ' — ' + esc(dari || '—') + ' s/d ' + esc(sampai || '—') + '</h4>';
-    // v4-33: hanya nilai UANG yang dibungkus rp() — hitungan (Transaksi,
+    // hanya nilai UANG yang dibungkus rp() — hitungan (Transaksi,
     // Item, Jumlah, Produk, StokMenipis) tampil sebagai angka polos, dan
     // PajakPersen sebagai persen (dulu "Transaksi: Rp 2").
     var HITUNGAN_LAPORAN = ['Transaksi', 'Item', 'Jumlah', 'Produk', 'StokMenipis'];
@@ -2798,7 +3008,7 @@ async function muatLaporan() {
   } catch (e) { alert(e.message); }
 }
 function renderPieTopProduct(baris, dari, sampai) {
-  // v4-33: agregasi HANYA dari transaksi Lunas dalam rentang filter
+  // agregasi HANYA dari transaksi Lunas dalam rentang filter
   // (dulu DATA.detail semua waktu — pie tidak mengikuti filter tanggal),
   // dengan qty bersih (detail dikurangi retur untuk transaksi yang sama).
   // ID transaksi diambil dari baris laporan yang sudah terfilter; bila
@@ -3015,7 +3225,7 @@ async function muatLogs() {
 }
 // Boot: tautan katalog publik (?katalog=ID) dibuka tanpa login.
 (function () {
-  // v4-33: kembali online -> sinkronkan antrean otomatis; offline ->
+  // kembali online -> sinkronkan antrean otomatis; offline ->
   // perbarui badge. Setiap tulis offline berhasil -> badge diperbarui.
   try {
     if (DB.setOnOutboxBerubah) DB.setOnOutboxBerubah(perbaruiIndikatorOffline);

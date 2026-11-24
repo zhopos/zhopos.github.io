@@ -5,12 +5,12 @@
 // - API Supabase            : network-first, TIDAK PERNAH di-cache
 //   (data harus selalu segar; request POST / auth tidak disentuh).
 //   Data offline TIDAK ditangani service worker — salinan data +
-//   antrean perubahan disimpan di IndexedDB oleh supabase.js (v4-33).
+//   antrean perubahan disimpan di IndexedDB oleh supabase.js (v4-34).
 // - File lintas origin lain : dilewatkan ke network tanpa cache.
 // - Naikkan CACHE_NAME setiap kali app shell berubah.
 // ============================================================
 
-var CACHE_NAME = 'zho-pos-v4-33';
+var CACHE_NAME = 'zho-pos-v4-34';
 
 var APP_SHELL = [
   './',
