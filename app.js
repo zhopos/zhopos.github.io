@@ -68,6 +68,7 @@ function fmtTanggalID(s) {
   return m[3] + '-' + m[2] + '-' + m[1];
 }
 function show(id, btn) {
+  if (typeof sembunyiKartuKeluar === 'function') sembunyiKartuKeluar(); // pindah layar: kartu keluar tidak lagi relevan
   document.querySelectorAll('main section').forEach(function (s) { s.classList.remove('active'); });
   var el = document.getElementById(id); if (el) el.classList.add('active');
   document.querySelectorAll('nav button.menu').forEach(function (b) { b.classList.remove('active'); });
@@ -103,7 +104,7 @@ function closeDrawer() { var n = document.getElementById('nav'); var b = documen
    pindah layar mencatat satu entri history.pushState; tombol kembali
    (popstate) mundur tepat satu layar: overlay ditutup dulu, form -> daftar,
    kasir mundur satu langkah (keranjang utuh), daftar/menu -> dashboard,
-   dan di dashboard tekan pertama hanya toast, tekan kedua (<2 detik) baru
+   dan di dashboard tekan pertama hanya kartu tengah, tekan kedua (<2 detik) baru
    keluar. Layar login TIDAK dicegat. */
 var NAV = {
   siap: false,          // entri penjaga sudah dipasang (sekali per login)
@@ -262,7 +263,7 @@ function saatPopstate(ev) {
   if (kep.aksi === 'tutupOverlay') { tutupOverlay(kep.overlay); navDorong(NAV.aktif); return; }
   if (kep.aksi === 'toastKeluar') {
     NAV.keluarDalam = Date.now();
-    tampilInfo('Tekan kembali sekali lagi untuk keluar');
+    tampilKartuKeluar();
     navDorong({ s: 'dashboard' });
     return;
   }
@@ -539,6 +540,24 @@ function tampilNotif(jenis, judul, pesan) {
 function tampilError(msg) { tampilNotif('error', 'Terjadi galat', msg); }
 // Pesan info/sukses di popup notif — terlihat di layar, bukan hanya alert.
 function tampilInfo(msg) { tampilNotif('sukses', 'Berhasil', msg); }
+// Kartu peringatan keluar (v4-36): tengah layar, bukan toast atas —
+// toast sukses ("Berhasil" + centang hijau) kurang jelas sebagai
+// peringatan keluar. Hanya untuk keluar; toast lain tetap di atas.
+// Kartu hilang sendiri dalam 2 detik (jendela tekan-kedua); pindah layar
+// juga menyembunyikannya (show() memanggil sembunyiKartuKeluar).
+var timerKartuKeluar = null;
+function tampilKartuKeluar() {
+  var k = document.getElementById('keluarCard'); if (!k) return;
+  k.style.display = 'flex';
+  if (timerKartuKeluar && typeof clearTimeout === 'function') { try { clearTimeout(timerKartuKeluar); } catch (e) {} }
+  timerKartuKeluar = null;
+  try { timerKartuKeluar = setTimeout(function () { sembunyiKartuKeluar(); }, 2000); } catch (e) {}
+}
+function sembunyiKartuKeluar() {
+  if (timerKartuKeluar && typeof clearTimeout === 'function') { try { clearTimeout(timerKartuKeluar); } catch (e) {} }
+  timerKartuKeluar = null;
+  var k = document.getElementById('keluarCard'); if (k) k.style.display = 'none';
+}
 function sembunyiError() { var w = document.getElementById('errBar'); if (w) { w.innerHTML = ''; w.style.display = 'none'; } }
 async function loadData() {
   try {
@@ -563,7 +582,7 @@ async function loadData() {
       }
       currentUser = sesi;
       try { sessionStorage.setItem('pos_user', JSON.stringify(sesi)); } catch (e) {}
-      document.getElementById('userLabel').textContent = '• ' + sesi.nama + ' (' + sesi.peran + ')';
+      document.getElementById('userLabel').textContent = '• ' + sesi.nama;
     }
     var d = await withTimeout(DB.loadAll(), 20000, 'Server tidak menjawab dalam 20 detik. Periksa koneksi internet, lalu muat ulang halaman.');
     DATA = Object.assign(DATA, d || {});
@@ -598,7 +617,7 @@ function selesaiMuatData() {
     var p = DATA.pengaturan || {};
     document.getElementById('namaTokoHead').textContent = p.NamaToko || 'ZPOS';
     var nd = document.getElementById('namaTokoDrawer'); if (nd) nd.textContent = p.NamaToko || 'ZPOS';
-    document.getElementById('heroToko').textContent = p.NamaToko || 'ZPOS';
+    var ht = document.getElementById('heroToko'); if (ht) ht.textContent = p.NamaToko || 'ZPOS';
     document.body.classList.toggle('dark', p.ModeGelap === 'YA');
     lastSyncAt = new Date();
     setModeLabel();
@@ -615,7 +634,7 @@ function selesaiMuatData() {
       return;
     }
     currentUser = saved || currentUser;
-    if (currentUser) document.getElementById('userLabel').textContent = '• ' + currentUser.nama + ' (' + currentUser.peran + ')';
+    if (currentUser) document.getElementById('userLabel').textContent = '• ' + currentUser.nama;
     document.getElementById('loginBox').style.display = 'none';
     document.body.classList.remove('belum-login');
     var oa = document.getElementById('offlineAwal'); if (oa) oa.style.display = 'none';
@@ -735,7 +754,7 @@ async function doLogin() {
     if (!res.ok) return alert(res.error || 'Login gagal');
     sessionStorage.setItem('pos_user', JSON.stringify(res));
     currentUser = res;
-    document.getElementById('userLabel').textContent = '• ' + res.nama + ' (' + res.peran + ')';
+    document.getElementById('userLabel').textContent = '• ' + res.nama;
     document.getElementById('loginBox').style.display = 'none';
     document.body.classList.remove('belum-login');
     document.querySelectorAll('main section').forEach(function (s) { s.style.display = ''; });
@@ -859,8 +878,8 @@ function renderAll() {
   var vsEl = document.getElementById('heroOmzetVs');
   vsEl.textContent = (pct >= 0 ? '+' : '') + pct + '% vs kemarin';
   vsEl.classList.toggle('down', pct < 0);
-  document.getElementById('heroUser').textContent = currentUser ? ('Halo, ' + currentUser.nama + ' (' + currentUser.peran + ') — kasir siap melayani hari ini.') : 'Kasir siap melayani hari ini.';
-  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • ' + currentUser.peran + ' • v4-35') : 'Kasir • v4-35';
+  document.getElementById('heroUser').textContent = currentUser ? ('Halo, ' + currentUser.nama + ' — selamat berjualan hari ini.') : 'Selamat berjualan hari ini.';
+  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • v4-36') : 'Kasir • v4-36';
   var bb = document.getElementById('bellBadge');
   if (bb) { var sm = Number(r.stokMenipis || 0); bb.style.display = sm > 0 ? 'flex' : 'none'; bb.textContent = sm > 99 ? '99+' : String(sm); }
   isiNotifPanel();
