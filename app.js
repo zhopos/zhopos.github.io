@@ -80,6 +80,10 @@ function show(id, btn) {
   if (id === 'kasir') langkahKasir(1);
   closeDrawer(); window.scrollTo(0, 0);
   if (typeof navSinkronSesudahShow === 'function') navSinkronSesudahShow(id);
+  // v4-37: mendarat di dashboard dengan tumpukan kosong (mis. kembali tanpa
+  // riwayat) — pastikan ada entri penjaga (pushState) supaya tombol kembali
+  // berikutnya tertangkap.
+  if (id === 'dashboard' && typeof pasangPenjagaRiwayat === 'function') pasangPenjagaRiwayat();
 }
 /* ---------- KASIR 3 LANGKAH ala Griyo: 1) daftar produk, 2) keranjang, 3) pembayaran (#bayar) ---------- */
 var langkahKasirAktif = 1;
@@ -97,7 +101,7 @@ function kembaliKeKeranjang() { kembali(); }
 function toggleDrawer() { var n = document.getElementById('nav'); var b = document.getElementById('drawerBackdrop'); var open = n && !n.classList.contains('open'); if (n) n.classList.toggle('open', open); if (b) b.style.display = open ? 'block' : 'none'; }
 function closeDrawer() { var n = document.getElementById('nav'); var b = document.getElementById('drawerBackdrop'); if (n) n.classList.remove('open'); if (b) b.style.display = 'none'; }
 
-/* ---------- RIWAYAT NAVIGASI / TOMBOL KEMBALI ANDROID (v4-35) ----------
+/* ---------- RIWAYAT NAVIGASI / TOMBOL KEMBALI ANDROID (v4-35, penjaga diperkuat v4-37) ----------
    Masalah: aplikasi pindah layar hanya dengan JavaScript (show/bukaForm/
    langkahKasir) tanpa History API — tombol kembali Android tidak punya
    "layar sebelumnya" dan langsung menutup aplikasi. Perbaikan: setiap
@@ -105,7 +109,11 @@ function closeDrawer() { var n = document.getElementById('nav'); var b = documen
    (popstate) mundur tepat satu layar: overlay ditutup dulu, form -> daftar,
    kasir mundur satu langkah (keranjang utuh), daftar/menu -> dashboard,
    dan di dashboard tekan pertama hanya kartu tengah, tekan kedua (<2 detik) baru
-   keluar. Layar login TIDAK dicegat. */
+   keluar. Layar login TIDAK dicegat. v4-37: entri penjaga dashboard dipasang
+   sejak awal (awal loadData) dan dipasang ulang tiap aplikasi kembali ke
+   depan + saat mendarat di dashboard — penjaga v4-35/36 yang hanya dipasang
+   sekali di akhir muat data membuat kembali di dashboard segar / setelah
+   buka-lagi-dari-latar-belakang lolos tanpa kartu. */
 var NAV = {
   siap: false,          // entri penjaga sudah dipasang (sekali per login)
   aktif: null,          // deskriptor layar saat ini {s, f, k, d}
@@ -194,6 +202,7 @@ function navDorong(L) {
     history.pushState(L, '');
   } catch (e) { return false; }
   NAV.aktif = L; NAV.tumpuk.push(L);
+  NAV.izinKeluar = false; // v4-37: bendera basi dari keluar sebelumnya tidak boleh menelan popstate berikutnya
   return true;
 }
 function navGanti(L) {
@@ -204,6 +213,7 @@ function navGanti(L) {
   } catch (e) { return false; }
   NAV.aktif = L;
   if (NAV.tumpuk.length) NAV.tumpuk[NAV.tumpuk.length - 1] = L;
+  NAV.izinKeluar = false; // v4-37: seperti navDorong
   return true;
 }
 function navMundurProgram() {
@@ -223,6 +233,10 @@ function terapkanLayar(L) {
     if (s === 'kasir' && L.k) langkahKasir(L.k);
   } finally { NAV.tanpaRiwayat = false; }
   NAV.aktif = L;
+  // v4-37: mendarat di dashboard dengan tumpukan kosong (popstate) —
+  // pastikan penjaga ada (show() di atas melihat NAV.aktif lama, jadi
+  // hook di sini yang menutup kasus ini).
+  if (L.s === 'dashboard' && typeof pasangPenjagaRiwayat === 'function') pasangPenjagaRiwayat();
 }
 // Tombol "← Kembali" di dalam aplikasi: lewat riwayat supaya tumpukan
 // tetap konsisten dengan tombol kembali Android. Bila tidak ada entri
@@ -285,22 +299,45 @@ function saatPopstate(ev) {
   terapkanLayar(target);
   if (!samaLayar(target, mendarat)) navGanti(target);
 }
-// Pasang entri penjaga dashboard sekali per login (dipanggil di akhir
-// selesaiMuatData, saat aplikasi sudah tampil). Tanpa penjaga, kembali di
-// dashboard tidak memicu popstate dan aplikasi langsung tertutup.
+// Pasang entri penjaga dashboard (v4-37: idempotent, boleh dipanggil
+// berulang — bukan lagi sekali per muat halaman). Tanpa penjaga, kembali di
+// dashboard tidak memicu popstate dan aplikasi langsung tertutup. Dipanggil:
+// di awal loadData() (supaya tekan kembali saat loading pun tertangkap), di
+// akhir selesaiMuatData(), saat mendarat di dashboard (show), dan tiap
+// aplikasi kembali ke depan (pageshow / visibilitychange / focus) — menutup
+// dua lubang v4-36: (a) penjaga hanya dipasang sekali di akhir muat data,
+// (b) aplikasi yang dibuka lagi dari latar belakang tanpa reload tidak pernah
+// dipasangi penjaga lagi, dan (c) NAV.izinKeluar yang diset true saat keluar
+// 2x tidak pernah direset kecuali logout/reload, sehingga popstate berikutnya
+// ditelan diam-diam. Pemasangan (ulang) juga mereset izinKeluar/keluarDalam.
 function pasangPenjagaRiwayat() {
-  if (typeof NAV === 'undefined' || NAV.siap) return;
+  if (typeof NAV === 'undefined') return;
   if (typeof history === 'undefined' || !history.pushState) return;
+  // Hanya saat berada di dashboard dan sudah login (layar login tidak dicegat).
+  var aktif = NAV.aktif || { s: 'dashboard' };
+  if (aktif.s !== 'dashboard') return;
+  if (typeof sudahLoginRiwayat === 'function' && !sudahLoginRiwayat()) return;
+  // Jangan dorong ganda: puncak tumpukan sudah entri dashboard/penjaga.
+  var atas = NAV.tumpuk.length ? NAV.tumpuk[NAV.tumpuk.length - 1] : null;
+  if (atas && atas.s === 'dashboard') return;
   try {
     history.pushState({ s: 'dashboard', penjaga: true }, '');
-    NAV.siap = true;
-    NAV.aktif = { s: 'dashboard' };
-    NAV.tumpuk = [{ s: 'dashboard', penjaga: true }];
-    NAV.keluarDalam = 0; NAV.izinKeluar = false; NAV.mundurProgram = false;
-  } catch (e) {}
+  } catch (e) { return; }
+  NAV.siap = true;
+  NAV.aktif = { s: 'dashboard' };
+  NAV.tumpuk.push({ s: 'dashboard', penjaga: true });
+  NAV.keluarDalam = 0; NAV.izinKeluar = false; NAV.mundurProgram = false;
 }
 if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
   window.addEventListener('popstate', saatPopstate);
+  // v4-37: pasang ulang penjaga tiap aplikasi kembali ke depan (PWA yang
+  // dibuka lagi dari latar belakang tidak me-reload halaman, jadi tanpa ini
+  // penjaga yang sudah terpakai tidak pernah kembali).
+  window.addEventListener('pageshow', function () { if (typeof pasangPenjagaRiwayat === 'function') pasangPenjagaRiwayat(); });
+  window.addEventListener('focus', function () { if (typeof pasangPenjagaRiwayat === 'function') pasangPenjagaRiwayat(); });
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('visibilitychange', function () { if (!document.hidden && typeof pasangPenjagaRiwayat === 'function') pasangPenjagaRiwayat(); });
+  }
 }
 // Sinkronisasi riwayat sesudah navigasi (dipanggil show/bukaForm/
 // tutupForm/langkahKasir). Dijaga typeof supaya sim yang mengekstrak
@@ -540,11 +577,11 @@ function tampilNotif(jenis, judul, pesan) {
 function tampilError(msg) { tampilNotif('error', 'Terjadi galat', msg); }
 // Pesan info/sukses di popup notif — terlihat di layar, bukan hanya alert.
 function tampilInfo(msg) { tampilNotif('sukses', 'Berhasil', msg); }
-// Kartu peringatan keluar (v4-36): tengah layar, bukan toast atas —
-// toast sukses ("Berhasil" + centang hijau) kurang jelas sebagai
-// peringatan keluar. Hanya untuk keluar; toast lain tetap di atas.
-// Kartu hilang sendiri dalam 2 detik (jendela tekan-kedua); pindah layar
-// juga menyembunyikannya (show() memanggil sembunyiKartuKeluar).
+// Kartu peringatan keluar (v4-37): modal putih + ikon keluar merah + judul
+// "Keluar Aplikasi?" + latar redup — bukan lagi pil teal v4-36. Hanya untuk
+// keluar; toast lain tetap di atas. Kartu hilang sendiri dalam 2 detik
+// (jendela tekan-kedua); pindah layar juga menyembunyikannya (show()
+// memanggil sembunyiKartuKeluar).
 var timerKartuKeluar = null;
 function tampilKartuKeluar() {
   var k = document.getElementById('keluarCard'); if (!k) return;
@@ -560,6 +597,9 @@ function sembunyiKartuKeluar() {
 }
 function sembunyiError() { var w = document.getElementById('errBar'); if (w) { w.innerHTML = ''; w.style.display = 'none'; } }
 async function loadData() {
+  // v4-37: pasang penjaga sejak awal (sebelum sesi/data selesai dimuat)
+  // supaya tekan kembali saat loading pun tertangkap.
+  if (typeof pasangPenjagaRiwayat === 'function') pasangPenjagaRiwayat();
   try {
     // Mode Supabase: autentikasi DULU sebelum memuat data. Sebagai anon, RLS
     // menutup semua tabel (loadAll mengembalikan data kosong), jadi memuat data
@@ -582,7 +622,7 @@ async function loadData() {
       }
       currentUser = sesi;
       try { sessionStorage.setItem('pos_user', JSON.stringify(sesi)); } catch (e) {}
-      document.getElementById('userLabel').textContent = '• ' + sesi.nama;
+      document.getElementById('userLabel').textContent = '• ' + sesi.nama + (sesi.peran ? ' - ' + sesi.peran : '');
     }
     var d = await withTimeout(DB.loadAll(), 20000, 'Server tidak menjawab dalam 20 detik. Periksa koneksi internet, lalu muat ulang halaman.');
     DATA = Object.assign(DATA, d || {});
@@ -634,7 +674,7 @@ function selesaiMuatData() {
       return;
     }
     currentUser = saved || currentUser;
-    if (currentUser) document.getElementById('userLabel').textContent = '• ' + currentUser.nama;
+    if (currentUser) document.getElementById('userLabel').textContent = '• ' + currentUser.nama + (currentUser.peran ? ' - ' + currentUser.peran : '');
     document.getElementById('loginBox').style.display = 'none';
     document.body.classList.remove('belum-login');
     var oa = document.getElementById('offlineAwal'); if (oa) oa.style.display = 'none';
@@ -754,7 +794,7 @@ async function doLogin() {
     if (!res.ok) return alert(res.error || 'Login gagal');
     sessionStorage.setItem('pos_user', JSON.stringify(res));
     currentUser = res;
-    document.getElementById('userLabel').textContent = '• ' + res.nama;
+    document.getElementById('userLabel').textContent = '• ' + res.nama + (res.peran ? ' - ' + res.peran : '');
     document.getElementById('loginBox').style.display = 'none';
     document.body.classList.remove('belum-login');
     document.querySelectorAll('main section').forEach(function (s) { s.style.display = ''; });
@@ -879,7 +919,7 @@ function renderAll() {
   vsEl.textContent = (pct >= 0 ? '+' : '') + pct + '% vs kemarin';
   vsEl.classList.toggle('down', pct < 0);
   document.getElementById('heroUser').textContent = currentUser ? ('Halo, ' + currentUser.nama + ' — selamat berjualan hari ini.') : 'Selamat berjualan hari ini.';
-  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • v4-36') : 'Kasir • v4-36';
+  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • v4-37') : 'Kasir • v4-37';
   var bb = document.getElementById('bellBadge');
   if (bb) { var sm = Number(r.stokMenipis || 0); bb.style.display = sm > 0 ? 'flex' : 'none'; bb.textContent = sm > 99 ? '99+' : String(sm); }
   isiNotifPanel();
