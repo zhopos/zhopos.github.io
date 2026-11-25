@@ -29,6 +29,10 @@
      penjualan offline yang diulang tidak ditolak karena stok menipis). */
   var offlineMode = false;
   var _replay = false;
+  /* Cabang sesi (v4-40): diisi app.js dari pengguna.CabangID saat login.
+     Mengalahkan CabangAktif global, tapi TIDAK PERNAH ditulis ke
+     DATA.pengaturan — jadi tidak bocor ke DB lewat persistPengaturan(). */
+  var cabangSesiOverride = '';
 
   /* ---------- util ---------- */
   function todayStr(d) {
@@ -171,35 +175,45 @@
   /* ---------- ringkasan (dihitung dari DATA, sama seperti V12) ---------- */
   function computeRingkasan(d) {
     var tgl = todayStr();
-    var trxHariIni = (d.transaksi || []).filter(function (t) { return String(t.Tanggal || '').slice(0, 10) === tgl; });
+    // v4-40: semua agregat UTAMA dibatasi ke cabang efektif (override sesi
+    // login bila ada, else CabangAktif global). perCabang tetap semua cabang.
+    var cabangEfektif = cabangAktifId(d);
+    var trxCabang = (d.transaksi || []).filter(function (t) { return milikCabang(d, t, cabangEfektif); });
+    var trxHariIni = trxCabang.filter(function (t) { return String(t.Tanggal || '').slice(0, 10) === tgl; });
     var lunasHariIni = trxHariIni.filter(function (t) { return t.StatusBayar === 'Lunas'; });
     var omzet = lunasHariIni.reduce(function (a, t) { return a + Number(t.Total || 0); }, 0);
     var laba = lunasHariIni.reduce(function (a, t) { return a + Number(t.Laba || 0); }, 0);
     var dibayar = trxHariIni.reduce(function (a, t) { return a + Number(t.Bayar || 0); }, 0);
-    var piutang = (d.transaksi || []).filter(function (t) { return t.StatusBayar !== 'Lunas'; })
+    var piutang = trxCabang.filter(function (t) { return t.StatusBayar !== 'Lunas'; })
       .reduce(function (a, t) { return a + Number(t.Sisa || 0); }, 0);
-    var hutang = (d.utang || []).filter(function (u) { return u.Status !== 'Lunas'; })
-      .reduce(function (a, u) { return a + Number(u.Sisa || 0); }, 0);
-    var saldoKas = (d.kas || []).reduce(function (a, k) { return a + Number(k.Masuk || 0) - Number(k.Keluar || 0); }, 0);
+    // Utang tidak punya CabangID: cabangnya diturunkan dari pembelian
+    // (via PembelianID); bila pembelian tidak ketemu, cabang pertama.
+    var hutang = (d.utang || []).filter(function (u) {
+      if (u.Status === 'Lunas') return false;
+      return !cabangEfektif || cabangUtang(d, u) === String(cabangEfektif);
+    }).reduce(function (a, u) { return a + Number(u.Sisa || 0); }, 0);
+    var saldoKas = saldoKasCabang(d, cabangEfektif);
     var stokTipisList = (d.produk || []).filter(function (p) {
       if (!produkAktif(p) || !lacakStok(p)) return false;
+      if (!milikCabang(d, p, cabangEfektif)) return false;
       return stokOf(d, p) <= Number(p.StokMinimum == null ? 5 : p.StokMinimum);
     }).map(function (p) { return { nama: p.Nama, stok: stokOf(d, p), satuan: p.Satuan || '' }; });
     var kedaluwarsaList = (d.stokBatch || []).filter(function (b) {
       if (!b.Kedaluwarsa || Number(b.Qty) <= 0) return false;
+      if (!milikCabang(d, b, cabangEfektif)) return false;
       var diff = (new Date(b.Kedaluwarsa) - new Date(tgl)) / 86400000;
       return diff <= 7;
     }).map(function (b) {
       var p = (d.produk || []).find(function (x) { return x.ID === b.ProdukID; });
       return { nama: p ? p.Nama : (b.NamaProduk || ''), Kedaluwarsa: b.Kedaluwarsa, NamaProduk: p ? p.Nama : '' };
     });
-    // analitik 7 & 28 hari
+    // analitik 7 & 28 hari (cabang efektif saja)
     function analitik(n) {
       var perHari = [], om = 0, lb = 0, jml = 0;
       for (var i = n - 1; i >= 0; i--) {
         var dt = new Date(); dt.setDate(dt.getDate() - i);
         var ds = todayStr(dt);
-        var list = (d.transaksi || []).filter(function (t) { return String(t.Tanggal || '').slice(0, 10) === ds && t.StatusBayar === 'Lunas'; });
+        var list = trxCabang.filter(function (t) { return String(t.Tanggal || '').slice(0, 10) === ds && t.StatusBayar === 'Lunas'; });
         var o = list.reduce(function (a, t) { return a + Number(t.Total || 0); }, 0);
         var l = list.reduce(function (a, t) { return a + Number(t.Laba || 0); }, 0);
         perHari.push({ tanggal: ds, omzet: o, laba: l, jumlah: list.length });
@@ -207,30 +221,45 @@
       }
       return { omzet: om, laba: lb, jumlah: jml, perHari: perHari };
     }
-    // terlaris & pelanggan top (semua waktu)
+    // terlaris & pelanggan top (cabang efektif saja; detail tidak punya
+    // CabangID, jadi difilter lewat Set ID transaksi cabang itu)
+    var idTrxCabang = {};
+    trxCabang.forEach(function (t) { idTrxCabang[t.ID] = true; });
     var jual = {};
-    (d.detail || []).forEach(function (x) { jual[x.NamaProduk] = (jual[x.NamaProduk] || 0) + Number(x.Qty || 0); });
+    (d.detail || []).forEach(function (x) { if (!idTrxCabang[x.TransaksiID]) return; jual[x.NamaProduk] = (jual[x.NamaProduk] || 0) + Number(x.Qty || 0); });
     var terlaris = Object.keys(jual).map(function (k) { return { nama: k, qty: jual[k] }; })
       .sort(function (a, b) { return b.qty - a.qty; }).slice(0, 5);
-    var pelangganTop = (d.pelanggan || []).filter(function (p) { return Number(p.TotalBeli || 0) > 0; })
+    var pelangganTop = (d.pelanggan || []).filter(function (p) { return Number(p.TotalBeli || 0) > 0 && milikCabang(d, p, cabangEfektif); })
       .map(function (p) { return { nama: p.Nama, total: Number(p.TotalBeli || 0) }; })
       .sort(function (a, b) { return b.total - a.total; }).slice(0, 5);
     var perCabang = (d.cabang || []).map(function (c) {
       var lt = (d.transaksi || []).filter(function (t) { return String(t.CabangID || '') === String(c.ID) && String(t.Tanggal || '').slice(0, 10) === tgl && t.StatusBayar === 'Lunas'; });
+      // v4-40: stokMenipis dihitung PER cabang ini (dulu memakai jumlah
+      // global stokTipisList untuk semua cabang).
+      var tipis = (d.produk || []).filter(function (p) {
+        if (!produkAktif(p) || !lacakStok(p)) return false;
+        if (!milikCabang(d, p, c.ID)) return false;
+        return stokOfCabang(d, p, c.ID) <= Number(p.StokMinimum == null ? 5 : p.StokMinimum);
+      }).length;
       return {
         cabangId: c.ID, nama: c.Nama,
         omzetHariIni: lt.reduce(function (a, t) { return a + Number(t.Total || 0); }, 0),
         labaHariIni: lt.reduce(function (a, t) { return a + Number(t.Laba || 0); }, 0),
-        jumlahTrx: lt.length, stokMenipis: stokTipisList.length
+        jumlahTrx: lt.length, stokMenipis: tipis
       };
     });
     var a7 = analitik(7), a28 = analitik(28);
     var kem = a7.perHari.length >= 2 ? a7.perHari[a7.perHari.length - 2].omzet : 0;
+    // Target: TargetHarian cabang efektif bila > 0, else TargetHarian global.
+    var targetCabang = 0;
+    var rowCbg = (d.cabang || []).find(function (c) { return String(c.ID) === String(cabangEfektif); });
+    if (rowCbg) targetCabang = Number(rowCbg.TargetHarian || 0);
     return {
+      cabangEfektifId: cabangEfektif,
       omzetHariIni: omzet, labaHariIni: laba, dibayarHariIni: dibayar,
       jumlahTrxHariIni: trxHariIni.length, piutang: piutang, hutang: hutang,
       saldoKas: saldoKas, stokMenipis: stokTipisList.length, stokTipisList: stokTipisList,
-      kedaluwarsaList: kedaluwarsaList, targetHarian: Number((d.pengaturan || {}).TargetHarian || 0),
+      kedaluwarsaList: kedaluwarsaList, targetHarian: targetCabang > 0 ? targetCabang : Number((d.pengaturan || {}).TargetHarian || 0),
       terlaris: terlaris, pelangganTop: pelangganTop, analitik7: a7, analitik28: a28,
       omzetKemarin: kem, perCabang: perCabang,
       poinAktif: (d.pengaturan || {}).PoinAktif !== 'TIDAK',
@@ -239,13 +268,46 @@
       pajakAktif: (d.pengaturan || {}).PajakAktif === 'YA'
     };
   }
-  function cabangAktifId(d) {
-    return (d.pengaturan || {}).CabangAktif || ((d.cabang || [])[0] && d.cabang[0].ID) || '';
+  /* ---------- cabang & stok per cabang (v4-40) ---------- */
+  // Baris tanpa CabangID dianggap milik cabang PERTAMA (aturan legacy).
+  function cabangPertamaId(d) { var c = (d.cabang || [])[0]; return (c && c.ID) || ''; }
+  // Bila cabangId kosong (tidak ada konteks cabang), semua baris cocok —
+  // menjaga perilaku lama saat daftar cabang kosong.
+  function milikCabang(d, row, cabangId) {
+    if (!cabangId) return true;
+    var cid = String((row && row.CabangID) || '') || String(cabangPertamaId(d));
+    return cid === String(cabangId);
   }
-  function stokOf(d, p) {
-    var sc = (d.stokCabang || []).find(function (x) { return String(x.ProdukID) === String(p.ID) && String(x.CabangID) === String(cabangAktifId(d)); });
+  // Cabang sebuah utang diturunkan dari pembeliannya (utang tidak punya
+  // CabangID sendiri); bila pembelian tidak ketemu, cabang pertama.
+  function cabangUtang(d, u) {
+    var pb = (d.pembelian || []).find(function (x) { return String(x.ID) === String(u.PembelianID); });
+    if (pb) return String(pb.CabangID || '') || String(cabangPertamaId(d));
+    return String(cabangPertamaId(d));
+  }
+  function setCabangSesi(id) { cabangSesiOverride = String(id || ''); if (DATA) refreshRingkasan(); }
+  function cabangAktifId(d) {
+    return cabangSesiOverride || (d.pengaturan || {}).CabangAktif || ((d.cabang || [])[0] && d.cabang[0].ID) || '';
+  }
+  function stokOfCabang(d, p, cabangId) {
+    var sc = (d.stokCabang || []).find(function (x) { return String(x.ProdukID) === String(p.ID) && String(x.CabangID) === String(cabangId); });
     if (sc) return Number(sc.Stok || 0);
     return Number(p.Stok || 0);
+  }
+  function stokOf(d, p) {
+    return stokOfCabang(d, p, cabangAktifId(d));
+  }
+  function saldoKasCabang(d, cabangId) {
+    return (d.kas || []).reduce(function (a, k) {
+      if (!milikCabang(d, k, cabangId)) return a;
+      return a + Number(k.Masuk || 0) - Number(k.Keluar || 0);
+    }, 0);
+  }
+  function cariPelangganCabang(d, nama, cabangId) {
+    return (d.pelanggan || []).find(function (x) { return x.Nama === nama && milikCabang(d, x, cabangId); }) || null;
+  }
+  function cariPemasokCabang(d, nama, cabangId) {
+    return (d.pemasok || []).find(function (x) { return x.Nama === nama && milikCabang(d, x, cabangId); }) || null;
   }
   // Sama seperti produkAktif/lacakStok di app.js (definisi ganda supaya tiap
   // file mandiri): produk nonaktif tidak dihitung; jasa tanpa stok (ONGKIR)
@@ -255,10 +317,17 @@
   // Normalisasi bendera boolean: DB menyimpan boolean, UI lama memakai 'YA'/'TIDAK'.
   // Jangan pakai `false || 'YA'` (menghasilkan 'YA') — pakai helper ini untuk nilai simpan.
   function boolFlag(v, def) { if (v === true || v === false) return v; if (typeof v === 'string') return v.toUpperCase() !== 'TIDAK'; return def; }
-  function setStok(d, p, nilai) {
-    var sc = (d.stokCabang || []).find(function (x) { return String(x.ProdukID) === String(p.ID) && String(x.CabangID) === String(cabangAktifId(d)); });
+  // v4-40: stok HANYA ditulis ke baris stok_cabang (dibuat bila belum ada).
+  // prod.Stok TIDAK lagi ditulis — ia hanya fallback baca (legacy) bila
+  // baris stok_cabang belum ada. Mengembalikan baris stok_cabang itu.
+  function setStok(d, p, nilai, cabangId) {
+    var cb = cabangId || cabangAktifId(d);
+    if (!d.stokCabang) d.stokCabang = [];
+    var sc = d.stokCabang.find(function (x) { return String(x.ProdukID) === String(p.ID) && String(x.CabangID) === String(cb); });
     if (sc) { sc.Stok = nilai; return sc; }
-    p.Stok = nilai; return p;
+    sc = { CabangID: cb, ProdukID: p.ID, NamaProduk: p.Nama, Stok: nilai, StokMinimum: p.StokMinimum == null ? 0 : p.StokMinimum };
+    d.stokCabang.push(sc);
+    return sc;
   }
   function addLog(d, pengguna, aksi, detail) {
     var row = { ID: uid('LOG'), Tanggal: nowISO(), Pengguna: pengguna || '', Aksi: aksi, Detail: detail || '', CabangID: d ? cabangAktifId(d) : '' };
@@ -386,7 +455,15 @@
       if (!DATA) await loadAll();
       var k = (DATA.katalog || []).find(function (x) { return String(x.ID) === String(id); }) || null;
       var p = DATA.pengaturan || {};
-      var prods = (DATA.produk || []).filter(function (x) { return produkAktif(x) && flagYa(x.TampilkanDiKatalog); }).map(function (x) { var c = clone(x); c.Stok = stokOf(DATA, x); return c; });
+      // v4-40: katalog hanya menampilkan produk cabangnya (produk tanpa
+      // CabangID dianggap cabang pertama); bila katalog tanpa CabangID,
+      // tanpa filter. Stok dibaca per cabang katalog itu.
+      var katCabang = k && k.CabangID ? String(k.CabangID) : '';
+      var prods = (DATA.produk || []).filter(function (x) {
+        if (!produkAktif(x) || !flagYa(x.TampilkanDiKatalog)) return false;
+        if (!katCabang) return true;
+        return milikCabang(DATA, x, katCabang);
+      }).map(function (x) { var c = clone(x); c.Stok = katCabang ? stokOfCabang(DATA, x, katCabang) : stokOf(DATA, x); return c; });
       return { katalog: k ? clone(k) : null, produk: prods, toko: { NamaToko: p.NamaToko || 'ZPOS', TeleponToko: p.TeleponToko || '' } };
     }
     if (!client || !client.rpc) throw new Error('Katalog tidak tersedia.');
@@ -581,7 +658,7 @@
       // v4-32: penjualan offline SELALU diizinkan (aturan Bos) — cek stok
       // dilewati saat offline maupun saat mengulang antrean (replay);
       // stok yang jadi negatif ditandai "Stok Minus — cek" di halaman Stok.
-      if (!offlineMode && !_replay && stokOf(DATA, prod) < butuh) throw new Error('Stok produk tidak mencukupi: ' + prod.Nama);
+      if (!offlineMode && !_replay && stokOfCabang(DATA, prod, cabangId) < butuh) throw new Error('Stok produk tidak mencukupi: ' + prod.Nama);
       // bahan baku via resep
       (DATA.resep || []).filter(function (r) { return String(r.ProdukID) === String(prod.ID); }).forEach(function (r) {
         var b = DATA.bahan.find(function (x) { return x.ID === r.BahanID; });
@@ -616,9 +693,8 @@
           batchChanges.push({ row: b, ambil: ambil });
           sisaButuh -= ambil;
         });
-        var baru = stokOf(DATA, prod) - butuh;
-        var sc = (DATA.stokCabang || []).find(function (x) { return String(x.ProdukID) === String(prod.ID) && String(x.CabangID) === String(cabangId); });
-        stokChanges.push({ prod: prod, baru: baru, batchChanges: batchChanges, sc: sc });
+        var baru = stokOfCabang(DATA, prod, cabangId) - butuh;
+        stokChanges.push({ prod: prod, baru: baru, batchChanges: batchChanges });
       }
       (DATA.resep || []).filter(function (r) { return String(r.ProdukID) === String(prod.ID); }).forEach(function (r) {
         var b = DATA.bahan.find(function (x) { return x.ID === r.BahanID; });
@@ -656,9 +732,11 @@
     var janji4b = [];
     stokChanges.forEach(function (c) {
       c.batchChanges.forEach(function (bc) { bc.row.Qty = Number(bc.row.Qty) - bc.ambil; janji4b.push(persist('stok_batch', bc.row)); });
-      setStok(DATA, c.prod, c.baru);
+      // v4-40: setStok mengembalikan baris stok_cabang (dibuat bila belum
+      // ada) — baris itulah yang dipersist, bukan tangkapan sc lama.
+      var scBaru = setStok(DATA, c.prod, c.baru, cabangId);
       janji4b.push(persist('produk', c.prod));
-      if (c.sc) janji4b.push(persist('stok_cabang', c.sc));
+      janji4b.push(persist('stok_cabang', scBaru));
     });
     bahanChanges.forEach(function (bc) { bc.row.Stok = Number(bc.row.Stok || 0) - bc.qty; janji4b.push(persist('bahan_baku', bc.row)); });
     items.forEach(function (it) {
@@ -677,7 +755,7 @@
     try { await Promise.all(janji4b); } catch (e) { throw new Error('Transaksi tersimpan, tapi stok/detail gagal diperbarui (' + (e.message || e) + '). Periksa stok sebelum menjual lagi.'); }
     // 5. Pelanggan: TotalBeli / Piutang / Poin / Tier / TerakhirBeli
     var poinDidapat = 0;
-    var pl = (DATA.pelanggan || []).find(function (x) { return x.Nama === trx.Pelanggan; });
+    var pl = cariPelangganCabang(DATA, trx.Pelanggan, cabangId);
     if (pl) {
       pl.TotalBeli = Number(pl.TotalBeli || 0) + total;
       pl.Piutang = Number(pl.Piutang || 0) + sisa;
@@ -706,7 +784,7 @@
     }
     // 6. Kas bila ada pembayaran
     if (bayar > 0) {
-      var saldo = (DATA.kas || []).reduce(function (a, k) { return a + Number(k.Masuk || 0) - Number(k.Keluar || 0); }, 0) + bayar;
+      var saldo = saldoKasCabang(DATA, cabangId) + bayar;
       var kasRow = { ID: uid('KAS'), Tanggal: nowISO(), Jenis: 'Masuk', Keterangan: 'Penjualan ' + id, Masuk: bayar, Keluar: 0, Saldo: saldo, CabangID: cabangId };
       DATA.kas.push(kasRow);
       await persist('kas', kasRow);
@@ -785,7 +863,9 @@
   }
   async function updateProdukStokHarga(prod) {
     if (MODE !== 'supabase' || !client || offlineMode) return;
-    var res = await client.from('produk').update({ stok: Number(prod.Stok || 0), harga_modal: Number(prod.HargaModal || 0), harga_jual: Number(prod.HargaJual || 0) }).eq('id', prod.ID);
+    // v4-40: HANYA harga yang ditulis ke baris produk — stok kini hidup di
+    // stok_cabang (ditulis setStok + persist('stok_cabang')).
+    var res = await client.from('produk').update({ harga_modal: Number(prod.HargaModal || 0), harga_jual: Number(prod.HargaJual || 0) }).eq('id', prod.ID);
     if (res.error) throw new Error(res.error.message);
   }
   async function upsertPelanggan(payload) {
@@ -794,7 +874,8 @@
       ID: payload.ID || '', Nama: payload.Nama, Telepon: payload.Telepon || '', Alamat: payload.Alamat || '',
       TotalBeli: Number(payload.TotalBeli || 0), Piutang: Number(payload.Piutang || 0),
       Poin: Number(payload.Poin || 0), Tier: payload.Tier || '', TanggalLahir: payload.TanggalLahir || null,
-      TerakhirBeli: payload.TerakhirBeli || null
+      TerakhirBeli: payload.TerakhirBeli || null,
+      CabangID: payload.CabangID || cabangAktifId(DATA)
     };
     var ex = row.ID ? DATA.pelanggan.find(function (x) { return x.ID === row.ID; }) : null;
     if (ex) { row.TotalBeli = ex.TotalBeli; row.Piutang = ex.Piutang; row.Poin = ex.Poin; row.TerakhirBeli = ex.TerakhirBeli; }
@@ -802,7 +883,7 @@
   }
   async function upsertPemasok(payload) {
     if (!DATA) await loadAll();
-    var row = { ID: payload.ID || '', Nama: payload.Nama, Telepon: payload.Telepon || '', Alamat: payload.Alamat || '', Hutang: Number(payload.Hutang || 0) };
+    var row = { ID: payload.ID || '', Nama: payload.Nama, Telepon: payload.Telepon || '', Alamat: payload.Alamat || '', Hutang: Number(payload.Hutang || 0), CabangID: payload.CabangID || cabangAktifId(DATA) };
     var ex = row.ID ? DATA.pemasok.find(function (x) { return x.ID === row.ID; }) : null;
     if (ex) row.Hutang = ex.Hutang;
     return upsertInto('pemasok', 'pemasok', row, 'PMS');
@@ -815,7 +896,10 @@
     var id = typeof payload === 'string' ? payload : (payload.id || payload.ID || '');
     var pm = (DATA.pemasok || []).find(function (x) { return String(x.ID) === String(id); });
     if (!pm) throw new Error('Pemasok tidak ditemukan.');
-    var dipakai = (DATA.pembelian || []).some(function (p) { return String(p.Pemasok || '') === String(pm.Nama); });
+    // v4-40: guard per cabang — pembelian cabang lain dengan nama pemasok
+    // yang sama tidak menghalangi hapus.
+    var cabPm = String(pm.CabangID || '') || String(cabangPertamaId(DATA));
+    var dipakai = (DATA.pembelian || []).some(function (p) { return String(p.Pemasok || '') === String(pm.Nama) && milikCabang(DATA, p, cabPm); });
     if (dipakai) throw new Error('Pemasok "' + pm.Nama + '" sudah pernah dipakai di pembelian, jadi tidak bisa dihapus.');
     await hapusDari('pemasok', 'pemasok', id);
     return { ok: true };
@@ -826,7 +910,7 @@
     if (!DATA) await loadAll();
     var row = { ID: payload.id || payload.ID || uid('PGL'), Tanggal: nowISO(), Kategori: payload.kategori || 'Lainnya', Keterangan: payload.keterangan || '', Nominal: Number(payload.nominal || 0), EfekLaba: payload.efekLaba || 'TidakMengurangi', CabangID: payload.cabangId || cabangAktifId(DATA) };
     DATA.pengeluaran.unshift(row); await persist('pengeluaran', row);
-    var saldo = (DATA.kas || []).reduce(function (a, k) { return a + Number(k.Masuk || 0) - Number(k.Keluar || 0); }, 0) - row.Nominal;
+    var saldo = saldoKasCabang(DATA, row.CabangID) - row.Nominal;
     var kasRow = { ID: uid('KAS'), Tanggal: nowISO(), Jenis: 'Keluar', Keterangan: 'Pengeluaran: ' + row.Kategori + ' — ' + row.Keterangan, Masuk: 0, Keluar: row.Nominal, Saldo: saldo, CabangID: row.CabangID };
     DATA.kas.push(kasRow); await persist('kas', kasRow);
     addLog(DATA, '', 'Pengeluaran', row.Kategori + ' — ' + row.Nominal);
@@ -835,8 +919,9 @@
   async function simpanUangKas(payload) {
     if (!DATA) await loadAll();
     var nominal = Number(payload.nominal || 0);
-    var saldo = (DATA.kas || []).reduce(function (a, k) { return a + Number(k.Masuk || 0) - Number(k.Keluar || 0); }, 0) + (payload.jenis === 'Keluar' ? -nominal : nominal);
-    var row = { ID: payload.id || payload.ID || uid('KAS'), Tanggal: nowISO(), Jenis: payload.jenis || 'Masuk', Keterangan: payload.keterangan || '', Masuk: payload.jenis === 'Keluar' ? 0 : nominal, Keluar: payload.jenis === 'Keluar' ? nominal : 0, Saldo: saldo, CabangID: payload.cabangId || cabangAktifId(DATA) };
+    var cbKas = payload.cabangId || cabangAktifId(DATA);
+    var saldo = saldoKasCabang(DATA, cbKas) + (payload.jenis === 'Keluar' ? -nominal : nominal);
+    var row = { ID: payload.id || payload.ID || uid('KAS'), Tanggal: nowISO(), Jenis: payload.jenis || 'Masuk', Keterangan: payload.keterangan || '', Masuk: payload.jenis === 'Keluar' ? 0 : nominal, Keluar: payload.jenis === 'Keluar' ? nominal : 0, Saldo: saldo, CabangID: cbKas };
     DATA.kas.push(row); await persist('kas', row);
     refreshRingkasan(); return { ok: true, id: row.ID };
   }
@@ -871,10 +956,13 @@
     await Promise.all(items.map(async function (it) {
       var prod = DATA.produk.find(function (x) { return x.ID === it.ProdukID; });
       if (!prod) return;
-      prod.Stok = Number(prod.Stok || 0) + Number(it.Qty || 0);
+      // v4-40: stok bertambah di CABANG pembelian (stok_cabang), bukan di
+      // prod.Stok; updateProdukStokHarga kini hanya menulis harga.
+      var scBeli = setStok(DATA, prod, stokOfCabang(DATA, prod, cabangId) + Number(it.Qty || 0), cabangId);
       if (Number(it.HargaBeli || 0) > 0) prod.HargaModal = Number(it.HargaBeli);
       if (Number(it.HargaJual || 0) > 0) prod.HargaJual = Number(it.HargaJual);
       await updateProdukStokHarga(prod);
+      await persist('stok_cabang', scBeli);
       if (it.Kedaluwarsa) {
         var batch = { ID: uid('BTH'), ProdukID: it.ProdukID, CabangID: cabangId, Qty: Number(it.Qty || 0), Kedaluwarsa: it.Kedaluwarsa, PembelianID: id, TanggalMasuk: todayStr() };
         DATA.stokBatch.push(batch); await persist('stok_batch', batch);
@@ -883,7 +971,7 @@
     p.Diproses = true; p.Status = 'Diproses';
     await persist('pembelian', p);
     // pengeluaran + kas keluar sebesar Bayar
-    var saldo = (DATA.kas || []).reduce(function (a, k) { return a + Number(k.Masuk || 0) - Number(k.Keluar || 0); }, 0);
+    var saldo = saldoKasCabang(DATA, cabangId);
     var pg = { ID: uid('PGL'), Tanggal: nowISO(), Kategori: 'Pembelian', Keterangan: 'Pembelian ' + id + ' — ' + p.Pemasok, Nominal: p.Total, EfekLaba: 'TidakMengurangi', CabangID: cabangId };
     DATA.pengeluaran.unshift(pg); await persist('pengeluaran', pg);
     if (Number(p.Bayar || 0) > 0) {
@@ -894,7 +982,7 @@
     if (Number(p.Sisa || 0) > 0) {
       var ut = { ID: uid('UTG'), Tanggal: nowISO(), PembelianID: id, Pemasok: p.Pemasok, Total: Number(p.Sisa), Dibayar: 0, Sisa: Number(p.Sisa), Status: 'Hutang' };
       DATA.utang.unshift(ut); await persist('utang', ut);
-      var pm = DATA.pemasok.find(function (x) { return x.Nama === p.Pemasok; });
+      var pm = cariPemasokCabang(DATA, p.Pemasok, cabangId);
       if (pm) { pm.Hutang = Number(pm.Hutang || 0) + Number(p.Sisa); await persist('pemasok', pm); }
     }
     addLog(DATA, '', 'Pembelian Diproses', id + ' — stok bertambah, utang ' + (p.Sisa || 0));
@@ -913,10 +1001,13 @@
     await persist('utang', u);
     var cic = { ID: uid('CIC'), UtangID: u.ID, Tanggal: nowISO(), Nominal: nominal, Keterangan: payload.keterangan || '' };
     DATA.cicilanUtang.unshift(cic); await persist('cicilan_utang', cic);
-    var saldo = (DATA.kas || []).reduce(function (a, k) { return a + Number(k.Masuk || 0) - Number(k.Keluar || 0); }, 0) - nominal;
-    var kasRow = { ID: uid('KAS'), Tanggal: nowISO(), Jenis: 'Keluar', Keterangan: 'Cicil utang ' + u.ID + ' — ' + u.Pemasok, Masuk: 0, Keluar: nominal, Saldo: saldo, CabangID: cabangAktifId(DATA) };
+    // v4-40: cicilan dibayar dari kas CABANG utang itu (diturunkan dari
+    // pembelian), bukan cabang aktif.
+    var cabUtang = cabangUtang(DATA, u);
+    var saldo = saldoKasCabang(DATA, cabUtang) - nominal;
+    var kasRow = { ID: uid('KAS'), Tanggal: nowISO(), Jenis: 'Keluar', Keterangan: 'Cicil utang ' + u.ID + ' — ' + u.Pemasok, Masuk: 0, Keluar: nominal, Saldo: saldo, CabangID: cabUtang };
     DATA.kas.push(kasRow); await persist('kas', kasRow);
-    var pm = DATA.pemasok.find(function (x) { return x.Nama === u.Pemasok; });
+    var pm = cariPemasokCabang(DATA, u.Pemasok, cabUtang);
     if (pm) { pm.Hutang = Math.max(0, Number(pm.Hutang || 0) - nominal); await persist('pemasok', pm); }
     refreshRingkasan(); return { ok: true };
   }
@@ -936,10 +1027,10 @@
     // varian seperti batalkanTransaksi, dan kembalikan ke cabang trx itu.
     var qtyStok = Number(payload.stokQty != null ? payload.stokQty : qty);
     if (prod) {
-      var scRetur = (DATA.stokCabang || []).find(function (x) { return String(x.ProdukID) === String(prod.ID) && String(x.CabangID) === String(trx.CabangID || cabangAktifId(DATA)); });
-      setStok(DATA, prod, stokOf(DATA, prod) + qtyStok);
+      var cabRetur = trx.CabangID || cabangAktifId(DATA);
+      var scRetur = setStok(DATA, prod, stokOfCabang(DATA, prod, cabRetur) + qtyStok, cabRetur);
       await persist('produk', prod);
-      if (scRetur) await persist('stok_cabang', scRetur);
+      await persist('stok_cabang', scRetur);
     }
     var sisaLama = Number(trx.Sisa || 0);
     // v4-33: uang hanya kembali sebesar yang SUDAH dibayar. Retur item yang
@@ -969,7 +1060,7 @@
     // Pelanggan: retur mengurangi TotalBeli sebesar nominal, dan piutang
     // sebesar berkurangnya sisa (simetris dengan tambahItemTrx yang
     // menambah keduanya). Tanpa ini piutang nyangkut seperti Rp2.000 di #7.
-    var pl = DATA.pelanggan.find(function (x) { return x.Nama === trx.Pelanggan; });
+    var pl = cariPelangganCabang(DATA, trx.Pelanggan, trx.CabangID || cabangAktifId(DATA));
     if (pl) {
       pl.TotalBeli = Math.max(0, Number(pl.TotalBeli || 0) - nominal);
       pl.Piutang = Math.max(0, Number(pl.Piutang || 0) - (sisaLama - trx.Sisa));
@@ -978,7 +1069,7 @@
     // v4-33: kas Keluar hanya sebesar kasKeluar (porsi yang sudah dibayar) —
     // sisanya hanya mengurangi Sisa/piutang, tanpa menyentuh kas.
     if (kasKeluar > 0) {
-      var saldo = (DATA.kas || []).reduce(function (a, k) { return a + Number(k.Masuk || 0) - Number(k.Keluar || 0); }, 0) - kasKeluar;
+      var saldo = saldoKasCabang(DATA, row.CabangID) - kasKeluar;
       var kasRow = { ID: uid('KAS'), Tanggal: nowISO(), Jenis: 'Keluar', Keterangan: 'Retur ' + trx.ID + ' — ' + row.Produk, Masuk: 0, Keluar: kasKeluar, Saldo: saldo, CabangID: row.CabangID };
       DATA.kas.push(kasRow); await persist('kas', kasRow);
     }
@@ -994,10 +1085,10 @@
     trx.Sisa = Math.max(0, Number(trx.Total || 0) - trx.Bayar);
     if (trx.Sisa === 0) trx.StatusBayar = 'Lunas'; else trx.StatusBayar = 'Kurang';
     await persist('transaksi', trx);
-    var saldo = (DATA.kas || []).reduce(function (a, k) { return a + Number(k.Masuk || 0) - Number(k.Keluar || 0); }, 0) + nominal;
+    var saldo = saldoKasCabang(DATA, trx.CabangID || cabangAktifId(DATA)) + nominal;
     var kasRow = { ID: uid('KAS'), Tanggal: nowISO(), Jenis: 'Masuk', Keterangan: 'Pelunasan ' + trx.ID, Masuk: nominal, Keluar: 0, Saldo: saldo, CabangID: trx.CabangID || cabangAktifId(DATA) };
     DATA.kas.push(kasRow); await persist('kas', kasRow);
-    var pl = DATA.pelanggan.find(function (x) { return x.Nama === trx.Pelanggan; });
+    var pl = cariPelangganCabang(DATA, trx.Pelanggan, trx.CabangID || cabangAktifId(DATA));
     if (pl) { pl.Piutang = Math.max(0, Number(pl.Piutang || 0) - nominal); await persist('pelanggan', pl); }
     refreshRingkasan(); return { ok: true, sisa: trx.Sisa, statusBayar: trx.StatusBayar };
   }
@@ -1019,7 +1110,7 @@
     var cabangId = trx.CabangID || cabangAktifId(DATA);
     // v4-32: seperti saveTransaksi — tambah item offline/replay tidak
     // boleh ditolak karena stok (kasir tidak boleh macet).
-    if (!offlineMode && !_replay && lacakStok(prod) && stokOf(DATA, prod) < butuh) throw new Error('Stok produk tidak mencukupi: ' + prod.Nama);
+    if (!offlineMode && !_replay && lacakStok(prod) && stokOfCabang(DATA, prod, cabangId) < butuh) throw new Error('Stok produk tidak mencukupi: ' + prod.Nama);
     (DATA.resep || []).filter(function (r) { return String(r.ProdukID) === String(prod.ID); }).forEach(function (r) {
       var b = DATA.bahan.find(function (x) { return x.ID === r.BahanID; });
       if (!offlineMode && !_replay && b && Number(b.Stok || 0) < Number(r.QtyPakai || 0) * butuh) throw new Error('Stok bahan tidak mencukupi: ' + b.Nama);
@@ -1060,10 +1151,9 @@
         await persist('stok_batch', batches[bi]);
         sisaButuh -= ambil;
       }
-      var sc = (DATA.stokCabang || []).find(function (x) { return String(x.ProdukID) === String(prod.ID) && String(x.CabangID) === String(cabangId); });
-      setStok(DATA, prod, stokOf(DATA, prod) - butuh);
+      var sc = setStok(DATA, prod, stokOfCabang(DATA, prod, cabangId) - butuh, cabangId);
       await persist('produk', prod);
-      if (sc) await persist('stok_cabang', sc);
+      await persist('stok_cabang', sc);
     }
     var bahanUbah = [];
     (DATA.resep || []).filter(function (r) { return String(r.ProdukID) === String(prod.ID); }).forEach(function (r) {
@@ -1076,7 +1166,7 @@
     trx.StatusBayar = trx.Sisa === 0 ? 'Lunas' : (Number(trx.Bayar || 0) > 0 ? 'Kurang' : 'Belum Dibayar');
     trx.Laba = Number(trx.Laba || 0) + (harga - Number(prod.HargaModal || 0)) * qty;
     await persist('transaksi', trx);
-    var pl = DATA.pelanggan.find(function (x) { return x.Nama === trx.Pelanggan; });
+    var pl = cariPelangganCabang(DATA, trx.Pelanggan, trx.CabangID || cabangAktifId(DATA));
     if (pl) {
       pl.TotalBeli = Number(pl.TotalBeli || 0) + subtotal;
       pl.Piutang = Number(pl.Piutang || 0) + subtotal;
@@ -1089,7 +1179,8 @@
   async function lunasiSemua(payload) {
     if (!DATA) await loadAll();
     var nama = payload.pelanggan || payload.nama;
-    var list = DATA.transaksi.filter(function (t) { return t.Pelanggan === nama && t.StatusBayar !== 'Lunas'; });
+    var cabLunas = payload.cabangId || cabangAktifId(DATA);
+    var list = DATA.transaksi.filter(function (t) { return t.Pelanggan === nama && t.StatusBayar !== 'Lunas' && milikCabang(DATA, t, cabLunas); });
     var total = 0;
     for (var i = 0; i < list.length; i++) {
       total += Number(list[i].Sisa || 0);
@@ -1133,9 +1224,12 @@
       returTrx.forEach(function (r) { if (String(r.Produk || '') === String(d.NamaProduk) || String(r.Produk || '') === String(prod.Nama)) qtyRetur += Number(r.Qty || 0); });
       var kembali = Math.max(0, Number(d.Qty || 0) - qtyRetur) * isi;
       if (lacakStok(prod)) {
-        var sc = (DATA.stokCabang || []).find(function (x) { return String(x.ProdukID) === String(prod.ID) && String(x.CabangID) === String(trx.CabangID || cabangAktifId(DATA)); });
-        if (sc) { sc.Stok = Number(sc.Stok || 0) + kembali; await persist('stok_cabang', sc); }
-        else { prod.Stok = Number(prod.Stok || 0) + kembali; await persist('produk', prod); }
+        // v4-40: stok kembali ke cabang transaksi itu lewat setStok
+        // (membuat baris stok_cabang bila belum ada); prod.Stok tak ditulis.
+        var cabBatal = trx.CabangID || cabangAktifId(DATA);
+        var scBaru = setStok(DATA, prod, stokOfCabang(DATA, prod, cabBatal) + kembali, cabBatal);
+        await persist('stok_cabang', scBaru);
+        await persist('produk', prod);
       }
       (DATA.resep || []).filter(function (r) { return String(r.ProdukID) === String(prod.ID); }).forEach(function (r) {
         var b = DATA.bahan.find(function (x) { return x.ID === r.BahanID; });
@@ -1144,7 +1238,7 @@
     }
     var daftarBahan = Object.keys(bahanKembali);
     for (var bi = 0; bi < daftarBahan.length; bi++) await persist('bahan_baku', bahanKembali[daftarBahan[bi]]);
-    var pl = DATA.pelanggan.find(function (x) { return x.Nama === trx.Pelanggan; });
+    var pl = cariPelangganCabang(DATA, trx.Pelanggan, trx.CabangID || cabangAktifId(DATA));
     if (pl) {
       pl.Piutang = Math.max(0, Number(pl.Piutang || 0) - Number(trx.Sisa || 0));
       pl.TotalBeli = Math.max(0, Number(pl.TotalBeli || 0) - Number(trx.Total || 0));
@@ -1165,7 +1259,7 @@
     // lewat retur — bila tidak, pelanggan menerima uang retur 2x.
     var kembaliKas = Math.max(0, Number(trx.Bayar || 0) - returKas);
     if (kembaliKas > 0) {
-      var saldo = (DATA.kas || []).reduce(function (a, k) { return a + Number(k.Masuk || 0) - Number(k.Keluar || 0); }, 0) - kembaliKas;
+      var saldo = saldoKasCabang(DATA, trx.CabangID || cabangAktifId(DATA)) - kembaliKas;
       var kasRow = { ID: uid('KAS'), Tanggal: nowISO(), Jenis: 'Keluar', Keterangan: 'Batal transaksi ' + trx.ID + ' (uang kembali)', Masuk: 0, Keluar: kembaliKas, Saldo: saldo, CabangID: trx.CabangID || cabangAktifId(DATA) };
       DATA.kas.push(kasRow); await persist('kas', kasRow);
     }
@@ -1249,23 +1343,28 @@
     if (!DATA) await loadAll();
     var prod = DATA.produk.find(function (x) { return x.ID === payload.produkId; });
     if (!prod) throw new Error('Produk tidak ditemukan.');
-    var sistem = stokOf(DATA, prod);
+    var cabOpname = payload.cabangId || cabangAktifId(DATA);
+    var sistem = stokOfCabang(DATA, prod, cabOpname);
     var fisik = Number(payload.stokFisik || 0);
-    var row = { ID: payload.id || payload.ID || uid('OPN'), Tanggal: nowISO(), ProdukID: prod.ID, NamaProduk: prod.Nama, StokSistem: sistem, StokFisik: fisik, Selisih: fisik - sistem, Keterangan: payload.keterangan || '', CabangID: payload.cabangId || cabangAktifId(DATA), Pengguna: '' };
+    var row = { ID: payload.id || payload.ID || uid('OPN'), Tanggal: nowISO(), ProdukID: prod.ID, NamaProduk: prod.Nama, StokSistem: sistem, StokFisik: fisik, Selisih: fisik - sistem, Keterangan: payload.keterangan || '', CabangID: cabOpname, Pengguna: '' };
     DATA.opname.unshift(row); await persist('opname', row);
-    setStok(DATA, prod, fisik);
+    var sc = setStok(DATA, prod, fisik, row.CabangID);
     await persist('produk', prod);
-    var sc = (DATA.stokCabang || []).find(function (x) { return String(x.ProdukID) === String(prod.ID) && String(x.CabangID) === String(row.CabangID); });
-    if (sc) await persist('stok_cabang', sc);
+    await persist('stok_cabang', sc);
     addLog(DATA, '', 'Opname', prod.Nama + ' — sistem ' + sistem + ' → fisik ' + fisik);
     refreshRingkasan(); return { ok: true, id: row.ID };
   }
   async function saranOrder(payload) {
     if (!DATA) await loadAll();
-    var list = (DATA.produk || []).map(function (p) {
-      var terjual = (DATA.detail || []).filter(function (d) { return d.ProdukID === p.ID; }).reduce(function (a, d) { return a + Number(d.Qty || 0); }, 0);
+    // v4-40: hanya produk cabang itu; terjual dihitung dari detail
+    // transaksi cabang itu saja.
+    var cabSaran = (payload && payload.cabangId) || cabangAktifId(DATA);
+    var idTrxSaran = {};
+    (DATA.transaksi || []).forEach(function (t) { if (milikCabang(DATA, t, cabSaran)) idTrxSaran[t.ID] = true; });
+    var list = (DATA.produk || []).filter(function (p) { return milikCabang(DATA, p, cabSaran); }).map(function (p) {
+      var terjual = (DATA.detail || []).filter(function (d) { return d.ProdukID === p.ID && idTrxSaran[d.TransaksiID]; }).reduce(function (a, d) { return a + Number(d.Qty || 0); }, 0);
       var perHari = terjual / 28;
-      var stok = stokOf(DATA, p);
+      var stok = stokOfCabang(DATA, p, cabSaran);
       var hariTersisa = perHari > 0 ? Math.floor(stok / perHari) : null;
       return { produkId: p.ID, nama: p.Nama, stok: stok, terjualPerHari: Math.round(perHari * 100) / 100, hariTersisa: hariTersisa, saranQty: perHari > 0 && (hariTersisa == null || hariTersisa < 7) ? Math.ceil(perHari * 14) : 0 };
     }).filter(function (s) { return s.saranQty > 0; });
@@ -1273,7 +1372,10 @@
   }
   async function getLaporanStok(payload) {
     if (!DATA) await loadAll();
-    var produk = (DATA.produk || []).map(function (p) { return { nama: p.Nama, stok: stokOf(DATA, p), modal: Number(p.HargaModal || 0), harga: Number(p.HargaJual || 0) }; });
+    // v4-40: hanya produk cabang itu (payload.cabangId || cabang aktif);
+    // bahan tetap global (bahan_baku di luar lingkup v4-40).
+    var cabLapStok = (payload && payload.cabangId) || cabangAktifId(DATA);
+    var produk = (DATA.produk || []).filter(function (p) { return milikCabang(DATA, p, cabLapStok); }).map(function (p) { return { nama: p.Nama, stok: stokOfCabang(DATA, p, cabLapStok), modal: Number(p.HargaModal || 0), harga: Number(p.HargaJual || 0) }; });
     var bahan = (DATA.bahan || []).map(function (b) { return { nama: b.Nama, stok: Number(b.Stok || 0), satuan: b.Satuan || '' }; });
     return { produk: produk, bahan: bahan, kedaluwarsa: (DATA.ringkasan || {}).kedaluwarsaList || [] };
   }
@@ -1288,8 +1390,72 @@
   async function upsertCabang(payload) {
     if (!DATA) await loadAll();
     var exCbg = payload.ID ? (DATA.cabang || []).find(function (x) { return String(x.ID) === String(payload.ID); }) : null;
+    var target = payload.TargetHarian != null ? Number(payload.TargetHarian) : (exCbg && exCbg.TargetHarian != null ? Number(exCbg.TargetHarian) : 0);
     var row = { ID: payload.ID || '', Nama: payload.Nama, Alamat: payload.Alamat || '', Telepon: payload.Telepon || '', Aktif: exCbg ? exCbg.Aktif : true };
-    return upsertInto('cabang', 'cabang', row, 'CBG');
+    // v4-40: TargetHarian TIDAK ikut ke upsertInto — kolom target_harian
+    // belum ada di DB live, bila terkirim upsert gagal. Target disimpan
+    // in-memory pada baris hasil + tulisTargetCabang (best-effort).
+    // exCbg lama yang sudah membawa TargetHarian disingkirkan dulu dari
+    // objeknya supaya persist() di upsertInto tidak ikut mengirimnya.
+    if (exCbg) delete exCbg.TargetHarian;
+    var hasil = await upsertInto('cabang', 'cabang', row, 'CBG');
+    hasil.TargetHarian = target;
+    await tulisTargetCabang(hasil.ID, target);
+    return hasil;
+  }
+  // v4-40: tulis target_harian cabang ke DB bila kolomnya sudah ada
+  // (migrasi v4-40); bila kolom belum ada, galat ditelan diam-diam.
+  // Baris in-memory selalu diperbarui + ringkasan dihitung ulang.
+  async function tulisTargetCabang(cabangId, nilai) {
+    if (DATA) {
+      var c = (DATA.cabang || []).find(function (x) { return String(x.ID) === String(cabangId); });
+      if (c) c.TargetHarian = Number(nilai || 0);
+    }
+    if (MODE !== 'supabase' || !client || offlineMode) { if (DATA) refreshRingkasan(); return; }
+    try {
+      var res = await client.from('cabang').update({ target_harian: Number(nilai || 0) }).eq('id', cabangId);
+      if (res && res.error) { /* kolom belum ada — telan */ }
+    } catch (e) { /* telan */ }
+    if (DATA) refreshRingkasan();
+  }
+  /* ---------- v4-40: salin produk antar cabang & Umum per cabang ---------- */
+  function normalNama(s) { return String(s || '').trim().toLowerCase(); }
+  async function salinProdukAntarCabang(payload) {
+    if (!DATA) await loadAll();
+    var dari = payload.dariCabangId, ke = payload.keCabangId;
+    if (!dari || !ke) throw new Error('Cabang sumber dan tujuan wajib diisi.');
+    if (String(dari) === String(ke)) return { ok: true, disalin: 0, dilewati: 0, dilewatiNama: [] };
+    var sumber = (DATA.produk || []).filter(function (p) { return produkAktif(p) && milikCabang(DATA, p, dari); });
+    var adaNama = {};
+    (DATA.produk || []).forEach(function (p) { if (milikCabang(DATA, p, ke)) adaNama[normalNama(p.Nama)] = true; });
+    var disalin = 0, dilewatiNama = [];
+    for (var i = 0; i < sumber.length; i++) {
+      var p = sumber[i];
+      if (adaNama[normalNama(p.Nama)]) { dilewatiNama.push(p.Nama); continue; }
+      var row = {
+        ID: uid('PRD'), Nama: p.Nama, Kategori: p.Kategori || '', Grup: p.Grup || '',
+        SKUBarcode: p.SKUBarcode || p.SKU || '', HargaJual: Number(p.HargaJual || 0), HargaModal: Number(p.HargaModal || 0),
+        Stok: 0, Satuan: p.Satuan || 'pcs', Aktif: true, StokMinimum: Number(p.StokMinimum == null ? 5 : p.StokMinimum),
+        GambarURL: p.GambarURL || '', Keterangan: p.Keterangan || '',
+        HargaBisaDiganti: p.HargaBisaDiganti, TermasukStok: p.TermasukStok,
+        HargaLainJSON: p.HargaLainJSON || '', HargaJumlahJSON: p.HargaJumlahJSON || '',
+        VarianJSON: p.VarianJSON || '', TampilkanDiKatalog: p.TampilkanDiKatalog,
+        CabangID: ke
+      };
+      DATA.produk.unshift(row);
+      await persist('produk', row);
+      adaNama[normalNama(p.Nama)] = true;
+      disalin++;
+    }
+    refreshRingkasan();
+    return { ok: true, disalin: disalin, dilewati: dilewatiNama.length, dilewatiNama: dilewatiNama };
+  }
+  async function pastikanUmumCabang(cabangId) {
+    if (!DATA) await loadAll();
+    var cb = cabangId || cabangAktifId(DATA);
+    var ex = cariPelangganCabang(DATA, 'Umum', cb);
+    if (ex) return ex;
+    return upsertPelanggan({ Nama: 'Umum', CabangID: cb });
   }
   async function hapusCabang(payload) { if (!DATA) await loadAll(); hapusDari('cabang', 'cabang', payload.id); return { ok: true }; }
   async function setCabangAktif(payload) {
@@ -1411,9 +1577,12 @@
     var batas = Number((DATA.pengaturan || {}).JatuhTempoHari || 7);
     var now = new Date();
     var daftar = [];
+    // v4-40: hanya pelanggan + transaksi cabang efektif.
+    var cabIngat = cabangAktifId(DATA);
     (DATA.pelanggan || []).forEach(function (pl) {
       if (Number(pl.Piutang || 0) <= 0) return;
-      var list = (DATA.transaksi || []).filter(function (t) { return t.Pelanggan === pl.Nama && t.StatusBayar !== 'Lunas'; });
+      if (!milikCabang(DATA, pl, cabIngat)) return;
+      var list = (DATA.transaksi || []).filter(function (t) { return t.Pelanggan === pl.Nama && t.StatusBayar !== 'Lunas' && milikCabang(DATA, t, cabIngat); });
       if (!list.length) return;
       var tertua = list.map(function (t) { return new Date(String(t.Tanggal || '').replace(' ', 'T')); }).sort(function (a, b) { return a - b; })[0];
       var hari = Math.floor((now - tertua) / 86400000);
@@ -1428,7 +1597,8 @@
   async function tagihanGabungan(payload) {
     if (!DATA) await loadAll();
     var nama = payload.pelanggan || payload.nama;
-    var list = (DATA.transaksi || []).filter(function (t) { return t.Pelanggan === nama && t.StatusBayar !== 'Lunas'; });
+    // v4-40: hanya transaksi cabang efektif.
+    var list = (DATA.transaksi || []).filter(function (t) { return t.Pelanggan === nama && t.StatusBayar !== 'Lunas' && milikCabang(DATA, t, cabangAktifId(DATA)); });
     var lines = ['TAGIHAN — ' + (DATA.pengaturan.NamaToko || 'ZPOS'), 'Pelanggan: ' + nama, '------------------------------'];
     var total = 0;
     list.forEach(function (t) { lines.push(t.ID + ' — ' + String(t.Tanggal || '').slice(0, 10) + ' — Rp' + Number(t.Sisa || 0).toLocaleString('id-ID') + ' (' + t.StatusBayar + ')'); total += Number(t.Sisa || 0); });
@@ -1484,7 +1654,9 @@
       baris = Object.keys(byMetode).map(function (m) { return { Metode: m, Total: byMetode[m] }; });
     } else if (jenis === 'stok') {
       ringkasan = { Produk: (DATA.produk || []).filter(produkAktif).length, StokMenipis: (DATA.ringkasan || {}).stokMenipis || 0 };
-      baris = (DATA.produk || []).map(function (p) { return { Produk: p.Nama, Stok: stokOf(DATA, p), HargaJual: p.HargaJual, HargaModal: p.HargaModal }; });
+      // v4-40: hanya produk cabang laporan itu (cabangId || cabang aktif).
+      var cabLapStok2 = cabangId || cabangAktifId(DATA);
+      baris = (DATA.produk || []).filter(function (p) { return milikCabang(DATA, p, cabLapStok2); }).map(function (p) { return { Produk: p.Nama, Stok: stokOfCabang(DATA, p, cabLapStok2), HargaJual: p.HargaJual, HargaModal: p.HargaModal }; });
     } else if (jenis === 'labarugi') {
       var omzet = lunas.reduce(function (a, t) { return a + Number(t.Total || 0); }, 0);
       var labaKotor = lunas.reduce(function (a, t) { return a + Number(t.Laba || 0); }, 0);
@@ -1522,6 +1694,12 @@
     var trx = DATA.transaksi.find(function (x) { return x.ID === payload.transaksiId; });
     if (!trx) throw new Error('Transaksi tidak ditemukan.');
     var p = DATA.pengaturan || {};
+    // v4-40: struk memakai alamat + telepon cabang transaksi (fallback ke
+    // pengaturan global bila kosong). Cabang tidak punya kolom kota — kota
+    // tetap dari pengaturan. Nama toko + slogan + footer tetap brand global.
+    var cb = (DATA.cabang || []).find(function (c) { return String(c.ID) === String(trx.CabangID || ''); }) || (DATA.cabang || [])[0] || {};
+    var alamatStruk = (cb.Alamat && String(cb.Alamat).trim()) ? cb.Alamat : p.AlamatToko;
+    var telpStruk = (cb.Telepon && String(cb.Telepon).trim()) ? cb.Telepon : p.TeleponToko;
     var d = new Date(trx.Tanggal);
     var BLN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
     var tgl = d.getDate() + ' ' + BLN[d.getMonth()] + ' ' + d.getFullYear() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
@@ -1534,9 +1712,9 @@
     var angka = function (n) { return Number(n || 0).toLocaleString('id-ID'); };
     var lines = [tengah(p.NamaToko || 'ZPOS')];
     if (p.SloganToko) lines.push(tengah(p.SloganToko));
-    if (p.AlamatToko) lines.push(tengah(p.AlamatToko));
+    if (alamatStruk) lines.push(tengah(alamatStruk));
     if (p.KotaToko) lines.push(tengah(p.KotaToko));
-    if (p.TeleponToko) lines.push(tengah(p.TeleponToko));
+    if (telpStruk) lines.push(tengah(telpStruk));
     lines.push('', tgl + (no ? '  #' + no : ''), 'Pelanggan: ' + trx.Pelanggan, '--------------------------------');
     DATA.detail.filter(function (x) { return x.TransaksiID === trx.ID; }).forEach(function (x) {
       lines.push(x.NamaProduk);
@@ -1868,6 +2046,8 @@
     simpanOpname: simpanOpname, simpanPengaturan: simpanPengaturan,
     upsertPengguna: upsertPengguna, hapusPengguna: hapusPengguna,
     upsertCabang: upsertCabang, hapusCabang: hapusCabang, setCabangAktif: setCabangAktif,
+    salinProdukAntarCabang: salinProdukAntarCabang, pastikanUmumCabang: pastikanUmumCabang,
+    tulisTargetCabang: tulisTargetCabang,
     ubahStatusPesanan: ubahStatusPesanan, ubahTransaksi: ubahTransaksi,
     koreksiPoin: koreksiPoin, simpanTeks: simpanTeks, hapusTeks: hapusTeks,
     upsertGrup: upsertGrup, hapusGrup: hapusGrup, upsertSatuan: upsertSatuan, hapusSatuan: hapusSatuan,
@@ -2007,7 +2187,7 @@
      metode baca diekspor langsung. */
   window.DB = Object.assign({
     mode: MODE, configured: !!CONFIGURED, isSample: MODE === 'contoh',
-    getData: getData, refreshRingkasan: refreshRingkasan,
+    getData: getData, refreshRingkasan: refreshRingkasan, setCabangSesi: setCabangSesi,
     loadAll: loadAll, login: login, getSessionUser: getSessionUser, logout: logout,
     loadKatalogPublik: loadKatalogPublik,
     muatDariSnapshot: muatDariSnapshot, sedangOffline: sedangOffline,
