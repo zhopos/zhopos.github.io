@@ -453,12 +453,14 @@ function isiNotifPanel() {
 function go(sec) { show(sec, document.querySelector('nav button.menu[data-sec="' + sec + '"]')); }
 function terjemah(kata) { var t = DATA.terjemahan || {}; return t[kata] || kata; }
 function cabangAktifId() { var p = DATA.pengaturan || {}; return p.CabangAktif || ((DATA.cabang || [])[0] && DATA.cabang[0].ID) || ''; }
-/* v4-40: cabang sesi — pengguna yang dikunci Admin ke satu cabang
-   (currentUser.CabangID) hanya melihat & menulis cabang itu; Admin tanpa
-   CabangID memakai cabang aktif global (cabangAktifId). Baris tanpa
-   CabangID dianggap milik cabang pertama (aturan legacy). */
-function cabangSesiId() { return (typeof currentUser !== 'undefined' && currentUser && currentUser.CabangID) ? currentUser.CabangID : cabangAktifId(); }
-function cabangTerkunci() { return !!(typeof currentUser !== 'undefined' && currentUser && currentUser.CabangID); }
+/* v4-41: cabang sesi — HANYA Kasir yang dikunci ke satu cabang
+   (currentUser.CabangID). Admin SELALU memakai Cabang Aktif global
+   (cabangAktifId) walau data penggunanya punya CabangID — pemilik harus
+   bisa ganti cabang bebas. Peran dibaca dari currentUser.peran (bentuk
+   yang dikembalikan DB.login) dengan fallback currentUser.Peran.
+   Baris tanpa CabangID dianggap milik cabang pertama (aturan legacy). */
+function cabangSesiId() { var peran = (typeof currentUser !== 'undefined' && currentUser) ? (currentUser.peran || currentUser.Peran || '') : ''; if (peran === 'Admin') return cabangAktifId(); return (typeof currentUser !== 'undefined' && currentUser && currentUser.CabangID) ? currentUser.CabangID : cabangAktifId(); }
+function cabangTerkunci() { var peran = (typeof currentUser !== 'undefined' && currentUser) ? (currentUser.peran || currentUser.Peran || '') : ''; return peran === 'Kasir' && !!(typeof currentUser !== 'undefined' && currentUser && currentUser.CabangID); }
 function cabangPertamaId() { var c = (typeof DATA !== 'undefined' && DATA && DATA.cabang) || []; return (c[0] && c[0].ID) || ''; }
 function milikCabangSesi(x) { return String((x && x.CabangID) || cabangPertamaId()) === String(cabangSesiId()); }
 /* Baris cabang sesi (untuk alamat/telepon/target per cabang di struk & pengaturan). */
@@ -472,6 +474,23 @@ function milikCabangSesiUtang(u) { return String(cabangDariUtang(u)) === String(
 /* Cabang efektif untuk laporan: pilihan eksplisit di dropdown dihormati,
    kecuali pengguna terkunci (dipaksa cabang sesi); tanpa pilihan = cabang sesi. */
 function cabangLaporanEfektif(pilihan) { if (cabangTerkunci()) return cabangSesiId(); return pilihan || cabangSesiId() || undefined; }
+/* ---------- PERINGATAN MIGRASI CABANG (v4-41) ----------
+   DB.kolomCabangBelumAda (data layer) = true bila penulisan cabang_id
+   pernah ditolak = migrasi-cabang-v441.sql belum dijalankan. Guard typeof
+   supaya aman bila data layer lama belum punya flag itu. Toast hanya
+   sekali per sesi; banner di Pengaturan tampil selama flag true. */
+var TEKS_MIGRASI_CABANG = 'Migrasi cabang belum dijalankan — pelanggan/pemasok belum terpisah per cabang. Jalankan migrasi-cabang-v441.sql di SQL Editor Supabase.';
+var _peringatanMigrasiSudah = false;
+function migrasiCabangBelumAda() { try { return typeof DB !== 'undefined' && DB && typeof DB.kolomCabangBelumAda !== 'undefined' && !!DB.kolomCabangBelumAda; } catch (e) { return false; } }
+function tampilkanBannerMigrasi() { var b = document.getElementById('bannerMigrasiCabang'); if (b) b.style.display = migrasiCabangBelumAda() ? '' : 'none'; }
+function peringatkanMigrasiCabangSekali() {
+  tampilkanBannerMigrasi();
+  if (_peringatanMigrasiSudah) return false;
+  if (!migrasiCabangBelumAda()) return false;
+  _peringatanMigrasiSudah = true;
+  tampilInfo(TEKS_MIGRASI_CABANG);
+  return true;
+}
 function stokProduk(p) {
   var sc = (DATA.stokCabang || []).filter(function (x) { return String(x.ProdukID) === String(p.ID) && String(x.CabangID) === String(cabangSesiId()); });
   if (sc.length) return Number(sc[0].Stok || 0);
@@ -673,8 +692,9 @@ function tampilkanOfflineAwal() {
 }
 /* Bagian akhir loadData (dipakai jalur online maupun snapshot offline). */
 function selesaiMuatData() {
-    // v4-40: kunci lapisan data ke cabang sesi + pastikan pelanggan Umum cabang sesi ada.
-    try { DB.setCabangSesi(cabangSesiId()); } catch (e) {}
+    // v4-41: kunci lapisan data ke cabang sesi + pastikan pelanggan Umum cabang sesi ada.
+    // Admin tidak di-override (pakai Cabang Aktif global); hanya Kasir terkunci yang di-override.
+    try { DB.setCabangSesi(cabangTerkunci() ? cabangSesiId() : cabangAktifId()); } catch (e) {}
     try { var pr = DB.pastikanUmumCabang(cabangSesiId()); if (pr && pr.catch) pr.catch(function () {}); } catch (e) {}
     var p = DATA.pengaturan || {};
     document.getElementById('namaTokoHead').textContent = p.NamaToko || 'ZPOS';
@@ -702,6 +722,8 @@ function selesaiMuatData() {
     var oa = document.getElementById('offlineAwal'); if (oa) oa.style.display = 'none';
     document.querySelectorAll('main section').forEach(function (s) { s.style.display = ''; });
     renderAll(); applyRole(); hideLoading();
+    // v4-41: peringatan migrasi cabang — toast sekali per sesi (+ banner Pengaturan).
+    try { peringatkanMigrasiCabangSekali(); } catch (e) {}
     // v4-35: pasang entri penjaga dashboard untuk tombol kembali Android
     // (sekali per login; panggil ulang aman karena dijaga NAV.siap).
     if (typeof pasangPenjagaRiwayat === 'function') pasangPenjagaRiwayat();
@@ -816,7 +838,10 @@ async function doLogin() {
     if (!res.ok) return alert(res.error || 'Login gagal');
     sessionStorage.setItem('pos_user', JSON.stringify(res));
     currentUser = res;
-    try { DB.setCabangSesi(cabangSesiId()); } catch (e) {}
+    // v4-41: hanya Kasir yang di-override ke cabangnya; Admin override-nya
+    // dikosongkan (setCabangSesi('')) supaya memakai Cabang Aktif global —
+    // selesaiMuatData() nanti mengisinya dari cabangAktifId() setelah data dimuat.
+    try { DB.setCabangSesi(cabangTerkunci() ? cabangSesiId() : ''); } catch (e) {}
     document.getElementById('userLabel').textContent = '• ' + res.nama + (res.peran ? ' - ' + res.peran : '');
     document.getElementById('loginBox').style.display = 'none';
     document.body.classList.remove('belum-login');
@@ -887,10 +912,12 @@ function isiPengaturanForm() {
   var cb = document.getElementById('sCabangAktif');
   cb.innerHTML = (DATA.cabang || []).map(function (c) { return '<option value="' + esc(c.ID) + '"' + (String(c.ID) === String(cabangTerkunci() ? cabangSesiId() : p.CabangAktif) ? ' selected' : '') + '>' + esc(c.Nama) + '</option>'; }).join('');
   terapkanKunciCabang();
+  tampilkanBannerMigrasi();
   pratinjauProfil();
 }
-/* v4-40: pengguna terkunci tidak boleh mengganti cabang aktif — select
-   #sCabangAktif di-disable + keterangan "Terkunci ke cabang Anda". */
+/* v4-41: kunci cabang HANYA untuk Kasir (cabangTerkunci) — select
+   #sCabangAktif di-disable + keterangan "Terkunci ke cabang Anda" hanya
+   untuk Kasir terkunci. Admin selalu bisa mengganti Cabang Aktif. */
 function terapkanKunciCabang() {
   var cb = document.getElementById('sCabangAktif');
   if (cb) cb.disabled = cabangTerkunci();
@@ -944,9 +971,47 @@ var SHORTCUT_GROUPS = [
   ['Uang', [['pembelian', ikon('bag', 20) + ' Pembelian'], ['pengeluaran', ikon('out', 20) + ' Pengeluaran'], ['aruskas', ikon('refresh', 20) + ' Arus Kas'], ['utang', ikon('card', 20) + ' Utang']]],
   ['Laporan', [['laporan', ikon('trend', 20) + ' Laporan'], ['pelanggan', ikon('users', 20) + ' Pelanggan'], ['pengaturan', ikon('gear', 20) + ' Pengaturan']]]
 ];
-/* v4-40: kartu Stok Menipis ringkas — maks 5 paling kritis (stok menaik),
+/* v4-41: kartu Stok Menipis ringkas — maks 5 paling kritis (stok menaik),
    ringkasan "X habis • Y menipis", badge jumlah, tombol Lihat semua bila > 5.
    Data (stokTipisList) tidak diubah; pengurutan hanya saat render. */
+/* ---------- KARTU DASHBOARD PROFESIONAL (v4-41) ----------
+   Pola sama seperti renderStokTipis: maks 5 baris, data & logika tidak
+   diubah — hanya tampilan. Peringkat 1–5: badge teal untuk #1, netral
+   untuk #2–5; nama kiri, nilai rata kanan; garis pemisah halus antar
+   baris (CSS .rank-row di index.html). Target Harian: progress bar +
+   persen + sisa target; bila belum ada target, tombol ke Pengaturan. */
+function renderTerlaris(r) {
+  var box = document.getElementById('terlaris'); if (!box) return;
+  var list = (r.terlaris || []).slice(0, 5);
+  if (!list.length) { box.innerHTML = '<div class="rank-kosong">Belum ada penjualan.</div>'; return; }
+  box.innerHTML = list.map(function (x, i) {
+    var rank = i + 1;
+    return '<div class="rank-row"><span class="rank-badge' + (rank === 1 ? ' rank-1' : '') + '">' + rank + '</span><span class="rank-nama">' + esc(x.nama) + '</span><span class="rank-nilai">' + (x.qty || 0) + ' terjual</span></div>';
+  }).join('');
+}
+function renderPelangganTop(r) {
+  var box = document.getElementById('pelangganTop'); if (!box) return;
+  var list = (r.pelangganTop || []).slice(0, 5);
+  if (!list.length) { box.innerHTML = '<div class="rank-kosong">Belum ada data.</div>'; return; }
+  box.innerHTML = list.map(function (x, i) {
+    var rank = i + 1;
+    return '<div class="rank-row"><span class="rank-badge' + (rank === 1 ? ' rank-1' : '') + '">' + rank + '</span><span class="rank-nama">' + esc(x.nama) + '</span><span class="rank-nilai">' + rp(x.total) + '</span></div>';
+  }).join('');
+}
+function renderTargetHarian(r) {
+  var box = document.getElementById('targetBox'); if (!box) return;
+  var target = targetHarianEfektif();
+  if (!(target > 0)) {
+    box.innerHTML = '<div class="rank-kosong">Belum ada target harian.</div><button class="primary" style="width:100%;margin-top:10px" onclick="go(\'pengaturan\');setTimeout(function(){var el=document.getElementById(\'sTarget\');if(el)el.focus();},100)">Atur Target Omzet Harian</button>';
+    return;
+  }
+  var tercapai = Number(r.omzetHariIni || 0);
+  var pct = Math.round(tercapai / target * 100);
+  var sisa = Math.max(0, target - tercapai);
+  box.innerHTML = '<div class="target-angka"><span>Tercapai <b>' + rp(tercapai) + '</b> dari ' + rp(target) + '</span><b class="target-persen">' + pct + '%</b></div>'
+    + '<div class="target-bar"><div class="target-isi" style="width:' + Math.min(100, pct) + '%"></div></div>'
+    + '<div class="target-sisa">' + (sisa > 0 ? 'Kurang ' + rp(sisa) + ' lagi' : 'Target tercapai!') + '</div>';
+}
 function renderStokTipis(r) {
   var box = document.getElementById('stokTipis');
   var badge = document.getElementById('stokTipisBadge');
@@ -974,7 +1039,7 @@ function renderAll() {
   vsEl.textContent = (pct >= 0 ? '+' : '') + pct + '% vs kemarin';
   vsEl.classList.toggle('down', pct < 0);
   document.getElementById('heroUser').textContent = currentUser ? ('Halo, ' + currentUser.nama + ' — selamat berjualan hari ini.') : 'Selamat berjualan hari ini.';
-  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • v4-40') : 'Kasir • v4-40';
+  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • v4-41') : 'Kasir • v4-41';
   var bb = document.getElementById('bellBadge');
   if (bb) { var sm = Number(r.stokMenipis || 0); bb.style.display = sm > 0 ? 'flex' : 'none'; bb.textContent = sm > 99 ? '99+' : String(sm); }
   isiNotifPanel();
@@ -993,12 +1058,11 @@ function renderAll() {
     ['Piutang (Belum Lunas)', rp(r.piutang)], ['Hutang ke Pemasok', rp(r.hutang)],
     ['Saldo Kas', rp(r.saldoKas)], ['Stok Menipis', r.stokMenipis || 0]
   ].map(function (x) { return '<div class="card stat"><span>' + x[0] + '</span><b>' + x[1] + '</b></div>'; }).join('');
-  document.getElementById('terlaris').innerHTML = (r.terlaris || []).map(function (x) { return esc(x.nama) + ' — ' + x.qty + ' terjual'; }).join('<br>') || 'Belum ada penjualan.';
-  document.getElementById('pelangganTop').innerHTML = (r.pelangganTop || []).map(function (x) { return esc(x.nama) + ' — ' + rp(x.total); }).join('<br>') || 'Belum ada data.';
+  renderTerlaris(r);
+  renderPelangganTop(r);
   renderStokTipis(r);
   document.getElementById('kedaluwarsaBox').innerHTML = ((r.kedaluwarsaList || []).map(function (b) { return esc(b.nama || b.NamaProduk || '') + ' — kedaluwarsa ' + (b.Kedaluwarsa || ''); }).join('<br>')) || 'Tidak ada batch mendekati kedaluwarsa.';
-  var target = targetHarianEfektif();
-  document.getElementById('targetBox').innerHTML = target > 0 ? 'Target: ' + rp(target) + ' • Tercapai hari ini: ' + rp(r.omzetHariIni) + ' (' + Math.round((r.omzetHariIni || 0) / target * 100) + '%)<div style="background:#e2e8f0;height:12px;border-radius:999px;overflow:hidden;margin-top:8px"><div style="background:#0f766e;height:12px;width:' + Math.min(100, (r.omzetHariIni || 0) / target * 100) + '%"></div></div>' : 'Belum ada target harian. Atur di Pengaturan > Target Omzet Harian.';
+  renderTargetHarian(r);
   var a7 = r.analitik7 || {}, a28 = r.analitik28 || {};
   document.getElementById('analitikBox').innerHTML = '7 hari: omzet ' + rp(a7.omzet) + ' • laba ' + rp(a7.laba) + ' • ' + (a7.jumlah || 0) + ' transaksi<br>28 hari: omzet ' + rp(a28.omzet) + ' • laba ' + rp(a28.laba) + ' • ' + (a28.jumlah || 0) + ' transaksi';
   var perHari = a7.perHari || [];
@@ -2463,12 +2527,31 @@ async function simpanProduk() {
   try { await DB.upsertProduk(payload); } catch (e) { tampilError('Gagal menyimpan produk: ' + (e.message || e)); return; }
   await loadData(); resetProduk(); tampilInfo('Produk tersimpan.');
 }
-/* ---------- SALIN PRODUK ANTAR CABANG (v4-40) ----------
+/* ---------- SALIN PRODUK ANTAR CABANG (v4-41) ----------
    Menyalin data master produk dari cabang lain ke cabang sesi TANPA stok
-   (stok di cabang tujuan mulai 0); nama yang sudah ada di tujuan dilewati. */
+   (stok di cabang tujuan mulai 0); nama yang sudah ada di tujuan dilewati.
+   v4-41: (a) modal sumber DITUTUP dulu sebelum konfirmasi dibuka, dan
+   z-index konfirmasi (96) di atas modal salin (91) — konfirmasi tidak
+   lagi ter-render di bawah dialog sumber; bila batal, modal sumber
+   dibuka lagi dengan pilihan dicentang seperti semula. (b) daftar centang
+   produk sumber (default semua tercentang) + "Pilih semua / Hapus semua
+   pilihan" — hanya yang dicentang yang disalin (ids ke DB); bila data
+   layer lama belum kenal ids (galat menyebut ids), fallback salin semua. */
+function produkCabang(id) { return (DATA.produk || []).filter(function (p) { return String((p && p.CabangID) || cabangPertamaId()) === String(id); }); }
+function isiDaftarSalinProduk(dariId) {
+  var box = document.getElementById('salinDaftar'); var jml = document.getElementById('salinJumlah');
+  if (!box) return;
+  var list = dariId ? produkCabang(dariId).filter(produkAktif) : [];
+  if (jml) jml.textContent = list.length ? list.length + ' produk di cabang sumber — centang yang mau disalin.' : 'Belum ada produk di cabang sumber.';
+  box.innerHTML = list.length ? list.map(function (p) { return '<label class="checkrow" style="padding:8px 0"><input type="checkbox" class="salinChk" value="' + esc(p.ID) + '" checked> ' + esc(p.Nama) + ' <span style="color:#64748b;font-size:13px">• ' + rp(p.HargaJual || 0) + '</span></label>'; }).join('') : '<div style="color:#64748b;font-size:13px;padding:6px 0">Tidak ada produk untuk disalin.</div>';
+}
+function aturSemuaSalin(ya) { document.querySelectorAll('.salinChk').forEach(function (c) { c.checked = !!ya; }); }
+function salinProdukTerpilih() { var ids = []; document.querySelectorAll('.salinChk').forEach(function (c) { if (c.checked) ids.push(c.value); }); return ids; }
 function bukaSalinProduk() {
   var sel = document.getElementById('salinCabangSumber');
-  if (sel) sel.innerHTML = (DATA.cabang || []).filter(function (c) { return String(c.ID) !== String(cabangSesiId()); }).map(function (c) { return '<option value="' + esc(c.ID) + '">' + esc(c.Nama) + '</option>'; }).join('');
+  var lain = (DATA.cabang || []).filter(function (c) { return String(c.ID) !== String(cabangSesiId()); });
+  if (sel) { sel.innerHTML = lain.map(function (c) { return '<option value="' + esc(c.ID) + '">' + esc(c.Nama) + '</option>'; }).join(''); if (!sel.value && lain.length) sel.value = lain[0].ID; }
+  if (typeof isiDaftarSalinProduk === 'function') isiDaftarSalinProduk(sel && sel.value ? sel.value : (lain[0] && lain[0].ID) || '');
   var m = document.getElementById('salinModal'); if (m) m.style.display = 'block';
   var b = document.getElementById('salinBackdrop'); if (b) b.style.display = 'block';
 }
@@ -2482,10 +2565,35 @@ async function jalankanSalinProduk() {
   if (!dari) return tampilError('Pilih cabang sumber dulu.');
   var sumber = (DATA.cabang || []).find(function (c) { return String(c.ID) === String(dari); });
   var namaSumber = sumber ? sumber.Nama : dari;
-  if (!await konfirmasi('Salin produk dari ' + namaSumber + '?', 'Data master produk disalin TANPA stok (stok di cabang ini mulai 0). Produk yang namanya sudah ada di cabang ini dilewati.', 'Ya, Salin', 'primary')) return;
+  // Daftar centang (bila ada): hanya yang dicentang yang disalin.
+  var adaDaftar = false, ids = [];
+  if (typeof salinProdukTerpilih === 'function') {
+    try { adaDaftar = document.querySelectorAll('.salinChk').length > 0; ids = salinProdukTerpilih(); } catch (e) { adaDaftar = false; ids = []; }
+  }
+  if (adaDaftar && !ids.length) return tampilError('Pilih minimal satu produk untuk disalin.');
+  var pesan = 'Data master produk disalin TANPA stok (stok di cabang ini mulai 0). Produk yang namanya sudah ada di cabang ini dilewati.';
+  if (adaDaftar) pesan = ids.length + ' produk dipilih dari ' + namaSumber + '. ' + pesan;
+  // Tutup dialog sumber DULU supaya konfirmasi tampil di atas (bukan di bawah).
+  tutupSalinProduk();
+  if (!await konfirmasi('Salin produk dari ' + namaSumber + '?', pesan, 'Ya, Salin', 'primary')) {
+    // Batal: buka lagi dialog sumber dengan pilihan seperti semula.
+    bukaSalinProduk();
+    if (sel) sel.value = dari;
+    if (typeof isiDaftarSalinProduk === 'function') isiDaftarSalinProduk(dari);
+    if (adaDaftar) { try { document.querySelectorAll('.salinChk').forEach(function (c) { c.checked = ids.indexOf(c.value) > -1; }); } catch (e) {} }
+    return;
+  }
   try {
-    var res = await DB.salinProdukAntarCabang({ dariCabangId: dari, keCabangId: cabangSesiId() });
-    tutupSalinProduk();
+    var res;
+    try {
+      var args = { dariCabangId: dari, keCabangId: cabangSesiId() };
+      if (ids.length) args.ids = ids;
+      res = await DB.salinProdukAntarCabang(args);
+    } catch (e) {
+      // Data layer lama belum kenal ids — ulangi tanpa ids (salin semua).
+      if (ids.length && /ids/i.test(String((e && e.message) || e))) res = await DB.salinProdukAntarCabang({ dariCabangId: dari, keCabangId: cabangSesiId() });
+      else throw e;
+    }
     await loadData();
     var teks = 'Disalin ' + (res.disalin || 0) + ' produk, ' + (res.dilewati || 0) + ' dilewati.';
     if (res.dilewatiNama && res.dilewatiNama.length) teks += ' Dilewati: ' + res.dilewatiNama.slice(0, 5).join(', ') + (res.dilewatiNama.length > 5 ? ', …' : '');
@@ -3612,7 +3720,7 @@ function strukKeHtml(teks) {
 async function simpanPengaturan() {
   var payload = { NamaToko: document.getElementById('sNama').value, AlamatToko: document.getElementById('sAlamat').value, KotaToko: document.getElementById('sKota').value, TeleponToko: document.getElementById('sTelp').value, FooterStruk: document.getElementById('sFooter').value, SloganToko: document.getElementById('sSlogan').value, TargetHarian: parseUang(document.getElementById('sTarget').value), NomorPemilikWA: document.getElementById('sWa').value, JatuhTempoHari: document.getElementById('sJatuhTempo').value, PoinAktif: document.getElementById('sPoinAktif').value, PoinPerRupiah: document.getElementById('sPoinPer').value, PoinTukarRate: document.getElementById('sPoinRate').value, PajakAktif: document.getElementById('sPajakAktif').value, PajakPersen: document.getElementById('sPajakPersen').value, Bahasa: document.getElementById('sBahasa').value, FormatTanggal: document.getElementById('sFormatTanggal').value, ModeGelap: document.getElementById('sGelap').value, TampilkanPoinStruk: document.getElementById('sPoinStruk').value, WatermarkStruk: document.getElementById('sWatermark').value, StrukUkuranKertas: document.getElementById('sKertas').value, ModeMejaAktif: document.getElementById('sMeja').value, PromoAktif: document.getElementById('sPromo').value, MultiCabangAktif: document.getElementById('sMultiCabang').value, LogoToko: logoDataUrl, Logo2: logo2DataUrl, Watermark: watermarkDataUrl };
   await DB.simpanPengaturan(payload);
-  // v4-40: target harian per cabang (best-effort; TargetHarian global di payload tetap jadi fallback).
+  // v4-41: target harian per cabang (best-effort; TargetHarian global di payload tetap jadi fallback).
   try { if (typeof DB !== 'undefined' && DB && typeof DB.tulisTargetCabang === 'function') { var _tt = DB.tulisTargetCabang(cabangSesiId(), parseUang(document.getElementById('sTarget').value)); if (_tt && _tt.catch) _tt.catch(function () {}); } } catch (e) {}
   document.body.classList.toggle('dark', payload.ModeGelap === 'YA');
   var cb = document.getElementById('sCabangAktif').value;
@@ -3625,7 +3733,27 @@ async function simpanCabang() {
   ['cbNama', 'cbAlamat', 'cbTelp'].forEach(function (i) { document.getElementById(i).value = ''; });
   await loadData(); tutupForm('pengaturan'); tampilInfo('Cabang tersimpan.');
 }
-async function hapusCabang(id, el) { if (!await konfirmasi('Hapus cabang?', 'Cabang ini akan dihapus.', 'Ya, Hapus', 'danger')) return; try { await DB.hapusCabang({ id: id }); await loadData(); tampilInfo('Cabang dihapus.'); } catch (e) { tampilError('Gagal menghapus cabang: ' + (e.message || e)); } }
+/* v4-41: hapus cabang memakai hasil DB.hapusCabang — bila ditolak karena
+   riwayat ({ok:false, alasan, jumlah:{transaksi, pembelian, kas}}),
+   tampilkan alasannya; bila berhasil dengan rincian {dihapus:{produk,
+   pelanggan, pemasok}}, sebutkan yang ikut terhapus; bila kembalian lama
+   (hanya {ok:true}), toast berhasil biasa. */
+async function hapusCabang(id, el) {
+  if (!await konfirmasi('Hapus cabang?', 'Cabang ini akan dihapus.', 'Ya, Hapus', 'danger')) return;
+  try {
+    var res = await DB.hapusCabang({ id: id });
+    if (res && res.ok === false) {
+      var j = res.jumlah || {};
+      var rincian = ((j.transaksi || 0) || (j.pembelian || 0) || (j.kas || 0)) ? ' (' + (j.transaksi || 0) + ' transaksi, ' + (j.pembelian || 0) + ' pembelian, ' + (j.kas || 0) + ' kas)' : '';
+      tampilError('Cabang tidak bisa dihapus: ' + (res.alasan || 'masih ada riwayat.') + rincian);
+      return;
+    }
+    await loadData();
+    if (res && res.dihapus) tampilInfo('Cabang dihapus. (' + (res.dihapus.produk || 0) + ' produk, ' + (res.dihapus.pelanggan || 0) + ' pelanggan, ' + (res.dihapus.pemasok || 0) + ' pemasok ikut terhapus.)');
+    else tampilInfo('Cabang dihapus.');
+  } catch (e) { tampilError('Gagal menghapus cabang: ' + (e.message || e)); }
+}
+/* v4-41: guard kunci hanya menolak Kasir terkunci — Admin selalu lolos. */
 async function setCabangAktif(id) { if (cabangTerkunci()) { tampilError('Cabang Anda terkunci oleh Admin.'); return; } await DB.setCabangAktif({ id: id }); await loadData(); tampilInfo('Cabang aktif diganti.'); }
 async function simpanTerjemahan() {
   var istilah = ['Kasir', 'Pelanggan', 'Lunas', 'Kurang', 'Belum Dibayar', 'Total', 'Subtotal', 'Kembali', 'Proses', 'Selesai', 'Diambil', 'Antri'];

@@ -10,7 +10,7 @@
 // - Naikkan CACHE_NAME setiap kali app shell berubah.
 // ============================================================
 
-var CACHE_NAME = 'zho-pos-v4-40';
+var CACHE_NAME = 'zho-pos-v4-41';
 
 var APP_SHELL = [
   './',
