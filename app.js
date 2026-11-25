@@ -1039,7 +1039,7 @@ function renderAll() {
   vsEl.textContent = (pct >= 0 ? '+' : '') + pct + '% vs kemarin';
   vsEl.classList.toggle('down', pct < 0);
   document.getElementById('heroUser').textContent = currentUser ? ('Halo, ' + currentUser.nama + ' — selamat berjualan hari ini.') : 'Selamat berjualan hari ini.';
-  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • v4-41') : 'Kasir • v4-41';
+  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • v4-42') : 'Kasir • v4-42';
   var bb = document.getElementById('bellBadge');
   if (bb) { var sm = Number(r.stokMenipis || 0); bb.style.display = sm > 0 ? 'flex' : 'none'; bb.textContent = sm > 99 ? '99+' : String(sm); }
   isiNotifPanel();
@@ -3733,10 +3733,11 @@ async function simpanCabang() {
   ['cbNama', 'cbAlamat', 'cbTelp'].forEach(function (i) { document.getElementById(i).value = ''; });
   await loadData(); tutupForm('pengaturan'); tampilInfo('Cabang tersimpan.');
 }
-/* v4-41: hapus cabang memakai hasil DB.hapusCabang — bila ditolak karena
-   riwayat ({ok:false, alasan, jumlah:{transaksi, pembelian, kas}}),
-   tampilkan alasannya; bila berhasil dengan rincian {dihapus:{produk,
-   pelanggan, pemasok}}, sebutkan yang ikut terhapus; bila kembalian lama
+/* v4-42: hapus cabang memakai hasil DB.hapusCabang — bila ditolak karena
+   riwayat ({ok:false, alasan, jumlah:{transaksi, pembelian, kas, kasNet}}),
+   tampilkan alasannya + "kas net Rp X" bila kasNet ≠ 0; bila berhasil
+   dengan rincian {dihapus:{produk, pelanggan, pemasok, kas}}, sebutkan
+   yang ikut terhapus (kas hanya bila > 0); bila kembalian lama
    (hanya {ok:true}), toast berhasil biasa. */
 async function hapusCabang(id, el) {
   if (!await konfirmasi('Hapus cabang?', 'Cabang ini akan dihapus.', 'Ya, Hapus', 'danger')) return;
@@ -3744,12 +3745,12 @@ async function hapusCabang(id, el) {
     var res = await DB.hapusCabang({ id: id });
     if (res && res.ok === false) {
       var j = res.jumlah || {};
-      var rincian = ((j.transaksi || 0) || (j.pembelian || 0) || (j.kas || 0)) ? ' (' + (j.transaksi || 0) + ' transaksi, ' + (j.pembelian || 0) + ' pembelian, ' + (j.kas || 0) + ' kas)' : '';
+      var rincian = ((j.transaksi || 0) || (j.pembelian || 0) || (j.kas || 0)) ? ' (' + (j.transaksi || 0) + ' transaksi, ' + (j.pembelian || 0) + ' pembelian, ' + (j.kas || 0) + ' kas' + (((j.kasNet || 0) !== 0) ? ', kas net ' + rp(j.kasNet) : '') + ')' : '';
       tampilError('Cabang tidak bisa dihapus: ' + (res.alasan || 'masih ada riwayat.') + rincian);
       return;
     }
     await loadData();
-    if (res && res.dihapus) tampilInfo('Cabang dihapus. (' + (res.dihapus.produk || 0) + ' produk, ' + (res.dihapus.pelanggan || 0) + ' pelanggan, ' + (res.dihapus.pemasok || 0) + ' pemasok ikut terhapus.)');
+    if (res && res.dihapus) tampilInfo('Cabang dihapus. (' + (res.dihapus.produk || 0) + ' produk, ' + (res.dihapus.pelanggan || 0) + ' pelanggan, ' + (res.dihapus.pemasok || 0) + ' pemasok' + ((res.dihapus.kas || 0) > 0 ? ', ' + (res.dihapus.kas || 0) + ' entri kas' : '') + ' ikut terhapus.)');
     else tampilInfo('Cabang dihapus.');
   } catch (e) { tampilError('Gagal menghapus cabang: ' + (e.message || e)); }
 }

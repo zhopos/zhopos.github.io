@@ -1,5 +1,5 @@
 /* ============================================================
-   ZPOS v4-41 — Lapisan Data
+   ZPOS v4-42 — Lapisan Data
    - Bila SUPABASE_URL / SUPABASE_ANON_KEY di config.js terisi,
      semua baca/tulis memakai Supabase (tabel snake_case).
    - Bila kosong, dipakai DATA CONTOH di bawah (in-memory) sehingga
@@ -12,6 +12,9 @@
      yang belum ada (migrasi v441 belum jalan), checkout memastikan
      Umum cabang dulu (anti transaksi hantu), salin produk bisa
      memilih ids, hapus cabang menolak bila masih ada riwayat.
+   - v4-42: hapus cabang menghitung NET kas (Σ Masuk − Σ Keluar),
+     bukan jumlah baris kas — kas net 0 boleh dihapus dan baris kas
+     cabang ikut terhapus; kas net ≠ 0 tetap menolak.
    ============================================================ */
 (function () {
   'use strict';
@@ -1581,14 +1584,24 @@
     if (ex) return ex;
     return upsertPelanggan({ Nama: 'Umum', CabangID: cb });
   }
-  // v4-41: hapus cabang AMAN — menolak bila cabang masih punya riwayat
-  // (transaksi/pembelian/kas dengan CabangID persis cabang itu; baris
-  // legacy tanpa cabang TIDAK dihitung). Bila tanpa riwayat: hapus
-  // dulu semua produk cabang itu (eksplisit — produk.cabang_id memakai
-  // ON DELETE SET NULL, jadi tanpa hapus eksplisit produk jadi yatim),
-  // lalu pelanggan & pemasok cabang itu yang tanpa riwayat, lalu
-  // cabangnya. stok_cabang ikut terhapus oleh DB (ON DELETE CASCADE)
-  // dan dibersihkan juga dari DATA in-memory.
+  // v4-42: hapus cabang AMAN — menolak bila cabang masih punya riwayat
+  // (transaksi/pembelian dengan CabangID persis cabang itu, ATAU kas
+  // dengan NET ≠ 0). Kas adalah buku besar permanen: penjualan yang
+  // dibatalkan meninggalkan 2 baris kas (+Masuk dan −Keluar, net 0),
+  // dan baris kas tidak pernah dihapus dari UI — jadi menghitung
+  // JUMLAH baris kas (aturan v4-41) membuat cabang yang pernah
+  // berjualan lalu membatalkan semua transaksinya tidak bisa dihapus
+  // selamanya (kasus "TES Cabang 2", uji live v4-41). Yang dihitung
+  // kini net kas = Σ Masuk − Σ Keluar dari baris kas cabang itu;
+  // net 0 berarti kas sudah lunas dan cabang boleh dihapus — baris
+  // kasnya ikut terhapus eksplisit bersama produk/pelanggan/pemasok.
+  // Baris legacy tanpa CabangID TIDAK dihitung dan TIDAK dihapus.
+  // Bila tanpa riwayat: hapus dulu semua produk cabang itu
+  // (eksplisit — produk.cabang_id memakai ON DELETE SET NULL, jadi
+  // tanpa hapus eksplisit produk jadi yatim), lalu pelanggan &
+  // pemasok cabang itu yang tanpa riwayat, lalu cabangnya.
+  // stok_cabang ikut terhapus oleh DB (ON DELETE CASCADE) dan
+  // dibersihkan juga dari DATA in-memory.
   async function hapusCabang(payload) {
     if (!DATA) await loadAll();
     var id = (payload && (payload.id || payload.ID)) || '';
@@ -1596,9 +1609,13 @@
     if (!cb) throw new Error('Cabang tidak ditemukan.');
     var jmlTrx = (DATA.transaksi || []).filter(function (t) { return String(t.CabangID || '') === String(id); }).length;
     var jmlBeli = (DATA.pembelian || []).filter(function (p) { return String(p.CabangID || '') === String(id); }).length;
-    var jmlKas = (DATA.kas || []).filter(function (k) { return String(k.CabangID || '') === String(id); }).length;
-    if (jmlTrx > 0 || jmlBeli > 0 || jmlKas > 0) {
-      return { ok: false, alasan: 'Cabang "' + (cb.Nama || id) + '" masih punya riwayat dan tidak bisa dihapus.', jumlah: { transaksi: jmlTrx, pembelian: jmlBeli, kas: jmlKas } };
+    var kasCabang = (DATA.kas || []).filter(function (k) { return String(k.CabangID || '') === String(id); });
+    var jmlKas = kasCabang.length;
+    // v4-42: net kas — baris in-memory selalu PascalCase (toPascal di
+    // loadAll; kode tulis memakai Masuk/Keluar), seperti saldoKasCabang.
+    var kasNet = kasCabang.reduce(function (a, k) { return a + Number(k.Masuk || 0) - Number(k.Keluar || 0); }, 0);
+    if (jmlTrx > 0 || jmlBeli > 0 || kasNet !== 0) {
+      return { ok: false, alasan: 'Cabang "' + (cb.Nama || id) + '" masih punya riwayat dan tidak bisa dihapus.', jumlah: { transaksi: jmlTrx, pembelian: jmlBeli, kas: jmlKas, kasNet: kasNet } };
     }
     // Tanpa riwayat: pelanggan/pemasok cabang ini otomatis tanpa
     // riwayat juga (riwayat pelanggan = transaksi, riwayat pemasok =
@@ -1618,8 +1635,14 @@
     for (var j = 0; j < pelangganHapus.length; j++) await hapusDari('pelanggan', 'pelanggan', pelangganHapus[j].ID);
     var pemasokHapus = (DATA.pemasok || []).filter(function (x) { return String(x.CabangID || '') === String(id); });
     for (var k = 0; k < pemasokHapus.length; k++) await hapusDari('pemasok', 'pemasok', pemasokHapus[k].ID);
+    // v4-42: kas net 0 — hapus juga baris kas cabang ini (eksplisit
+    // dari DB + DATA in-memory, seperti produk; baris legacy tanpa
+    // CabangID bukan milik cabang ini dan tetap ada).
+    var kasHapus = kasCabang.length;
+    DATA.kas = (DATA.kas || []).filter(function (x) { return String(x.CabangID || '') !== String(id); });
+    await hapusBarisWhere('kas', 'cabang_id', id);
     await hapusDari('cabang', 'cabang', id);
-    return { ok: true, dihapus: { produk: produkHapus.length, pelanggan: pelangganHapus.length, pemasok: pemasokHapus.length } };
+    return { ok: true, dihapus: { produk: produkHapus.length, pelanggan: pelangganHapus.length, pemasok: pemasokHapus.length, kas: kasHapus } };
   }
   async function setCabangAktif(payload) {
     if (!DATA) await loadAll();
