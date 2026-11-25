@@ -919,7 +919,7 @@ function renderAll() {
   vsEl.textContent = (pct >= 0 ? '+' : '') + pct + '% vs kemarin';
   vsEl.classList.toggle('down', pct < 0);
   document.getElementById('heroUser').textContent = currentUser ? ('Halo, ' + currentUser.nama + ' — selamat berjualan hari ini.') : 'Selamat berjualan hari ini.';
-  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • v4-37') : 'Kasir • v4-37';
+  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • v4-38') : 'Kasir • v4-38';
   var bb = document.getElementById('bellBadge');
   if (bb) { var sm = Number(r.stokMenipis || 0); bb.style.display = sm > 0 ? 'flex' : 'none'; bb.textContent = sm > 99 ? '99+' : String(sm); }
   isiNotifPanel();
@@ -1030,6 +1030,17 @@ function emojiProduk(nama) {
   if (n.indexOf('ongkir') >= 0) return ikon('truck', 20);
   return ikon('box', 20);
 }
+/* v4-38: foto produk — tampilkan gambar bila ada, ikon bila tidak/rusak.
+   Dipakai kasir (.prod-thumb) dan katalog (inline kecil). */
+function adaGambarProduk(p) { var u = (p && p.GambarURL) || ''; return typeof u === 'string' && u.trim() !== ''; }
+function gagalGambar(el, nama) { // onerror: ganti <img> rusak dengan ikon
+  try { var s = document.createElement('span'); s.innerHTML = emojiProduk(nama); var ic = s.firstChild; if (ic && el.parentNode) el.parentNode.replaceChild(ic, el); } catch (e) { if (el) el.style.display = 'none'; }
+}
+function imgProduk(p, kelas) {
+  return '<img src="' + esc(p.GambarURL) + '" class="' + (kelas || 'prod-img') + '" alt="" onerror="gagalGambar(this,\'' + escJS(p.Nama) + '\')">';
+}
+function thumbProduk(p) { return adaGambarProduk(p) ? imgProduk(p, 'prod-img') : emojiProduk(p.Nama); }
+function ikonAtauGambarKatalog(p) { return adaGambarProduk(p) ? imgProduk(p, 'kat-thumb') : emojiProduk(p.Nama); }
 function renderProdukKasir() {
   var q = (document.getElementById('cariProduk').value || '').toLowerCase();
   document.getElementById('produkKasir').innerHTML = (DATA.produk || []).filter(function (p) { return produkAktif(p) && (!q || (p.Nama || '').toLowerCase().indexOf(q) >= 0 || String(p.SKU || p['SKU/Barcode'] || '').toLowerCase().indexOf(q) >= 0); })
@@ -1042,7 +1053,7 @@ function renderProdukKasir() {
         : diKeranjang > 0
         ? '<span class="qty-ctl"><button onclick="event.stopPropagation();ubahQtyKasir(\'' + esc(p.ID) + '\',-1)">−</button><b class="qty-badge">' + diKeranjang + '</b><button onclick="event.stopPropagation();ubahQtyKasir(\'' + esc(p.ID) + '\',1)">+</button></span>'
         : '<button class="qty-add" onclick="event.stopPropagation();addToCart(\'' + esc(p.ID) + '\')">+</button>';
-      return '<div class="prod-row"' + (habis ? '' : ' onclick="addToCart(\'' + esc(p.ID) + '\')"') + '><span style="display:flex;gap:10px;align-items:center"><span class="prod-thumb">' + emojiProduk(p.Nama) + '</span><span><b>' + esc(p.Nama) + '</b><br><small class="price">' + rp(p.HargaJual) + '</small><br><small class="' + (stok <= 0 ? 'red' : '') + '">Stok: ' + stok + '</small></span></span>' + kanan + '</div>';
+      return '<div class="prod-row"' + (habis ? '' : ' onclick="addToCart(\'' + esc(p.ID) + '\')"') + '><span style="display:flex;gap:10px;align-items:center"><span class="prod-thumb">' + thumbProduk(p) + '</span><span><b>' + esc(p.Nama) + '</b><br><small class="price">' + rp(p.HargaJual) + '</small><br><small class="' + (stok <= 0 ? 'red' : '') + '">Stok: ' + stok + '</small></span></span>' + kanan + '</div>';
     }).join('') || 'Produk tidak ditemukan.';
 }
 function ubahQtyKasir(id, delta) {
@@ -3141,7 +3152,7 @@ function renderKatalog() {
     // nonaktif seperti TES Kopi ikut tampil di pratinjau (99 vs 98).
     var prods = (DATA.produk || []).filter(function (p) { return produkAktif(p) && flagYa(p.TampilkanDiKatalog); });
     document.getElementById('katalogPreview').innerHTML = '<h4>' + esc(k.Nama) + '</h4>' + prods.map(function (p) {
-      return '<div class="cart-item"><span>' + (k.TampilkanGambar === 'YA' ? emojiProduk(p.Nama) + ' ' : '') + esc(p.Nama) + (k.TampilkanKeterangan === 'YA' && p.Keterangan ? '<br><small>' + esc(p.Keterangan) + '</small>' : '') + '</span><span>' + (k.TampilkanHarga === 'YA' ? rp(p.HargaJual) : '') + ' <button class="secondary" onclick="window.open(\'https://wa.me/' + String((DATA.pengaturan.TeleponToko || '')).replace(/\D/g, '') + '?text=' + encodeURIComponent('Halo, saya mau pesan ' + p.Nama) + '\',\'_blank\')">' + ikon('chat', 16) + ' Pesan</button></span></div>';
+      return '<div class="cart-item"><span>' + (k.TampilkanGambar === 'YA' ? ikonAtauGambarKatalog(p) + ' ' : '') + esc(p.Nama) + (k.TampilkanKeterangan === 'YA' && p.Keterangan ? '<br><small>' + esc(p.Keterangan) + '</small>' : '') + '</span><span>' + (k.TampilkanHarga === 'YA' ? rp(p.HargaJual) : '') + ' <button class="secondary" onclick="window.open(\'https://wa.me/' + String((DATA.pengaturan.TeleponToko || '')).replace(/\D/g, '') + '?text=' + encodeURIComponent('Halo, saya mau pesan ' + p.Nama) + '\',\'_blank\')">' + ikon('chat', 16) + ' Pesan</button></span></div>';
     }).join('') + (k.Footer ? '<p style="color:#64748b;font-size:13px">' + esc(k.Footer) + '</p>' : '');
   } else {
     document.getElementById('katalogPreview').innerHTML = 'Belum ada katalog.';
@@ -3176,7 +3187,7 @@ async function tampilKatalogPublik(id) {
     if (flagYa(k.SembunyikanStokKosong)) prods = prods.filter(function (x) { return Number(x.Stok || 0) > 0; });
     var wa = String(p.TeleponToko || '').replace(/\D/g, '');
     body.innerHTML = '<h3>' + esc(p.NamaToko || 'ZPOS') + '</h3><h4>' + esc(k.Nama) + '</h4>' + prods.map(function (x) {
-      return '<div class="cart-item"><span>' + (flagYa(k.TampilkanGambar) ? emojiProduk(x.Nama) + ' ' : '') + esc(x.Nama) + (flagYa(k.TampilkanKeterangan) && x.Keterangan ? '<br><small>' + esc(x.Keterangan) + '</small>' : '') + (flagYa(k.TampilkanStok) ? '<br><small>Stok: ' + Number(x.Stok || 0) + '</small>' : '') + '</span><span>' + (flagYa(k.TampilkanHarga) ? rp(x.HargaJual) : '') + ' <button class="secondary" onclick="window.open(\'https://wa.me/' + wa + '?text=' + encodeURIComponent('Halo, saya mau pesan ' + x.Nama) + '\',\'_blank\')">' + ikon('chat', 16) + ' Pesan</button></span></div>';
+      return '<div class="cart-item"><span>' + (flagYa(k.TampilkanGambar) ? ikonAtauGambarKatalog(x) + ' ' : '') + esc(x.Nama) + (flagYa(k.TampilkanKeterangan) && x.Keterangan ? '<br><small>' + esc(x.Keterangan) + '</small>' : '') + (flagYa(k.TampilkanStok) ? '<br><small>Stok: ' + Number(x.Stok || 0) + '</small>' : '') + '</span><span>' + (flagYa(k.TampilkanHarga) ? rp(x.HargaJual) : '') + ' <button class="secondary" onclick="window.open(\'https://wa.me/' + wa + '?text=' + encodeURIComponent('Halo, saya mau pesan ' + x.Nama) + '\',\'_blank\')">' + ikon('chat', 16) + ' Pesan</button></span></div>';
     }).join('') + (k.Footer ? '<p style="color:#64748b;font-size:13px">' + esc(k.Footer) + '</p>' : '');
   } catch (e) { body.innerHTML = '<p style="color:#64748b">Gagal memuat katalog: ' + esc(e.message || e) + '</p>'; }
 }
