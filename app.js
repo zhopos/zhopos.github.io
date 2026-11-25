@@ -910,6 +910,27 @@ var SHORTCUT_GROUPS = [
   ['Uang', [['pembelian', ikon('bag', 20) + ' Pembelian'], ['pengeluaran', ikon('out', 20) + ' Pengeluaran'], ['aruskas', ikon('refresh', 20) + ' Arus Kas'], ['utang', ikon('card', 20) + ' Utang']]],
   ['Laporan', [['laporan', ikon('trend', 20) + ' Laporan'], ['pelanggan', ikon('users', 20) + ' Pelanggan'], ['pengaturan', ikon('gear', 20) + ' Pengaturan']]]
 ];
+/* v4-39: kartu Stok Menipis ringkas — maks 5 paling kritis (stok menaik),
+   ringkasan "X habis • Y menipis", badge jumlah, tombol Lihat semua bila > 5.
+   Data (stokTipisList) tidak diubah; pengurutan hanya saat render. */
+function renderStokTipis(r) {
+  var box = document.getElementById('stokTipis');
+  var badge = document.getElementById('stokTipisBadge');
+  var list = (r.stokTipisList || []).slice().sort(function (a, b) { return Number(a.stok || 0) - Number(b.stok || 0); });
+  var total = list.length;
+  if (badge) { badge.style.display = total > 0 ? 'inline-block' : 'none'; if (total > 0) badge.textContent = total + ' produk'; }
+  if (!total) { box.innerHTML = 'Semua stok aman.'; return; }
+  var habis = 0; list.forEach(function (p) { if (Number(p.stok || 0) <= 0) habis++; });
+  var html = '<div style="font-size:13px;color:#64748b;margin-bottom:8px">' + habis + ' habis • ' + (total - habis) + ' menipis</div>';
+  html += list.slice(0, 5).map(function (p) {
+    var s = Number(p.stok || 0);
+    var sisa = 'sisa ' + s + ' ' + (p.satuan || '');
+    if (s <= 0) return esc(p.nama) + ' — ' + sisa + ' <b style="color:#dc2626">Habis</b>';
+    return esc(p.nama) + ' — <span style="color:#b45309">' + sisa + '</span>';
+  }).join('<br>');
+  if (total > 5) html += '<button class="primary" style="width:100%;margin-top:10px" onclick="go(\'stok\')">Lihat semua (' + total + ' produk)</button>';
+  box.innerHTML = html;
+}
 function renderAll() {
   var r = DATA.ringkasan || {};
   document.getElementById('heroOmzet').textContent = rp(r.omzetHariIni);
@@ -919,7 +940,7 @@ function renderAll() {
   vsEl.textContent = (pct >= 0 ? '+' : '') + pct + '% vs kemarin';
   vsEl.classList.toggle('down', pct < 0);
   document.getElementById('heroUser').textContent = currentUser ? ('Halo, ' + currentUser.nama + ' — selamat berjualan hari ini.') : 'Selamat berjualan hari ini.';
-  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • v4-38') : 'Kasir • v4-38';
+  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • v4-39') : 'Kasir • v4-39';
   var bb = document.getElementById('bellBadge');
   if (bb) { var sm = Number(r.stokMenipis || 0); bb.style.display = sm > 0 ? 'flex' : 'none'; bb.textContent = sm > 99 ? '99+' : String(sm); }
   isiNotifPanel();
@@ -940,7 +961,7 @@ function renderAll() {
   ].map(function (x) { return '<div class="card stat"><span>' + x[0] + '</span><b>' + x[1] + '</b></div>'; }).join('');
   document.getElementById('terlaris').innerHTML = (r.terlaris || []).map(function (x) { return esc(x.nama) + ' — ' + x.qty + ' terjual'; }).join('<br>') || 'Belum ada penjualan.';
   document.getElementById('pelangganTop').innerHTML = (r.pelangganTop || []).map(function (x) { return esc(x.nama) + ' — ' + rp(x.total); }).join('<br>') || 'Belum ada data.';
-  document.getElementById('stokTipis').innerHTML = ((r.stokTipisList || []).map(function (p) { return esc(p.nama) + ' — sisa ' + p.stok + ' ' + (p.satuan || ''); }).join('<br>')) || 'Semua stok aman.';
+  renderStokTipis(r);
   document.getElementById('kedaluwarsaBox').innerHTML = ((r.kedaluwarsaList || []).map(function (b) { return esc(b.nama || b.NamaProduk || '') + ' — kedaluwarsa ' + (b.Kedaluwarsa || ''); }).join('<br>')) || 'Tidak ada batch mendekati kedaluwarsa.';
   var target = Number(r.targetHarian || 0);
   document.getElementById('targetBox').innerHTML = target > 0 ? 'Target: ' + rp(target) + ' • Tercapai hari ini: ' + rp(r.omzetHariIni) + ' (' + Math.round((r.omzetHariIni || 0) / target * 100) + '%)<div style="background:#e2e8f0;height:12px;border-radius:999px;overflow:hidden;margin-top:8px"><div style="background:#0f766e;height:12px;width:' + Math.min(100, (r.omzetHariIni || 0) / target * 100) + '%"></div></div>' : 'Belum ada target harian. Atur di Pengaturan > Target Omzet Harian.';
