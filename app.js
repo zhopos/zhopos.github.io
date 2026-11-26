@@ -226,6 +226,10 @@ function navMundurProgram() {
 function terapkanLayar(L) {
   if (!L) L = { s: 'dashboard' };
   var s = L.s || 'dashboard';
+  // v4-44: render dari popstate yang meninggalkan Pengaturan — target
+  // kembali ke struk tidak berlaku lagi (navSinkronSesudahShow tidak
+  // jalan di jalur ini, jadi dibersihkan di sini).
+  if (s !== 'pengaturan' && typeof kembaliKeDetailDariPengaturan !== 'undefined') kembaliKeDetailDariPengaturan = '';
   NAV.tanpaRiwayat = true;
   try {
     show(s, (typeof document !== 'undefined' && document.querySelector) ? document.querySelector('nav button.menu[data-sec="' + s + '"]') : null);
@@ -250,6 +254,18 @@ function kembali() {
   if (L.s === 'bayar') { show('kasir', null); langkahKasir(2); return; }
   if (L.s === 'kasir' && L.k === 2) { langkahKasir(1); return; }
   if (L.s !== 'dashboard') { show('dashboard', null); return; }
+}
+// v4-44: tombol "← Kembali" di kartu Profil Toko. Bila Profil Toko dibuka
+// dari detail transaksi (target tercatat), kembali langsung ke struk itu;
+// bila tidak ada target (mis. dibuka dari drawer), pakai kembali() biasa.
+function kembaliDariProfil() {
+  var id = (typeof kembaliKeDetailDariPengaturan !== 'undefined' && kembaliKeDetailDariPengaturan) || '';
+  kembaliKeDetailDariPengaturan = '';
+  if (id) {
+    var t = (DATA.transaksi || []).find(function (x) { return x.ID === id; });
+    if (t) { bukaDetailTrx(id); return; }
+  }
+  kembali();
 }
 function saatPopstate(ev) {
   if (typeof NAV === 'undefined') return;
@@ -348,6 +364,11 @@ function navSinkronSesudahShow(id) {
   var baru = layarBaru(id, null, id === 'kasir' ? 1 : (id === 'bayar' ? 3 : undefined), d);
   if (samaLayar(baru, NAV.aktif)) return;
   var lama = NAV.aktif;
+  // v4-44: meninggalkan Pengaturan menuju layar lain — target kembali ke
+  // struk yang dicatat saat tombol Pengaturan di detail ditekan sudah
+  // tidak berlaku lagi (mencegah Kembali di Profil Toko melompat ke
+  // struk lama yang sudah ditinggalkan).
+  if (lama && lama.s === 'pengaturan' && id !== 'pengaturan' && typeof kembaliKeDetailDariPengaturan !== 'undefined') kembaliKeDetailDariPengaturan = '';
   NAV.aktif = baru; // lacak layar saat ini walau penjaga belum dipasang
   if (!NAV.siap) return;
   if (id === 'dashboard') { navGanti(baru); return; }
@@ -1039,7 +1060,7 @@ function renderAll() {
   vsEl.textContent = (pct >= 0 ? '+' : '') + pct + '% vs kemarin';
   vsEl.classList.toggle('down', pct < 0);
   document.getElementById('heroUser').textContent = currentUser ? ('Halo, ' + currentUser.nama + ' — selamat berjualan hari ini.') : 'Selamat berjualan hari ini.';
-  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • v4-43') : 'Kasir • v4-43';
+  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • v4-44') : 'Kasir • v4-44';
   var bb = document.getElementById('bellBadge');
   if (bb) { var sm = Number(r.stokMenipis || 0); bb.style.display = sm > 0 ? 'flex' : 'none'; bb.textContent = sm > 99 ? '99+' : String(sm); }
   isiNotifPanel();
@@ -1968,6 +1989,9 @@ function strukUlang(id) {
 }
 /* ---------- DETAIL TRANSAKSI ala Griyo (ketuk baris di Daftar) ---------- */
 var detailTrxId = '', detailTab = 'detail';
+// v4-44: struk asal yang dicatat saat tombol Pengaturan di detail transaksi
+// ditekan — dipakai tombol Kembali di Profil Toko. '' = tidak ada target.
+var kembaliKeDetailDariPengaturan = '';
 function detailTersortir() {
   return (DATA.transaksi || []).slice().sort(function (a, b) { return String(b.Tanggal || '') < String(a.Tanggal || '') ? -1 : 1; });
 }
@@ -1984,6 +2008,14 @@ async function bukaDetailTrx(id) {
   renderDetailTrx();
   show('detailTrx');
 }
+// v4-44: tombol Pengaturan di detail transaksi — catat struk asal sebelum
+// pindah ke Pengaturan, supaya tombol Kembali di Profil Toko bisa balik
+// ke struk yang sama (entri detail diganti navGanti saat pindah section,
+// jadi riwayat saja tidak cukup untuk kembali ke struk).
+function bukaPengaturanDariDetail() {
+  kembaliKeDetailDariPengaturan = detailTrxId || '';
+  show('pengaturan', document.querySelector('nav button.menu[data-sec="pengaturan"]'));
+}
 function detailTabKe(tab) {
   detailTab = tab;
   if (tab === 'tambah') tambahProdukId = '';
@@ -1999,7 +2031,7 @@ function renderDetailTrx() {
   var items = (DATA.detail || []).filter(function (x) { return x.TransaksiID === t.ID; });
   var no = trxNomor[t.ID] || '';
   var kode = t.KodeAlternatif || String(t.ID).slice(-6);
-  var html = '<div class="dhead"><button class="dhead-btn" onclick="kembali()">←</button><b>Transaksi #' + no + '</b><button class="dhead-btn" onclick="show(\'pengaturan\',document.querySelector(\'nav button.menu[data-sec=pengaturan]\'))">' + ikon('gear', 17) + '</button></div>';
+  var html = '<div class="dhead"><button class="dhead-btn" onclick="kembali()">←</button><b>Transaksi #' + no + '</b><button class="dhead-btn" onclick="bukaPengaturanDariDetail()">' + ikon('gear', 17) + '</button></div>';
   if (detailTab === 'retur') {
     html += '<div class="card" style="margin:12px"><h4 style="margin:0 0 4px">↩ Retur Item</h4>'
       + '<div style="font-size:13px;color:#64748b;margin-bottom:10px">Stok dikembalikan, total transaksi dikurangi. Centang item yang dikembalikan, atur jumlahnya — nominal dihitung otomatis (harga × jumlah).</div>'
@@ -2021,7 +2053,7 @@ function renderDetailTrx() {
       + '<div class="flex noprint"><button class="primary" style="flex:1" onclick="simpanTambahItem()">SIMPAN</button><button class="secondary" onclick="detailTabKe(\'detail\')">Batal</button></div></div>';
   } else if (detailTab === 'struk') {
     html += '<div class="struk-preview">' + (lastStruk ? '<div class="struk-box">' + strukKeHtml(lastStruk) + '</div>' : '<p style="color:#94a3b8;text-align:center">Struk tidak tersedia.</p>') + '</div>'
-      + '<div class="detail-tabs"><button class="detail-tab" onclick="show(\'pengaturan\',document.querySelector(\'nav button.menu[data-sec=pengaturan]\'))"><span>' + ikon('gear', 17) + '</span>Pengaturan</button><button class="detail-tab" onclick="window.print()"><span>' + ikon('printer', 17) + '</span>Cetak</button><button class="detail-tab" onclick="kirimWAGambar()"><span>' + ikon('chat', 17) + '</span>WhatsApp</button></div>';
+      + '<div class="detail-tabs"><button class="detail-tab" onclick="bukaPengaturanDariDetail()"><span>' + ikon('gear', 17) + '</span>Pengaturan</button><button class="detail-tab" onclick="window.print()"><span>' + ikon('printer', 17) + '</span>Cetak</button><button class="detail-tab" onclick="kirimWAGambar()"><span>' + ikon('chat', 17) + '</span>WhatsApp</button></div>';
   } else if (detailTab === 'bayar') {
     html += '<div class="card" style="margin:12px"><h4 style="margin:0 0 8px">' + ikon('banknote', 18) + ' Detil Pembayaran</h4>'
       + '<div class="drow"><span class="k">' + d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + jamMenit(d) + '</span><span>Total ' + rp(t.Total) + '</span></div>'
