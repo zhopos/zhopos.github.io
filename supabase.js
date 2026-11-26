@@ -1,5 +1,5 @@
 /* ============================================================
-   ZPOS v4-44 — Lapisan Data
+   ZPOS v4-45 — Lapisan Data
    - Bila SUPABASE_URL / SUPABASE_ANON_KEY di config.js terisi,
      semua baca/tulis memakai Supabase (tabel snake_case).
    - Bila kosong, dipakai DATA CONTOH di bawah (in-memory) sehingga
@@ -83,6 +83,20 @@
   // migrasi-cabang-v441.sql belum dijalankan. Diekspos ke UI sebagai
   // DB.kolomCabangBelumAda (getter) + DB.migrasiCabangBelumJalan().
   function migrasiCabangBelumJalan() { return !kolomCabangPelangganAda || !kolomCabangPemasokAda; }
+  // v4-45: probe proaktif — cek keberadaan kolom cabang_id saat data
+  // dimuat, supaya banner kuning tampil sejak awal sesi (dulu flag baru
+  // berubah setelah ada tulis pelanggan/pemasok yang ditolak server).
+  async function probeKolomCabang() {
+    if (MODE !== 'supabase' || !client || offlineMode) return;
+    try {
+      var r1 = await client.from('pelanggan').select('cabang_id').limit(1);
+      if (r1 && r1.error && galatKolomCabangTidakAda(r1.error)) kolomCabangPelangganAda = false;
+    } catch (e) { if (galatKolomCabangTidakAda(e)) kolomCabangPelangganAda = false; }
+    try {
+      var r2 = await client.from('pemasok').select('cabang_id').limit(1);
+      if (r2 && r2.error && galatKolomCabangTidakAda(r2.error)) kolomCabangPemasokAda = false;
+    } catch (e) { if (galatKolomCabangTidakAda(e)) kolomCabangPemasokAda = false; }
+  }
 
   /* ---------- util ---------- */
   function todayStr(d) {
@@ -273,10 +287,14 @@
     }
     // terlaris & pelanggan top (cabang efektif saja; detail tidak punya
     // CabangID, jadi difilter lewat Set ID transaksi cabang itu)
-    var idTrxCabang = {};
-    trxCabang.forEach(function (t) { idTrxCabang[t.ID] = true; });
+    // v4-45: terlaris hanya dari transaksi Lunas, net retur — konsisten
+    // dengan pie chart laporan (dulu semua transaksi incl. Belum Lunas
+    // dan mengabaikan retur, jadi dua tampilan "terlaris" bisa berbeda).
+    var idTrxLunas = {};
+    trxCabang.forEach(function (t) { if (t.StatusBayar === 'Lunas') idTrxLunas[t.ID] = true; });
     var jual = {};
-    (d.detail || []).forEach(function (x) { if (!idTrxCabang[x.TransaksiID]) return; jual[x.NamaProduk] = (jual[x.NamaProduk] || 0) + Number(x.Qty || 0); });
+    (d.detail || []).forEach(function (x) { if (!idTrxLunas[x.TransaksiID]) return; jual[x.NamaProduk] = (jual[x.NamaProduk] || 0) + Number(x.Qty || 0); });
+    (d.retur || []).forEach(function (r) { if (!idTrxLunas[r.TransaksiID]) return; jual[r.Produk] = Math.max(0, (jual[r.Produk] || 0) - Number(r.Qty || 0)); });
     var terlaris = Object.keys(jual).map(function (k) { return { nama: k, qty: jual[k] }; })
       .sort(function (a, b) { return b.qty - a.qty; }).slice(0, 5);
     var pelangganTop = (d.pelanggan || []).filter(function (p) { return Number(p.TotalBeli || 0) > 0 && milikCabang(d, p, cabangEfektif); })
@@ -516,6 +534,8 @@
     DATA = d;
     DATA.ringkasan = computeRingkasan(DATA);
     offlineMode = false;
+    // v4-45: probe proaktif keberadaan kolom cabang_id (lihat atas).
+    try { await probeKolomCabang(); } catch (e) {}
     // v4-32: snapshot HANYA ditimpa bila tidak ada antrean yang belum
     // diunggah — bila ada, snapshot lama (yang berisi perubahan offline)
     // dipertahankan supaya sinkronisasi yang gagal masih bisa
@@ -587,7 +607,9 @@
     // v4-32: simpan salinan pengguna terakhir di perangkat — dipakai
     // getSessionUser saat offline (tanpa ini, sesi Auth yang tersimpan
     // tidak bisa dipulihkan offline karena cariPenggunaAuth butuh network).
-    lsSet('zpos_sesi_pengguna', JSON.stringify({ auth_id: uid, nama: u.Nama, peran: u.Peran, ID: u.ID, CabangID: u.CabangID || '', IzinJSON: u.IzinJSON || '{}', AksesTransaksi: u.AksesTransaksi || 'Tidak dibatasi', email: em }));
+    // v4-45: catat waktu simpan — dipakai getSessionUser untuk menilai
+    // apakah salinan sesi masih segar saat login offline.
+    lsSet('zpos_sesi_pengguna', JSON.stringify({ auth_id: uid, nama: u.Nama, peran: u.Peran, ID: u.ID, CabangID: u.CabangID || '', IzinJSON: u.IzinJSON || '{}', AksesTransaksi: u.AksesTransaksi || 'Tidak dibatasi', email: em, disimpan: Date.now() }));
     if (tulisLog) { try { addLog(DATA, u.Nama, 'Login', u.Nama + ' masuk'); } catch (e) {} }
     return { ok: true, nama: u.Nama, peran: u.Peran, ID: u.ID, CabangID: u.CabangID || '', IzinJSON: u.IzinJSON || '{}', AksesTransaksi: u.AksesTransaksi || 'Tidak dibatasi', email: em };
   }
@@ -620,29 +642,47 @@
   }
   // Pulihkan sesi Auth yang tersimpan (mis. setelah muat ulang halaman).
   // Dipakai boot sebelum loadAll — TIDAK menulis log login (bukan login baru).
+  // v4-45: login offline tetap bisa dipakai selama salinan sesi tersimpan
+  // masih segar (<=7 hari sejak login) — dulu getSession() yang gagal
+  // (token JWT kedaluwarsa +-1 jam + offline) langsung mengembalikan null
+  // dan fallback localStorage tidak pernah tercapai. Bila salinan pun
+  // kedaluwarsa (atau dari sebelum v4-45, tanpa stempel waktu), kembalikan
+  // {ok:false, perluOnline:true} supaya UI memberi pesan jelas, bukan
+  // layar login diam.
+  var MASA_SESI_TERSIMPAN_MS = 7 * 24 * 60 * 60 * 1000;
+  function sesiTersimpanSegar() {
+    try {
+      var c = JSON.parse(lsGet('zpos_sesi_pengguna') || 'null');
+      if (!c || !c.nama) return null;
+      if (!c.disimpan || Date.now() - Number(c.disimpan) > MASA_SESI_TERSIMPAN_MS) return { kedaluwarsa: true, sesi: c };
+      return { kedaluwarsa: false, sesi: c };
+    } catch (e) { return null; }
+  }
   async function getSessionUser() {
     if (MODE === 'contoh') return null;
     if (!client || !client.auth || !client.auth.getSession) return null;
-    var res;
-    try { res = await client.auth.getSession(); } catch (e) { return null; }
+    var res = null;
+    try { res = await client.auth.getSession(); } catch (e) { res = null; }
     var sessUser = res && res.data && res.data.session && res.data.session.user;
-    if (!sessUser) return null;
-    try {
-      var sesi = await cariPenggunaAuth(sessUser, false);
-      return sesi.ok ? sesi : null;
-    } catch (e) {
-      // v4-32: offline — cariPenggunaAuth butuh network. Pakai salinan
-      // pengguna terakhir yang tersimpan di perangkat (ditulis saat login
-      // online), bila auth_id-nya cocok dengan sesi Auth yang tersimpan.
-      if (!galatJaringan(e)) return null;
+    if (sessUser) {
       try {
-        var c = JSON.parse(lsGet('zpos_sesi_pengguna') || 'null');
-        if (c && String(c.auth_id || '') === String(sessUser.id) && c.nama) {
-          return { ok: true, nama: c.nama, peran: c.peran, ID: c.ID, CabangID: c.CabangID || '', IzinJSON: c.IzinJSON || '{}', AksesTransaksi: c.AksesTransaksi || 'Tidak dibatasi', email: c.email || '' };
-        }
-      } catch (e2) {}
-      return null;
+        var sesi = await cariPenggunaAuth(sessUser, false);
+        return sesi.ok ? sesi : null;
+      } catch (e) {
+        // v4-32: offline — cariPenggunaAuth butuh network. Jatuh ke
+        // fallback sesi tersimpan di bawah (bila auth_id cocok).
+        if (!galatJaringan(e)) return null;
+      }
     }
+    var tersimpan = sesiTersimpanSegar();
+    if (tersimpan && !tersimpan.kedaluwarsa) {
+      var c = tersimpan.sesi;
+      if (!sessUser || String(c.auth_id || '') === String(sessUser.id)) {
+        return { ok: true, nama: c.nama, peran: c.peran, ID: c.ID, CabangID: c.CabangID || '', IzinJSON: c.IzinJSON || '{}', AksesTransaksi: c.AksesTransaksi || 'Tidak dibatasi', email: c.email || '' };
+      }
+    }
+    if (tersimpan && tersimpan.kedaluwarsa) return { ok: false, perluOnline: true };
+    return null;
   }
   async function logout() {
     lsHapus('zpos_sesi_pengguna');
@@ -960,7 +1000,19 @@
       VarianJSON: payload.VarianJSON || '', TampilkanDiKatalog: boolFlag(payload.TampilkanDiKatalog, true),
       CabangID: payload.CabangID || cabangAktifId(DATA)
     };
-    return upsertInto('produk', 'produk', row, 'PRD');
+    var hasilProduk = await upsertInto('produk', 'produk', row, 'PRD');
+    // v4-45: edit Stok harus mengubah stok yang dipakai kasir — bila baris
+    // stok_cabang produk ini sudah ada di cabang produk, tulis juga ke sana
+    // (dulu hanya produk.Stok yang berubah, kasir tetap membaca nilai lama).
+    if (exProd && payload.Stok != null && payload.Stok !== '') {
+      var cbStok = row.CabangID || cabangAktifId(DATA);
+      var adaSc = (DATA.stokCabang || []).some(function (x) { return String(x.ProdukID) === String(hasilProduk.ID) && String(x.CabangID) === String(cbStok); });
+      if (adaSc) {
+        var scBaru = setStok(DATA, hasilProduk, Number(payload.Stok), cbStok);
+        await persist('stok_cabang', scBaru);
+      }
+    }
+    return hasilProduk;
   }
   async function hapusProduk(id) { if (!DATA) await loadAll(); await hapusDari('produk', 'produk', id); return { ok: true }; }
   async function hapusPelanggan(id) { if (!DATA) await loadAll(); await hapusDari('pelanggan', 'pelanggan', id); return { ok: true }; }
@@ -1051,6 +1103,9 @@
     // v4-32: id dari payload dipakai lagi saat replay (lihat saveTransaksi).
     var id = payload.id || payload.ID || uid('PBL');
     var total = Number(payload.total || 0);
+    // v4-45: tolak Bayar > Total — dulu tersimpan dengan Sisa negatif dan
+    // kas Keluar melebihi total pembelian.
+    if (Number(payload.bayar || 0) > total) throw new Error('Bayar (Rp' + Number(payload.bayar || 0).toLocaleString('id-ID') + ') melebihi total pembelian (Rp' + total.toLocaleString('id-ID') + ').');
     var row = { ID: id, Tanggal: nowISO(), Pemasok: payload.pemasok || '', Total: total, Bayar: Number(payload.bayar || 0), Sisa: total - Number(payload.bayar || 0), Status: 'Draft', Catatan: payload.catatan || '', CabangID: payload.cabangId || cabangAktifId(DATA), Diskon: Number(payload.diskon || 0), Pajak: Number(payload.pajak || 0), BiayaLain: Number(payload.biayaLain || 0), Diproses: false };
     DATA.pembelian.unshift(row); await persist('pembelian', row);
     var dets = (payload.items || []).map(function (it) {
@@ -1063,6 +1118,9 @@
     addLog(DATA, '', 'Pembelian Draft', id + ' — ' + row.Pemasok + ' — ' + total);
     refreshRingkasan(); return { ok: true, id: id };
   }
+  // v4-45: peta item pembelian yang sudah terproses per pembelian
+  // (lihat prosesPembelian — sengaja di luar baris supaya tidak ter-persist).
+  var _prosesBeliSelesai = {};
   async function prosesPembelian(payload) {
     if (!DATA) await loadAll();
     var id = payload.id || payload.ID;
@@ -1072,21 +1130,50 @@
     var cabangId = p.CabangID || cabangAktifId(DATA);
     var items = DATA.pembelianDetail.filter(function (x) { return x.PembelianID === id; });
     if (!items.length) throw new Error('Pembelian ini tidak punya item — stok tidak bisa ditambah. Periksa detail pembelian.');
-    await Promise.all(items.map(async function (it) {
-      var prod = DATA.produk.find(function (x) { return x.ID === it.ProdukID; });
-      if (!prod) return;
-      // v4-40: stok bertambah di CABANG pembelian (stok_cabang), bukan di
-      // prod.Stok; updateProdukStokHarga kini hanya menulis harga.
-      var scBeli = setStok(DATA, prod, stokOfCabang(DATA, prod, cabangId) + Number(it.Qty || 0), cabangId);
-      if (Number(it.HargaBeli || 0) > 0) prod.HargaModal = Number(it.HargaBeli);
-      if (Number(it.HargaJual || 0) > 0) prod.HargaJual = Number(it.HargaJual);
-      await updateProdukStokHarga(prod);
-      await persist('stok_cabang', scBeli);
-      if (it.Kedaluwarsa) {
-        var batch = { ID: uid('BTH'), ProdukID: it.ProdukID, CabangID: cabangId, Qty: Number(it.Qty || 0), Kedaluwarsa: it.Kedaluwarsa, PembelianID: id, TanggalMasuk: todayStr() };
-        DATA.stokBatch.push(batch); await persist('stok_batch', batch);
+    // v4-45: proses item BERURUTAN (bukan Promise.all) + tiap item yang
+    // berhasil ditandai di _prosesBeliSelesai — retry melewati item yang
+    // sudah terproses sehingga stok tidak ganda. Bila gagal di tengah,
+    // galat menyebut item mana yang sudah terproses dan mana yang belum.
+    var selesai = _prosesBeliSelesai[id] || (_prosesBeliSelesai[id] = {});
+    for (var ii = 0; ii < items.length; ii++) {
+      var it = items[ii];
+      if (selesai[it.ProdukID]) continue;
+      // v4-45: simpan keadaan sebelum item ini diproses — bila gagal di
+      // tengah, mutasi in-memory dikembalikan supaya retry tidak
+      // menggandakan stok (setStok mengubah DATA SEBELUM persist).
+      var prodAwal = null, stokAwal = 0, modalAwal = 0, jualAwal = 0, stokTersimpan = false;
+      try {
+        var prod = DATA.produk.find(function (x) { return x.ID === it.ProdukID; });
+        if (!prod) { selesai[it.ProdukID] = true; continue; }
+        prodAwal = prod;
+        stokAwal = stokOfCabang(DATA, prod, cabangId);
+        modalAwal = prod.HargaModal; jualAwal = prod.HargaJual;
+        // v4-40: stok bertambah di CABANG pembelian (stok_cabang), bukan di
+        // prod.Stok; updateProdukStokHarga kini hanya menulis harga.
+        var scBeli = setStok(DATA, prod, stokAwal + Number(it.Qty || 0), cabangId);
+        if (Number(it.HargaBeli || 0) > 0) prod.HargaModal = Number(it.HargaBeli);
+        if (Number(it.HargaJual || 0) > 0) prod.HargaJual = Number(it.HargaJual);
+        await updateProdukStokHarga(prod);
+        await persist('stok_cabang', scBeli);
+        stokTersimpan = true;
+        if (it.Kedaluwarsa) {
+          var batch = { ID: uid('BTH'), ProdukID: it.ProdukID, CabangID: cabangId, Qty: Number(it.Qty || 0), Kedaluwarsa: it.Kedaluwarsa, PembelianID: id, TanggalMasuk: todayStr() };
+          DATA.stokBatch.push(batch); await persist('stok_batch', batch);
+        }
+        selesai[it.ProdukID] = true;
+      } catch (e) {
+        // Rollback hanya bila stok BELUM tersimpan di server — bila stok
+        // sudah tersimpan tapi batch gagal, stok in-memory dibiarkan
+        // (sudah sama dengan server) supaya retry tidak mengurangi.
+        if (prodAwal && !stokTersimpan) {
+          setStok(DATA, prodAwal, stokAwal, cabangId);
+          prodAwal.HargaModal = modalAwal; prodAwal.HargaJual = jualAwal;
+        }
+        var sudahN = Object.keys(selesai).length;
+        throw new Error('Pembelian gagal di item "' + (it.NamaProduk || it.ProdukID) + '": ' + (e.message || e) + ' (' + sudahN + ' dari ' + items.length + ' item sudah terproses — tekan PROSES lagi untuk melanjutkan sisanya.)');
       }
-    }));
+    }
+    delete _prosesBeliSelesai[id];
     p.Diproses = true; p.Status = 'Diproses';
     await persist('pembelian', p);
     // pengeluaran + kas keluar sebesar Bayar
@@ -1162,7 +1249,10 @@
     var kasKeluar = Math.max(0, Math.min(nominal, Number(trx.Bayar || 0) - returKasLama));
     trx.Total = Math.max(0, Number(trx.Total || 0) - nominal);
     trx.Sisa = Math.max(0, sisaLama - nominal);
-    if (trx.Sisa === 0 && Number(trx.Bayar || 0) > 0) trx.StatusBayar = 'Lunas';
+    // v4-45: retur penuh pada transaksi yang belum dibayar (Bayar 0,
+    // Total jadi 0) juga berarti Lunas — dulu status tertinggal
+    // 'Belum Dibayar' Rp0 padahal tidak ada yang perlu dibayar.
+    if (trx.Sisa === 0 && (Number(trx.Bayar || 0) > 0 || Number(trx.Total || 0) === 0)) trx.StatusBayar = 'Lunas';
     // v4-33: laba berkurang sebesar laba item yang diretur (simetris dengan
     // tambahItemTrx yang menambah Laba). Laba per unit diambil dari baris
     // detail; bila detail tidak ditemukan, pakai nominal − modal×qty.
@@ -1622,27 +1712,46 @@
     // pembelian — keduanya sudah 0 di cabang ini). Yang dihapus hanya
     // baris dengan CabangID persis cabang ini; baris legacy tanpa
     // CabangID bukan milik cabang ini (milik cabang pertama).
+    // v4-45: hapus berurutan dengan guard — bila satu langkah gagal,
+    // JANGAN lanjutkan; pulihkan DATA dari server (hapusDari sudah memotong
+    // DATA in-memory sebelum removeRow) lalu lempar galat jelas.
+    // v4-45: transaksi tertunda + riwayat poin cabang ini ikut terhapus
+    // (tertunda difilter CabangID; riwayat poin mengikuti pelanggan cabang
+    // ini karena barisnya hanya membawa PelangganID).
     var produkHapus = (DATA.produk || []).filter(function (p) { return String(p.CabangID || '') === String(id); });
-    for (var i = 0; i < produkHapus.length; i++) {
-      await hapusDari('produk', 'produk', produkHapus[i].ID);
-      // Baris stok_cabang produk ini ikut terhapus di DB (CASCADE);
-      // bersihkan juga dari DATA in-memory + hapus eksplisit di DB
-      // supaya tidak ada sisa bila CASCADE belum terpasang.
-      DATA.stokCabang = (DATA.stokCabang || []).filter(function (s) { return String(s.ProdukID) !== String(produkHapus[i].ID); });
-      await hapusBarisWhere('stok_cabang', 'produk_id', produkHapus[i].ID);
-    }
     var pelangganHapus = (DATA.pelanggan || []).filter(function (x) { return String(x.CabangID || '') === String(id); });
-    for (var j = 0; j < pelangganHapus.length; j++) await hapusDari('pelanggan', 'pelanggan', pelangganHapus[j].ID);
     var pemasokHapus = (DATA.pemasok || []).filter(function (x) { return String(x.CabangID || '') === String(id); });
-    for (var k = 0; k < pemasokHapus.length; k++) await hapusDari('pemasok', 'pemasok', pemasokHapus[k].ID);
-    // v4-42: kas net 0 — hapus juga baris kas cabang ini (eksplisit
-    // dari DB + DATA in-memory, seperti produk; baris legacy tanpa
-    // CabangID bukan milik cabang ini dan tetap ada).
+    var tertundaHapus = (DATA.transaksiTertunda || []).filter(function (x) { return String(x.CabangID || '') === String(id); });
+    var idPelangganHapus = {};
+    pelangganHapus.forEach(function (x) { idPelangganHapus[String(x.ID)] = true; });
+    var poinHapus = (DATA.riwayatPoin || []).filter(function (r) { return !!idPelangganHapus[String(r.PelangganID)]; });
     var kasHapus = kasCabang.length;
-    DATA.kas = (DATA.kas || []).filter(function (x) { return String(x.CabangID || '') !== String(id); });
-    await hapusBarisWhere('kas', 'cabang_id', id);
-    await hapusDari('cabang', 'cabang', id);
-    return { ok: true, dihapus: { produk: produkHapus.length, pelanggan: pelangganHapus.length, pemasok: pemasokHapus.length, kas: kasHapus } };
+    try {
+      for (var i = 0; i < produkHapus.length; i++) {
+        await hapusDari('produk', 'produk', produkHapus[i].ID);
+        // Baris stok_cabang produk ini ikut terhapus di DB (CASCADE);
+        // bersihkan juga dari DATA in-memory + hapus eksplisit di DB
+        // supaya tidak ada sisa bila CASCADE belum terpasang.
+        DATA.stokCabang = (DATA.stokCabang || []).filter(function (s) { return String(s.ProdukID) !== String(produkHapus[i].ID); });
+        await hapusBarisWhere('stok_cabang', 'produk_id', produkHapus[i].ID);
+      }
+      for (var j = 0; j < pelangganHapus.length; j++) await hapusDari('pelanggan', 'pelanggan', pelangganHapus[j].ID);
+      for (var k = 0; k < pemasokHapus.length; k++) await hapusDari('pemasok', 'pemasok', pemasokHapus[k].ID);
+      // v4-42: kas net 0 — hapus juga baris kas cabang ini (eksplisit
+      // dari DB + DATA in-memory, seperti produk; baris legacy tanpa
+      // CabangID bukan milik cabang ini dan tetap ada).
+      DATA.kas = (DATA.kas || []).filter(function (x) { return String(x.CabangID || '') !== String(id); });
+      await hapusBarisWhere('kas', 'cabang_id', id);
+      DATA.transaksiTertunda = (DATA.transaksiTertunda || []).filter(function (x) { return String(x.CabangID || '') !== String(id); });
+      DATA.riwayatPoin = (DATA.riwayatPoin || []).filter(function (r) { return !idPelangganHapus[String(r.PelangganID)]; });
+      await hapusBarisWhere('transaksi_tertunda', 'cabang_id', id);
+      for (var m = 0; m < pelangganHapus.length; m++) await hapusBarisWhere('riwayat_poin', 'pelanggan_id', pelangganHapus[m].ID);
+      await hapusDari('cabang', 'cabang', id);
+    } catch (e) {
+      try { await loadAll(); } catch (e2) {}
+      throw new Error('Hapus cabang tidak selesai: ' + (e.message || e) + ' — tidak ada yang terhapus, silakan coba lagi.');
+    }
+    return { ok: true, dihapus: { produk: produkHapus.length, pelanggan: pelangganHapus.length, pemasok: pemasokHapus.length, kas: kasHapus, tertunda: tertundaHapus.length, riwayatPoin: poinHapus.length } };
   }
   async function setCabangAktif(payload) {
     if (!DATA) await loadAll();
@@ -1693,7 +1802,9 @@
   async function hapusGrup(payload) { if (!DATA) await loadAll(); hapusDari('grup', 'grup_produk', payload.id); return { ok: true }; }
   async function upsertSatuan(payload) {
     if (!DATA) await loadAll();
-    return upsertInto('satuan', 'satuan', { ID: payload.id || payload.ID || '', Nama: payload.nama, Singkatan: payload.singkatan || '', Desimal: payload.desimal || 'TIDAK' }, 'STN');
+    // v4-45: Desimal WAJIB boolean — dulu string 'YA'/'TIDAK' dikirim ke
+    // kolom boolean dan PostgREST menolaknya (simpan satuan gagal diam-diam).
+    return upsertInto('satuan', 'satuan', { ID: payload.id || payload.ID || '', Nama: payload.nama, Singkatan: payload.singkatan || '', Desimal: boolFlag(payload.desimal, false) }, 'STN');
   }
   async function hapusSatuan(payload) { if (!DATA) await loadAll(); hapusDari('satuan', 'satuan', payload.id); return { ok: true }; }
   async function upsertJenisBayar(payload) {
@@ -1826,7 +1937,8 @@
       ringkasan = { Penjualan: lunas.reduce(function (a, t) { return a + Number(t.Total || 0); }, 0), Transaksi: lunas.length, Item: (DATA.detail || []).filter(function (d) { return lunas.some(function (t) { return t.ID === d.TransaksiID; }); }).reduce(function (a, d) { return a + Number(d.Qty || 0); }, 0), Ongkir: lunas.reduce(function (a, t) { return a + Number(t.Ongkir || 0); }, 0), Diskon: lunas.reduce(function (a, t) { return a + Number(t.Diskon || 0); }, 0), Laba: lunas.reduce(function (a, t) { return a + Number(t.Laba || 0); }, 0) };
       baris = lunas.map(function (t) { return { ID: t.ID, Tanggal: t.Tanggal, Pelanggan: t.Pelanggan, Total: t.Total, Bayar: t.Bayar, Sisa: t.Sisa, Status: t.StatusBayar }; });
     } else if (jenis === 'pengeluaran') {
-      var pg = (DATA.pengeluaran || []).filter(function (x) { var tg = String(x.Tanggal || '').slice(0, 10); return (!dari || tg >= dari) && (!sampai || tg <= sampai); });
+      // v4-45: pengeluaran ikut filter cabang (dulu hanya tanggal).
+      var pg = (DATA.pengeluaran || []).filter(function (x) { var tg = String(x.Tanggal || '').slice(0, 10); return (!dari || tg >= dari) && (!sampai || tg <= sampai) && (!cabangId || String(x.CabangID || '') === String(cabangId)); });
       ringkasan = { Total: pg.reduce(function (a, x) { return a + Number(x.Nominal || 0); }, 0), Jumlah: pg.length };
       baris = pg.map(function (x) { return { Tanggal: x.Tanggal, Kategori: x.Kategori, Keterangan: x.Keterangan, Nominal: x.Nominal, EfekLaba: x.EfekLaba }; });
     } else if (jenis === 'piutang') {
@@ -1846,7 +1958,8 @@
     } else if (jenis === 'labarugi') {
       var omzet = lunas.reduce(function (a, t) { return a + Number(t.Total || 0); }, 0);
       var labaKotor = lunas.reduce(function (a, t) { return a + Number(t.Laba || 0); }, 0);
-      var keluar = (DATA.pengeluaran || []).filter(function (x) { var tg = String(x.Tanggal || '').slice(0, 10); return (!dari || tg >= dari) && (!sampai || tg <= sampai) && x.EfekLaba === 'MengurangiLaba'; }).reduce(function (a, x) { return a + Number(x.Nominal || 0); }, 0);
+      // v4-45: bagian pengeluaran labarugi ikut filter cabang.
+      var keluar = (DATA.pengeluaran || []).filter(function (x) { var tg = String(x.Tanggal || '').slice(0, 10); return (!dari || tg >= dari) && (!sampai || tg <= sampai) && (!cabangId || String(x.CabangID || '') === String(cabangId)) && x.EfekLaba === 'MengurangiLaba'; }).reduce(function (a, x) { return a + Number(x.Nominal || 0); }, 0);
       ringkasan = { Omzet: omzet, LabaKotor: labaKotor, Pengeluaran: keluar, LabaBersih: labaKotor - keluar };
       baris = [{ Keterangan: 'Omzet (Lunas)', Nilai: omzet }, { Keterangan: 'Laba kotor', Nilai: labaKotor }, { Keterangan: 'Pengeluaran mengurangi laba', Nilai: keluar }, { Keterangan: 'Laba bersih', Nilai: labaKotor - keluar }];
     } else if (jenis === 'pajak') {
@@ -2331,7 +2444,17 @@
           return { ok: false, diunggah: diunggah, gagal: 1, galat: 'Jenis antrean tidak dikenal: ' + e.jenis, entriGagal: e };
         }
         try {
-          await fn.apply(null, e.args || []);
+          var hasilReplay = await fn.apply(null, e.args || []);
+          // v4-45: metode yang menolak TANPA throw ({ok:false}, mis.
+          // hapusCabang bila cabang keburu punya riwayat) JANGAN dihitung
+          // sukses — entri dipertahankan sebagai gagal supaya tidak hilang
+          // diam-diam dan toast menjelaskan penolakannya.
+          if (hasilReplay && hasilReplay.ok === false) {
+            var pesanTolak = hasilReplay.alasan || hasilReplay.error || 'Ditolak server saat sinkronisasi.';
+            await tandaiGagalOutbox(e.id, pesanTolak);
+            await pulihkanDataOffline(dataOffline, offlineDulu);
+            return { ok: false, diunggah: diunggah, gagal: 1, galat: pesanTolak, entriGagal: e };
+          }
           await hapusOutbox(e.id);
           diunggah++;
         } catch (err) {
