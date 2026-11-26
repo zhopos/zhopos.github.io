@@ -1,5 +1,5 @@
 /* ============================================================
-   ZPOS v4-42 — Lapisan Data
+   ZPOS v4-43 — Lapisan Data
    - Bila SUPABASE_URL / SUPABASE_ANON_KEY di config.js terisi,
      semua baca/tulis memakai Supabase (tabel snake_case).
    - Bila kosong, dipakai DATA CONTOH di bawah (in-memory) sehingga

@@ -1039,7 +1039,7 @@ function renderAll() {
   vsEl.textContent = (pct >= 0 ? '+' : '') + pct + '% vs kemarin';
   vsEl.classList.toggle('down', pct < 0);
   document.getElementById('heroUser').textContent = currentUser ? ('Halo, ' + currentUser.nama + ' — selamat berjualan hari ini.') : 'Selamat berjualan hari ini.';
-  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • v4-42') : 'Kasir • v4-42';
+  var dr = document.getElementById('drawerStoreRole'); if (dr) dr.textContent = currentUser ? (currentUser.nama + ' • v4-43') : 'Kasir • v4-43';
   var bb = document.getElementById('bellBadge');
   if (bb) { var sm = Number(r.stokMenipis || 0); bb.style.display = sm > 0 ? 'flex' : 'none'; bb.textContent = sm > 99 ? '99+' : String(sm); }
   isiNotifPanel();
@@ -1328,7 +1328,9 @@ function scanBarcode() {
   // cocok persis dengan SKU/barcode dulu; kalau tidak cocok dan teksnya juga
   // bukan bagian dari nama produk mana pun, beri tahu (kemungkinan scan gagal).
   var inp = document.getElementById('cariProduk');
-  var code = (inp.value || '').trim();
+  // v4-43: bersihkan awalan AIM (mis. ]C1) bila kode ditempel dari hasil scan.
+  var code = bersihkanKodeScan(inp.value);
+  if (inp) inp.value = code;
   if (!code) return;
   var p = (DATA.produk || []).find(function (x) { return String(x.SKU || x['SKU/Barcode'] || '').trim() === code; });
   if (p) {
@@ -1343,8 +1345,18 @@ function scanBarcode() {
 // Pustaka html5-qrcode dimuat via CDN di index.html (global Html5Qrcode).
 // Scan online-only (pustaka + izin kamera butuh internet); cari ketik
 // tetap jalan offline. Kamera belakang (facingMode environment).
-var scanAktif = null; // { target: 'produk'|'kasir', qr: Html5Qrcode }
+// v4-43: target 'form' mengisi kolom SKU di form Tambah/Edit Produk;
+// hasil scan dibersihkan dari awalan AIM (lihat bersihkanKodeScan).
+var scanAktif = null; // { target: 'produk'|'kasir'|'form', qr: Html5Qrcode }
 var scanTarget = 'produk';
+
+// v4-43: buang awalan AIM identifier yang ditambahkan pustaka scan di
+// depan kode barcode (mis. ]C1 = Code 128, ]E0 = EAN-13, ]Q3 = QR) —
+// awalan itu bukan bagian dari barcode, jadi pencocokan SKU harus
+// tanpa awalan. Kode polos tanpa awalan dikembalikan apa adanya.
+function bersihkanKodeScan(kode) {
+  return String(kode || '').trim().replace(/^\][A-Za-z][0-9]/, '').trim();
+}
 
 function scanButuhOnline() {
   try {
@@ -1361,7 +1373,7 @@ async function bukaScanKamera(target) {
   var box = document.getElementById('scanReader');
   if (!modal || !box) return tampilError('Layar scan tidak tersedia.');
   await hentikanScan();
-  scanTarget = target === 'kasir' ? 'kasir' : 'produk';
+  scanTarget = (target === 'kasir' || target === 'form') ? target : 'produk';
   modal.style.display = 'block';
   var qr = new Html5Qrcode('scanReader');
   scanAktif = { target: scanTarget, qr: qr };
@@ -1403,12 +1415,26 @@ function cariProdukDariKode(kode) {
 
 async function terapkanHasilScan(target, kode) {
   await hentikanScan();
-  var k = String(kode || '').trim();
+  // v4-43: bersihkan awalan AIM dulu — ini satu-satunya pintu masuk
+  // hasil kamera, jadi kasir + master + form ikut beres.
+  var k = bersihkanKodeScan(kode);
   if (!k) return;
   if (target === 'kasir') {
     var inp = document.getElementById('cariProduk');
     if (inp) inp.value = k;
     scanBarcode();
+    return;
+  }
+  // v4-43: target 'form' — isi kolom SKU di form Tambah/Edit Produk.
+  // Bila kode sudah dipakai produk LAIN, beri peringatan tapi tetap isi
+  // kolomnya (Bos yang putuskan).
+  if (target === 'form') {
+    var inpF = document.getElementById('pSKU');
+    if (inpF) inpF.value = k;
+    var idEdit = document.getElementById('pId') ? document.getElementById('pId').value : '';
+    var duplikat = (DATA.produk || []).find(function (x) { return String(x.SKU || x['SKU/Barcode'] || '').trim() === k && String(x.ID) !== String(idEdit); });
+    if (duplikat) return tampilError('Barcode sudah dipakai produk: ' + duplikat.Nama);
+    tampilInfo('Barcode terisi: ' + k);
     return;
   }
   cariProdukTeks = k;
