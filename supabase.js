@@ -1,5 +1,5 @@
 /* ============================================================
-   ZPOS v4-45 — Lapisan Data
+   ZPOS v4-46 — Lapisan Data
    - Bila SUPABASE_URL / SUPABASE_ANON_KEY di config.js terisi,
      semua baca/tulis memakai Supabase (tabel snake_case).
    - Bila kosong, dipakai DATA CONTOH di bawah (in-memory) sehingga
@@ -492,21 +492,62 @@
   // Tarik semua data dari server (tanpa menyentuh DATA / snapshot) —
   // dipakai loadAll online dan sinkronkanOutbox (replay butuh data server
   // segar supaya nilai yang dihitung tidak ganda dengan perubahan offline).
+  // v4-46: paginasi — PostgREST mengembalikan maksimal 1.000 baris per
+  // request, jadi select('*') polos diam-diam memotong tabel >1.000 baris
+  // (terbukti di Toko Rafi: 2.000 transaksi hanya tampil 1.000 pertama).
+  // Tiap tabel dimuat per halaman 1.000 baris, diurutkan PK supaya halaman
+  // stabil (tanpa ORDER BY, .range() bisa melompati/menggandakan baris).
+  // Satu halaman gagal -> THROW: data sebagian yang tampil seolah lengkap
+  // lebih buruk daripada layar galat.
+  var UKURAN_HALAMAN = 1000;
+  var PK_ORDER = {
+    tier_member: ['tier'], transaksi_detail: ['transaksi_id', 'produk_id'],
+    pembelian_detail: ['pembelian_id', 'produk_id'], resep: ['produk_id', 'bahan_id'],
+    stok_cabang: ['cabang_id', 'produk_id'],
+    pengaturan: ['kunci'], terjemahan: ['istilah']
+  };
+  async function muatTabelPenuh(namaTabel) {
+    var kolom = PK_ORDER[namaTabel] || ['id'];
+    var semua = [], dari = 0;
+    for (;;) {
+      var q = client.from(namaTabel).select('*');
+      // Client supabase-js asli selalu punya .order/.range. Client tiruan
+      // sim lama tidak — untuk sim lama, satu halaman polos sudah cukup
+      // (datanya <1.000 baris) dan perilakunya tidak berubah.
+      var bisaPaginasi = q && typeof q.order === 'function' && typeof q.range === 'function';
+      var res;
+      if (bisaPaginasi) {
+        kolom.forEach(function (k) { q = q.order(k, { ascending: true }); });
+        res = await q.range(dari, dari + UKURAN_HALAMAN - 1);
+      } else {
+        res = await q;
+      }
+      if (res.error) throw new Error('Gagal memuat ' + namaTabel + ' — ' + res.error.message);
+      var rows = res.data || [];
+      semua = semua.concat(rows);
+      if (!bisaPaginasi || rows.length < UKURAN_HALAMAN) break;
+      dari += UKURAN_HALAMAN;
+    }
+    return semua;
+  }
   async function muatDariServer() {
     var d = emptyData();
     // Muat semua tabel paralel (sebelumnya berurutan: 35x round-trip, puluhan detik).
-    var results = await Promise.all(TABLES.map(function (t) { return client.from(t).select('*'); }));
+    // Tiap tabel memaginasi sendiri secara berurutan di muatTabelPenuh.
+    var results = await Promise.all(TABLES.map(function (t) { return muatTabelPenuh(t); }));
     for (var i = 0; i < TABLES.length; i++) {
-      var t = TABLES[i], res = results[i];
-      if (res.error) throw new Error('Gagal memuat ' + t + ' — ' + res.error.message);
-      d[TABLE_KEY[t]] = (res.data || []).map(toPascal);
+      d[TABLE_KEY[TABLES[i]]] = results[i].map(toPascal);
     }
     // pengaturan: tabel kunci/nilai -> object
-    var rp = await client.from('pengaturan').select('*');
-    if (!rp.error) (rp.data || []).forEach(function (r) { d.pengaturan[snakeToPascal(r.kunci)] = r.nilai; });
+    try {
+      var rpRows = await muatTabelPenuh('pengaturan');
+      rpRows.forEach(function (r) { d.pengaturan[snakeToPascal(r.kunci)] = r.nilai; });
+    } catch (e) {}
     // terjemahan: tabel istilah/terjemahan -> object
-    var rt = await client.from('terjemahan').select('*');
-    if (!rt.error) (rt.data || []).forEach(function (r) { d.terjemahan[r.istilah] = r.terjemahan; });
+    try {
+      var rtRows = await muatTabelPenuh('terjemahan');
+      rtRows.forEach(function (r) { d.terjemahan[r.istilah] = r.terjemahan; });
+    } catch (e) {}
     return d;
   }
   async function loadAll() {
